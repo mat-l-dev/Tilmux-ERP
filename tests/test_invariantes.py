@@ -20,6 +20,13 @@ from compras.servicios import CompraError, pagar, registrar_gasto, revaluar
 from compras.servicios import confirmar as confirmar_compra
 from contabilidad.calculos import calcular_linea
 from contabilidad.cierre import cerrar, estado, revertir
+from contabilidad.impuestos import (
+    asentar_renta,
+    monto_renta_asentada,
+    pagar_renta,
+    saldo_cuenta,
+    saldo_renta,
+)
 from contabilidad.models import Asiento, AsientoLinea, Cuenta
 from contabilidad.moneda import a_soles
 from contabilidad.servicios import ContabilidadError
@@ -740,3 +747,43 @@ class InvarianteEstados(BaseContable):
         self.assertTrue(
             any(c["codigo"] == "40111" for c in datos["activo_corriente"])
         )
+
+    def test_el_igv_a_favor_se_arrastra_al_mes_siguiente(self):
+        self.comprar("10", "100", fecha=date(2026, 10, 1))
+        self.vender("1", "590", fecha=date(2026, 10, 5))
+        self.vender("1", "1180", fecha=date(2026, 11, 5))
+
+        self.assertEqual(
+            saldo_cuenta(self.empresa, "40111", date(2026, 10, 31)),
+            Decimal("-90.00"),
+        )
+        self.assertEqual(
+            saldo_cuenta(self.empresa, "40111", date(2026, 11, 30)),
+            Decimal("90.00"),
+        )
+
+class InvarianteRenta(BaseContable):
+    def test_asienta_la_renta_y_es_idempotente(self):
+        self.comprar("10", "100", fecha=date(2026, 10, 1))
+        self.vender("1", "1180", fecha=date(2026, 10, 5))
+
+        asiento = asentar_renta(self.empresa, 2026, 10)
+
+        self.assertIsNotNone(asiento)
+        self.assertEqual(monto_renta_asentada(asiento), Decimal("15.00"))
+        self.assertEqual(
+            saldo_renta(self.empresa, date(2026, 10, 31)), Decimal("15.00")
+        )
+        self.assertEqual(asentar_renta(self.empresa, 2026, 10).pk, asiento.pk)
+
+    def test_pagar_renta_baja_el_saldo(self):
+        self.comprar("10", "100", fecha=date(2026, 10, 1))
+        self.vender("1", "1180", fecha=date(2026, 10, 5))
+        asentar_renta(self.empresa, 2026, 10)
+
+        movimiento = pagar_renta(
+            self.empresa, date(2026, 11, 5), Decimal("15.00"), self.bbva
+        )
+
+        self.assertEqual(movimiento.importe, Decimal("15.00"))
+        self.assertEqual(saldo_renta(self.empresa, date(2026, 11, 5)), Decimal("0.00"))

@@ -13,6 +13,7 @@ from compras.models_gasto import Gasto
 from ventas.models import NotaCredito, NotaDebito, Venta
 
 CERO = Decimal("0")
+TASA_RENTA_RER = Decimal("0.015")
 
 
 def calcular(empresa, anio: int, mes: int) -> dict:
@@ -72,4 +73,5 @@ def calcular(empresa, anio: int, mes: int) -> dict:
         "compras_igv": igv_compras,
         "no_gravado": no_gravado,
         "resultado": igv_ventas - igv_compras,
+        "renta": (base_ventas * TASA_RENTA_RER).quantize(Decimal("0.01")),
     }

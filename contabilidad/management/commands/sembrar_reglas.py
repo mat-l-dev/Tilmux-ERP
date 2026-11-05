@@ -66,6 +66,10 @@ REGLAS = {
         "Renta RER del mes",
         [("881", D, TOTAL, "Impuesto corriente"), ("40171", H, TOTAL, "Por pagar")],
     ),
+    "PAGO_RENTA": (
+        "Pago de renta RER",
+        [("40171", D, TOTAL, "Renta por pagar"), (None, H, MEDIO, "Salida de dinero")],
+    ),
     "CAPITAL_SUSCRITO": (
         "Capital suscrito en la constitución",
         [("1421", D, TOTAL, "Por cobrar a socios"), ("5011", H, TOTAL, "Capital")],

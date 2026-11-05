@@ -19,4 +19,6 @@ urlpatterns = [
     path("inventario/", views.inventario, name="inventario"),
     path("kardex/<int:pk>/", views.kardex, name="kardex"),
     path("impuestos/", views.impuestos, name="impuestos"),
+    path("impuestos/renta/", views.asentar_renta_mes, name="asentar_renta"),
+    path("impuestos/renta/pagar/", views.pagar_renta_mes, name="pagar_renta"),
 ]

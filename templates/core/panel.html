@@ -32,9 +32,12 @@
     <span class="kpi-note">{{ igv_nota }}</span>
   </article>
   <article class="kpi">
-    <span class="kpi-label">Renta RER</span>
-    <span class="kpi-value num">S/ {{ renta_mes }}</span>
-    <span class="kpi-note">1,5 % de ingresos netos</span>
+    <span class="kpi-label">Renta RER por pagar</span>
+    <span class="kpi-value num">S/ {{ ir_por_pagar }}</span>
+    <span class="kpi-note">
+      Del mes: S/ {{ renta_mes }}{% if renta_pendiente %} ·
+      <a href="{% url 'reportes:impuestos' %}?periodo={{ periodo_valor }}">asentar</a>{% endif %}
+    </span>
   </article>
 </section>
 

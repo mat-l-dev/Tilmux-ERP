@@ -19,12 +19,12 @@
     <span class="kpi-note">Base {{ compras_base|floatformat:2 }}</span>
   </article>
   <article class="kpi">
-    <span class="kpi-label">IGV del periodo</span>
-    <span class="kpi-value num">S/ {{ igv|floatformat:2 }}</span>
-    <span class="kpi-note">{% if igv < 0 %}Saldo a favor{% else %}Por pagar{% endif %}</span>
+    <span class="kpi-label">{% if igv_por_pagar < 0 %}IGV a favor{% else %}IGV por pagar{% endif %}</span>
+    <span class="kpi-value num">S/ {{ igv_por_pagar_abs|floatformat:2 }}</span>
+    <span class="kpi-note">Resultante del mes: S/ {{ igv_resultante_abs|floatformat:2 }}</span>
   </article>
   <article class="kpi">
-    <span class="kpi-label">Renta RER</span>
+    <span class="kpi-label">Renta RER del mes</span>
     <span class="kpi-value num">S/ {{ renta|floatformat:2 }}</span>
     <span class="kpi-note">1,5 % de {{ ventas_base|floatformat:2 }}</span>
   </article>
@@ -37,11 +37,71 @@
     <div><dt>IGV de ventas</dt><dd class="num">{{ ventas_igv|floatformat:2 }}</dd></div>
     <div><dt>Compras netas (base)</dt><dd class="num">{{ compras_base|floatformat:2 }}</dd></div>
     <div><dt>IGV de compras</dt><dd class="num">{{ compras_igv|floatformat:2 }}</dd></div>
-    <div class="total"><dt>IGV resultante</dt><dd class="num">{{ igv|floatformat:2 }}</dd></div>
+    <div><dt>Saldo de IGV del mes anterior</dt><dd class="num">{{ igv_anterior|floatformat:2 }}</dd></div>
+    <div><dt>IGV del mes</dt><dd class="num">{{ igv|floatformat:2 }}</dd></div>
+    <div class="total"><dt>IGV resultante</dt><dd class="num">{{ igv_resultante|floatformat:2 }}</dd></div>
+    {% if igv_por_pagar != igv_resultante %}
+    <div><dt>IGV por pagar después de pagos</dt><dd class="num">{{ igv_por_pagar|floatformat:2 }}</dd></div>
+    {% endif %}
   </dl>
   <p class="preview-note">
-    El saldo a favor se arrastra al mes siguiente. La renta RER se calcula sobre ingresos netos,
-    no sobre el resultado contable.
+    El saldo a favor se arrastra al mes siguiente; un saldo negativo es a favor.
+    La renta RER se calcula sobre ingresos netos, no sobre el resultado contable.
   </p>
+</section>
+
+<section class="card" style="margin-top:12px">
+  <header class="card-head">
+    <h2>Renta RER por pagar</h2>
+    <span class="chip">Cuenta 40171</span>
+  </header>
+
+  <dl class="totales">
+    <div><dt>Renta del periodo</dt><dd class="num">{{ renta|floatformat:2 }}</dd></div>
+    <div><dt>Asentada en el libro</dt><dd class="num">{{ monto_asentado|floatformat:2 }}</dd></div>
+    <div class="total"><dt>IR por pagar acumulado</dt><dd class="num">{{ ir_por_pagar|floatformat:2 }}</dd></div>
+  </dl>
+
+  {% if asiento %}
+  <p class="preview-note">
+    Asentada en el asiento {{ asiento.numero }} del {{ asiento.fecha|date:"d/m/Y" }}.
+  </p>
+  {% elif puede_asentar %}
+  <form method="post" action="{% url 'reportes:asentar_renta' %}">
+    {% csrf_token %}
+    <input type="hidden" name="anio" value="{{ anio }}">
+    <input type="hidden" name="mes" value="{{ mes }}">
+    <button class="btn btn-primary" type="submit">Asentar renta de {{ mes }}/{{ anio }}</button>
+  </form>
+  {% elif not es_mes %}
+  <p class="preview-note">Elige un mes en el filtro para asentar la renta.</p>
+  {% else %}
+  <p class="preview-note">No hay renta que asentar en este periodo.</p>
+  {% endif %}
+
+  {% if ir_por_pagar > 0 and medios %}
+  <form method="post" action="{% url 'reportes:pagar_renta' %}" class="filtro" style="margin-top:14px">
+    {% csrf_token %}
+    <input type="hidden" name="anio" value="{{ anio }}">
+    <input type="hidden" name="mes" value="{{ mes }}">
+    <label class="field" style="min-width:130px">
+      <span>Pagar renta</span>
+      <input type="number" name="importe" step="0.01" min="0.01" value="{{ ir_por_pagar|stringformat:'0.2f' }}">
+    </label>
+    <label class="field" style="min-width:170px">
+      <span>Medio</span>
+      <select name="medio">
+        {% for m in medios %}<option value="{{ m.pk }}">{{ m.nombre }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="field">
+      <span>Fecha</span>
+      <input type="date" name="fecha" value="{{ hoy|date:'Y-m-d' }}">
+    </label>
+    <button class="btn btn-ghost" type="submit">Registrar pago</button>
+  </form>
+  {% elif ir_por_pagar > 0 %}
+  <p class="preview-note">No hay cuentas de tesorería activas para registrar el pago.</p>
+  {% endif %}
 </section>
 {% endblock %}

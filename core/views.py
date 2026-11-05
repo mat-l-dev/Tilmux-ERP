@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import calendar
 from datetime import date
 from decimal import Decimal
 
@@ -15,6 +16,12 @@ from django.views.decorators.http import require_POST
 from compras.models import Compra
 from contabilidad.cierre import cerrar, revertir
 from contabilidad.cierre import estado as estado_cierre
+from contabilidad.impuestos import (
+    asentar_renta,
+    asiento_renta,
+    saldo_cuenta,
+    saldo_renta,
+)
 from contabilidad.models import Asiento, AsientoLinea, Cuenta
 from contabilidad.servicios import ContabilidadError
 from ventas.models import Venta
@@ -23,7 +30,6 @@ from .context import empresa_actual
 from .models import Empresa, Periodo
 from .permisos import requiere_escritura
 
-TASA_RENTA_RER = Decimal("0.015")
 MESES_CORTOS = ("Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Set", "Oct", "Nov", "Dic")
 
 
@@ -34,7 +40,8 @@ def _meses_atras(anio: int, mes: int, pasos: int) -> tuple[int, int]:
 
 def soles(valor) -> str:
     numero = Decimal(valor or 0).quantize(Decimal("0.01"))
-    return f"{numero:,.2f}"
+    texto = f"{numero:,.2f}"
+    return texto.replace(",", "X").replace(".", ",").replace("X", ".")
 
 
 @login_required
@@ -66,8 +73,12 @@ def panel(request: HttpRequest) -> HttpResponse:
 
     saldo = Decimal("0")
     ventas_base = Decimal("0")
-    igv_ventas = Decimal("0")
-    igv_compras = Decimal("0")
+    igv = Decimal("0")
+    renta = Decimal("0")
+    ir_por_pagar = Decimal("0")
+    asiento = None
+    renta_asentada = False
+    renta_pendiente = False
 
     if empresa:
         saldos = AsientoLinea.objects.filter(
@@ -81,11 +92,14 @@ def panel(request: HttpRequest) -> HttpResponse:
 
         datos_mes = calcular(empresa, anio, mes)
         ventas_base = datos_mes["ventas_base"]
-        igv_ventas = datos_mes["ventas_igv"]
-        igv_compras = datos_mes["compras_igv"]
+        renta = datos_mes["renta"]
 
-    igv = Decimal(igv_ventas) - Decimal(igv_compras)
-    renta = Decimal(ventas_base) * TASA_RENTA_RER
+        fin_mes = date(anio, mes, calendar.monthrange(anio, mes)[1])
+        igv = saldo_cuenta(empresa, "40111", fin_mes)
+        ir_por_pagar = saldo_renta(empresa, fin_mes)
+        asiento = asiento_renta(empresa, anio, mes)
+        renta_asentada = asiento is not None
+        renta_pendiente = renta > 0 and not renta_asentada
 
     ventas_acumulado = Decimal("0")
     ventas_anterior = Decimal("0")
@@ -158,6 +172,10 @@ def panel(request: HttpRequest) -> HttpResponse:
         "igv_etiqueta": "IGV a favor" if igv < 0 else "IGV por pagar",
         "igv_nota": "Saldo a favor" if igv < 0 else "Después del crédito de compras",
         "renta_mes": soles(renta),
+        "ir_por_pagar": soles(ir_por_pagar),
+        "renta_asentada": renta_asentada,
+        "renta_pendiente": renta_pendiente,
+        "renta_asiento": asiento,
         "periodo_actual": (
             Periodo.objects.filter(empresa=empresa, anio=anio, mes=mes).first()
             if empresa
@@ -247,6 +265,16 @@ def cerrar_periodo(request: HttpRequest, pk: int) -> HttpResponse:
             f"No se puede cerrar: hay {borradores} borrador(es) sin confirmar en ese mes.",
         )
     else:
+        try:
+            asentar_renta(
+                periodo.empresa,
+                periodo.anio,
+                periodo.mes,
+                usuario=request.user,
+            )
+        except ContabilidadError as exc:
+            messages.error(request, f"No se pudo cerrar: {exc}")
+            return redirect("core:periodos")
         periodo.estado = Periodo.Estado.CERRADO
         periodo.save(update_fields=["estado"])
         messages.success(request, f"Periodo {periodo.etiqueta} cerrado.")

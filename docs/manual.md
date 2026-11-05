@@ -102,6 +102,20 @@ Cada nota modifica un solo comprobante y usa los catálogos 09 y 10 de SUNAT.
 | Estados financieros | Situación, resultados, cambios y flujo |
 | Conciliación SUNAT | Casillas contra la vista preliminar o contra la propuesta del SIRE |
 
+## Impuestos
+
+**IGV y RER.** El reporte calcula el IGV del mes y la renta del 1,5 %. La
+tarjeta **IGV por pagar** muestra el saldo real de la cuenta 40111: incluye el
+crédito o saldo a favor del mes anterior. La tarjeta **Renta RER por pagar**
+muestra el saldo de la 40171, es decir, la renta de meses anteriores que aún no
+se paga.
+
+Cuando hay renta y todavía no está asentada, el botón **Asentar renta de
+MM/AAAA** crea el asiento 881 contra 40171. Al cerrar el mes se hace solo. Para
+pagarla, usa **Registrar pago**: debita la 40171 y registra la salida del banco.
+Si el mes no tiene ventas, la renta del mes es cero, pero el saldo por pagar de
+los meses anteriores sigue visible.
+
 ## Cierre del mes
 
 **Periodos**. Antes de cerrar:

@@ -2,27 +2,42 @@
 
 from __future__ import annotations
 
-from datetime import date
+import calendar
+from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Q, Sum
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.views.decorators.http import require_POST
 
-from catalogo.models import Producto
+from catalogo.models import CuentaTesoreria, Producto
 from compras.models import Compra
 from compras.models_gasto import Gasto
+from contabilidad.impuestos import (
+    asentar_renta,
+    asiento_renta,
+    monto_renta_asentada,
+    saldo_cuenta,
+    saldo_renta,
+)
+from contabilidad.impuestos import (
+    pagar_renta as registrar_pago_renta,
+)
 from contabilidad.models import Cuenta
+from contabilidad.servicios import ContabilidadError
 from core.context import empresa_actual
+from core.permisos import requiere_escritura
 from inventario.models import CapaFIFO, MovimientoStock
 from ventas.models import NotaCredito, NotaDebito, Venta
 
-from .casillas import calcular
+from .casillas import TASA_RENTA_RER, calcular
 from .sire import ArchivoInvalido, leer_filas, sumar
 from .utils import rango
 
-TASA_RENTA_RER = Decimal("0.015")
 CERO = Decimal("0")
 
 
@@ -33,6 +48,13 @@ def _entero(valor, defecto: int) -> int:
         return defecto
 
 
+def _es_mes(desde: date, hasta: date) -> bool:
+    return (
+        desde.year == hasta.year
+        and desde.month == hasta.month
+        and desde.day == 1
+        and hasta.day == calendar.monthrange(hasta.year, hasta.month)[1]
+    )
 
 
 @login_required
@@ -310,17 +332,115 @@ def impuestos(request):
     igv = ventas_igv - compras_igv
     renta = (ventas_base * TASA_RENTA_RER).quantize(Decimal("0.01"))
 
+    es_mes = _es_mes(desde, hasta)
+    igv_anterior = Decimal("0")
+    igv_por_pagar = Decimal("0")
+    ir_por_pagar = Decimal("0")
+    asiento = None
+    monto_asentado = Decimal("0")
+    if empresa:
+        igv_anterior = saldo_cuenta(empresa, "40111", desde - timedelta(days=1))
+        igv_por_pagar = saldo_cuenta(empresa, "40111", hasta)
+        ir_por_pagar = saldo_renta(empresa, hasta)
+        if es_mes:
+            asiento = asiento_renta(empresa, desde.year, desde.month)
+            monto_asentado = monto_renta_asentada(asiento)
+    igv_resultante = igv_anterior + igv
+    puede_asentar = bool(empresa and es_mes and renta > 0 and asiento is None)
+
     contexto = {
         "desde": desde,
         "hasta": hasta,
+        "anio": hasta.year,
+        "mes": hasta.month,
+        "es_mes": es_mes,
         "ventas_base": ventas_base,
         "ventas_igv": ventas_igv,
         "compras_base": compras_base,
         "compras_igv": compras_igv,
         "igv": igv,
+        "igv_anterior": igv_anterior,
+        "igv_resultante": igv_resultante,
+        "igv_resultante_abs": abs(igv_resultante),
+        "igv_por_pagar": igv_por_pagar,
+        "igv_por_pagar_abs": abs(igv_por_pagar),
         "renta": renta,
+        "ir_por_pagar": ir_por_pagar,
+        "asiento": asiento,
+        "monto_asentado": monto_asentado,
+        "puede_asentar": puede_asentar,
+        "medios": (
+            CuentaTesoreria.objects.filter(empresa=empresa, activa=True)
+            if empresa
+            else []
+        ),
+        "hoy": date.today(),
     }
     return render(request, "reportes/impuestos.html", contexto)
+
+
+@login_required
+@requiere_escritura
+@require_POST
+def asentar_renta_mes(request):
+    empresa = empresa_actual(request)
+    anio = min(max(_entero(request.POST.get("anio"), date.today().year), 2000), 2100)
+    mes = min(max(_entero(request.POST.get("mes"), date.today().month), 1), 12)
+
+    if empresa is None:
+        messages.error(request, "Configura una empresa antes de asentar la renta.")
+    else:
+        try:
+            asiento = asentar_renta(empresa, anio, mes, usuario=request.user)
+        except ContabilidadError as exc:
+            messages.error(request, str(exc))
+        else:
+            if asiento is None:
+                messages.info(
+                    request, f"No hay renta que asentar en {mes:02d}/{anio}."
+                )
+            else:
+                messages.success(
+                    request,
+                    f"Renta de {mes:02d}/{anio} asentada en el asiento "
+                    f"{asiento.numero}.",
+                )
+    return redirect(f"{reverse('reportes:impuestos')}?periodo={anio}-{mes:02d}")
+
+
+@login_required
+@requiere_escritura
+@require_POST
+def pagar_renta_mes(request):
+    empresa = empresa_actual(request)
+    anio = min(max(_entero(request.POST.get("anio"), date.today().year), 2000), 2100)
+    mes = min(max(_entero(request.POST.get("mes"), date.today().month), 1), 12)
+
+    if empresa is None:
+        messages.error(request, "Configura una empresa antes de pagar la renta.")
+    else:
+        try:
+            importe = Decimal(
+                (request.POST.get("importe") or "0").replace(",", ".")
+            )
+            fecha = date.fromisoformat(
+                request.POST.get("fecha") or date.today().isoformat()
+            )
+            medio = CuentaTesoreria.objects.get(
+                pk=request.POST.get("medio"), empresa=empresa, activa=True
+            )
+        except (InvalidOperation, TypeError, ValueError, CuentaTesoreria.DoesNotExist):
+            messages.error(request, "Revisa el importe, el medio de pago y la fecha.")
+        else:
+            try:
+                registrar_pago_renta(empresa, fecha, importe, medio)
+            except ContabilidadError as exc:
+                messages.error(request, str(exc))
+            else:
+                messages.success(
+                    request, f"Pago de renta registrado por S/ {importe}."
+                )
+    return redirect(f"{reverse('reportes:impuestos')}?periodo={anio}-{mes:02d}")
 
 
 @login_required
