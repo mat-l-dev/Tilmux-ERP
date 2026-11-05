@@ -21,3 +21,5 @@ class PeriodoAdmin(admin.ModelAdmin):
 class TipoCambioAdmin(admin.ModelAdmin):
     list_display = ("fecha", "compra", "venta", "fuente")
     ordering = ("-fecha",)
+
+from .admin_perfil import PerfilAdmin  # noqa: E402,F401

@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block titulo %}Conciliación SUNAT{% endblock %}
+{% block titulo_pagina %}Conciliación con SUNAT{% endblock %}
+
+{% block contenido %}
+{% include "reportes/_tabs.html" %}
+
+<form method="get" class="filtro">
+  <label class="field" style="min-width:110px">
+    <span>Año</span>
+    <input type="number" name="anio" value="{{ anio }}" min="2020" max="2100">
+  </label>
+  <label class="field" style="min-width:110px">
+    <span>Mes</span>
+    <input type="number" name="mes" value="{{ mes }}" min="1" max="12">
+  </label>
+  <label class="field" style="min-width:140px">
+    <span>107 · Compras base</span>
+    <input type="text" name="c107" inputmode="decimal" placeholder="0.00">
+  </label>
+  <label class="field" style="min-width:140px">
+    <span>108 · IGV compras</span>
+    <input type="text" name="c108" inputmode="decimal" placeholder="0.00">
+  </label>
+  <label class="field" style="min-width:140px">
+    <span>120 · No gravado</span>
+    <input type="text" name="c120" inputmode="decimal" placeholder="0.00">
+  </label>
+  <label class="field" style="min-width:140px">
+    <span>140 · Saldo</span>
+    <input type="text" name="c140" inputmode="decimal" placeholder="0.00">
+  </label>
+  <button class="btn btn-ghost" type="submit">Comparar</button>
+</form>
+
+<section class="card">
+  <header class="card-head">
+    <h2>Casillas del periodo {{ mes }}/{{ anio }}</h2>
+    <span class="chip">Escribe los valores de la vista preliminar</span>
+  </header>
+
+  {% if filas %}
+  <table class="tabla-doc">
+    <thead>
+      <tr>
+        <th>Casilla</th>
+        <th>Concepto</th>
+        <th class="der">Sistema</th>
+        <th class="der">SUNAT</th>
+        <th class="der">Diferencia</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for f in filas %}
+      <tr>
+        <td class="num">{{ f.casilla }}</td>
+        <td>{{ f.concepto }}</td>
+        <td class="num der">{{ f.sistema|floatformat:2 }}</td>
+        <td class="num der">{% if f.sunat is not None %}{{ f.sunat|floatformat:2 }}{% else %}—{% endif %}</td>
+        <td class="num der">
+          {% if f.diferencia is not None %}
+            <span class="{% if f.diferencia %}chip chip-warn{% else %}chip chip-ok{% endif %}">
+              {{ f.diferencia|floatformat:2 }}
+            </span>
+          {% else %}—{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="preview-note">
+    Copia los valores de la vista preliminar del SIRE. Una diferencia distinta de
+    cero en la 120 suele ser un comprobante sin sustento; en la 108, un crédito
+    fiscal no declarado.
+  </p>
+  {% else %}
+  <p class="muted">Configura una empresa para ver la conciliación.</p>
+  {% endif %}
+</section>
+{% endblock %}

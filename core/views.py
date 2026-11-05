@@ -18,6 +18,7 @@ from ventas.models import Venta
 
 from .context import empresa_actual
 from .models import Empresa, Periodo
+from .permisos import requiere_escritura
 
 TASA_RENTA_RER = Decimal("0.015")
 MESES_CORTOS = ("Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Set", "Oct", "Nov", "Dic")
@@ -143,6 +144,7 @@ def periodos(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
+@requiere_escritura
 @require_POST
 def cerrar_periodo(request: HttpRequest, pk: int) -> HttpResponse:
     periodo = get_object_or_404(Periodo, pk=pk)
@@ -172,6 +174,7 @@ def cerrar_periodo(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @login_required
+@requiere_escritura
 @require_POST
 def revaluar_periodo(request: HttpRequest, pk: int) -> HttpResponse:
     from compras.servicios import revaluar

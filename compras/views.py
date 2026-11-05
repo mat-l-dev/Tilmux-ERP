@@ -18,6 +18,7 @@ from contabilidad.models import Asiento, Cuenta
 from contabilidad.moneda import SinTipoCambio, a_soles
 from core.context import empresa_actual
 from core.contexto import usuario_actual
+from core.permisos import requiere_escritura
 from documentos.xml_cpe import Guia, XMLInvalido, leer
 from ventas.models import Venta
 from ventas.models_guia import GuiaRemision
@@ -46,6 +47,7 @@ def lista(request):
 
 
 @login_required
+@requiere_escritura
 def nueva(request):
     empresa = empresa_actual(request)
     if empresa is None:
@@ -238,6 +240,7 @@ def _cuenta_sugerida(emisor: str) -> Cuenta | None:
 
 
 @login_required
+@requiere_escritura
 def importar(request):
     empresa = empresa_actual(request)
     if request.method == "POST":
@@ -322,6 +325,7 @@ def importar(request):
 
 
 @login_required
+@requiere_escritura
 def importar_preview(request):
     empresa = empresa_actual(request)
     datos = request.session.get("xml_pendiente")
@@ -389,6 +393,7 @@ def importar_preview(request):
 
 
 @login_required
+@requiere_escritura
 @require_POST
 def vincular_guia(request):
     empresa = empresa_actual(request)
@@ -433,6 +438,7 @@ def vincular_guia(request):
 
 
 @login_required
+@requiere_escritura
 def importar_compra(request):
     empresa = empresa_actual(request)
     datos = request.session.get("xml_pendiente")
@@ -523,6 +529,7 @@ def importar_compra(request):
 
 
 @login_required
+@requiere_escritura
 def pagar_compra(request, pk: int):
     compra = get_object_or_404(Compra, pk=pk)
     cuentas = list(
@@ -581,6 +588,7 @@ def detalle(request, pk: int):
 
 
 @login_required
+@requiere_escritura
 @require_POST
 def confirmar_compra(request, pk: int):
     compra = get_object_or_404(Compra, pk=pk)

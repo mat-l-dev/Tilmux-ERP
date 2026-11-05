@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from decimal import Decimal
+from datetime import date
+from decimal import Decimal, InvalidOperation
 
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum
@@ -14,6 +15,7 @@ from contabilidad.models import Cuenta
 from core.context import empresa_actual
 from ventas.models import NotaCredito, NotaDebito, Venta
 
+from .casillas import calcular
 from .utils import rango
 
 TASA_RENTA_RER = Decimal("0.015")
@@ -274,3 +276,50 @@ def impuestos(request):
         "renta": renta,
     }
     return render(request, "reportes/impuestos.html", contexto)
+
+
+@login_required
+def conciliacion(request):
+    """Compara las casillas del sistema con las que muestra SUNAT."""
+    empresa = empresa_actual(request)
+    hoy = date.today()
+    anio = int(request.GET.get("anio") or hoy.year)
+    mes = int(request.GET.get("mes") or hoy.month)
+
+    datos = calcular(empresa, anio, mes) if empresa else None
+    filas = []
+
+    if datos:
+        pares = [
+            ("100", "Ventas gravadas (base)", datos["ventas_base"]),
+            ("101", "IGV de ventas", datos["ventas_igv"]),
+            ("107", "Compras gravadas (base)", datos["compras_base"]),
+            ("108", "IGV de compras", datos["compras_igv"]),
+            ("120", "Compras no gravadas", datos["no_gravado"]),
+            ("140", "Saldo a favor / por pagar", datos["resultado"]),
+        ]
+        for casilla, concepto, sistema in pares:
+            texto = request.GET.get(f"c{casilla}")
+            sunat = None
+            diferencia = None
+            if texto:
+                try:
+                    sunat = Decimal(texto.replace(",", ".")).quantize(Decimal("0.01"))
+                    diferencia = (sistema - sunat).quantize(Decimal("0.01"))
+                except (InvalidOperation, ValueError):
+                    sunat = None
+            filas.append(
+                {
+                    "casilla": casilla,
+                    "concepto": concepto,
+                    "sistema": sistema,
+                    "sunat": sunat,
+                    "diferencia": diferencia,
+                }
+            )
+
+    return render(
+        request,
+        "reportes/conciliacion.html",
+        {"datos": datos, "filas": filas, "anio": anio, "mes": mes},
+    )

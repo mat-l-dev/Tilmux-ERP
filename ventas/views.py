@@ -17,6 +17,7 @@ from contabilidad.calculos import calcular_linea
 from contabilidad.models import Asiento
 from core.context import empresa_actual
 from core.contexto import usuario_actual
+from core.permisos import requiere_escritura
 
 from .forms import CabeceraVentaForm
 from .models import NotaCredito, NotaCreditoLinea, NotaDebito, Venta, VentaLinea
@@ -105,6 +106,7 @@ def lista(request):
 
 
 @login_required
+@requiere_escritura
 def nueva(request):
     empresa = empresa_actual(request)
     if empresa is None:
@@ -217,6 +219,7 @@ def nueva(request):
 
 
 @login_required
+@requiere_escritura
 def nota_credito(request, pk: int):
     venta = get_object_or_404(Venta, pk=pk)
     lineas = list(venta.lineas.select_related("producto"))
@@ -273,6 +276,7 @@ def nota_credito(request, pk: int):
 
 
 @login_required
+@requiere_escritura
 def nota_debito(request, pk: int):
     venta = get_object_or_404(Venta, pk=pk)
 
@@ -322,6 +326,7 @@ def detalle(request, pk: int):
 
 
 @login_required
+@requiere_escritura
 @require_POST
 def confirmar_venta(request, pk: int):
     venta = get_object_or_404(Venta, pk=pk)

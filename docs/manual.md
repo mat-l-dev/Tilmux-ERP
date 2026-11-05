@@ -35,9 +35,24 @@ IGV forma parte del costo.
 
 ## Pagar una compra
 
-En el detalle de la compra confirmada, **Pagar compra**. Sale el dinero de la
-cuenta que elijas. Si la compra es en dólares y pagas con otro tipo de cambio, la
-diferencia se reconoce en la 6761 o 7761.
+En el detalle de la compra confirmada, **Pagar compra**. Puedes pagar todo o una
+parte: el sistema muestra el saldo y lo descuenta con cada pago. La compra queda
+como pagada cuando el saldo llega a cero.
+
+Si la compra es en dólares y pagas con otro tipo de cambio, la diferencia se
+reconoce en la 6761 o 7761, proporcional a la parte pagada.
+
+## Usuarios y roles
+
+En **Configuración → Perfiles** se asigna a cada usuario un rol:
+
+| Rol | Puede |
+|---|---|
+| Administrador | Todo |
+| Registrador | Registrar y confirmar documentos |
+| Solo lectura | Consultar reportes, sin registrar |
+
+Un usuario sin perfil se trata como administrador.
 
 ## Ventas
 
@@ -67,6 +82,7 @@ Cada nota modifica un solo comprobante y usa los catálogos 09 y 10 de SUNAT.
 | Registro de compras | Compras y gastos, con exportación CSV |
 | IGV y RER | IGV del mes y renta del 1,5 % |
 | Estados financieros | Situación, resultados, cambios y flujo |
+| Conciliación SUNAT | Compara las casillas del sistema con la vista preliminar |
 
 ## Cierre del mes
 

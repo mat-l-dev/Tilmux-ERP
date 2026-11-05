@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from django.conf import settings
 from django.db import models
 
 
@@ -100,3 +101,29 @@ class TipoCambio(models.Model):
         if registro is None:
             raise ValueError(f"No hay tipo de cambio para {fecha}.")
         return registro
+
+
+class Perfil(models.Model):
+    """Rol del usuario dentro de la empresa."""
+
+    class Rol(models.TextChoices):
+        ADMIN = "ADMIN", "Administrador"
+        REGISTRADOR = "REGISTRADOR", "Registrador"
+        LECTOR = "LECTOR", "Solo lectura"
+
+    usuario = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="perfil",
+    )
+    empresa = models.ForeignKey(
+        Empresa, on_delete=models.PROTECT, null=True, blank=True, related_name="perfiles"
+    )
+    rol = models.CharField(max_length=12, choices=Rol.choices, default=Rol.REGISTRADOR)
+
+    class Meta:
+        verbose_name = "perfil"
+        verbose_name_plural = "perfiles"
+
+    def __str__(self) -> str:
+        return f"{self.usuario.username} · {self.get_rol_display()}"
