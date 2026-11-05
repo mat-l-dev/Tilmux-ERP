@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block titulo %}Nota de débito{% endblock %}
+{% block titulo_pagina %}Nota de débito{% endblock %}
+
+{% block contenido %}
+<div class="doc">
+  <div class="doc-main">
+    <section class="card">
+      <header class="card-head">
+        <h2>Nota de débito sobre {{ venta.serie }}-{{ venta.numero }}</h2>
+        <span class="chip">{{ venta.cliente_nombre }}</span>
+      </header>
+
+      <form method="post" class="form">
+        {% csrf_token %}
+        <div class="grid-fields">
+          <label class="field">
+            <span>Fecha</span>
+            <input type="date" name="fecha" value="{{ hoy|date:'Y-m-d' }}" required>
+          </label>
+          <label class="field">
+            <span>Serie</span>
+            <input type="text" name="serie" value="FD01" maxlength="4" required>
+          </label>
+          <label class="field">
+            <span>Número</span>
+            <input type="text" name="numero" maxlength="20" required>
+          </label>
+          <label class="field field-wide">
+            <span>Motivo (catálogo 10)</span>
+            <select name="motivo" required>
+              {% for codigo, texto in motivos %}
+              <option value="{{ codigo }}">{{ codigo }} · {{ texto }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label class="field">
+            <span>Importe sin IGV</span>
+            <input type="text" name="base" inputmode="decimal" required placeholder="0.00">
+          </label>
+          <label class="field field-full">
+            <span>Descripción</span>
+            <input type="text" name="descripcion" maxlength="200" placeholder="Intereses, penalidad…">
+          </label>
+        </div>
+
+        <button class="btn btn-primary" type="submit">Emitir nota de débito</button>
+      </form>
+    </section>
+  </div>
+
+  <aside class="doc-side">
+    <div class="card sticky">
+      <header class="card-head"><h2>Qué hace</h2></header>
+      <p class="preview-note">
+        Aumenta el importe del comprobante original: intereses por mora, penalidades
+        o aumento del valor. El IGV se calcula al 18 %.
+      </p>
+      <div class="preview-row"><span>1212 · Por cobrar</span><b>aumenta</b></div>
+      <div class="preview-row"><span>7599 · Otros ingresos</span><b>base</b></div>
+      <div class="preview-row"><span>40111 · IGV</span><b>18 %</b></div>
+      <a class="btn btn-ghost btn-block" href="{% url 'ventas:detalle' venta.pk %}">Volver</a>
+    </div>
+  </aside>
+</div>
+{% endblock %}

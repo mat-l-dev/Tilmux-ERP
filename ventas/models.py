@@ -168,6 +168,20 @@ class VentaLinea(models.Model):
 
 
 class NotaCredito(models.Model):
+    class Motivo(models.TextChoices):
+        ANULACION = "01", "Anulación de la operación"
+        ERROR_RUC = "02", "Anulación por error en el RUC"
+        ERROR_DESCRIPCION = "03", "Corrección por error en la descripción"
+        DESCUENTO_GLOBAL = "04", "Descuento global"
+        DESCUENTO_ITEM = "05", "Descuento por ítem"
+        DEVOLUCION_TOTAL = "06", "Devolución total"
+        DEVOLUCION_ITEM = "07", "Devolución por ítem"
+        BONIFICACION = "08", "Bonificación"
+        DISMINUCION = "09", "Disminución en el valor"
+        OTROS = "10", "Otros conceptos"
+        AJUSTE_EXPORTACION = "11", "Ajustes de operaciones de exportación"
+        AJUSTE_IVAP = "12", "Ajustes afectos al IVAP"
+
     venta = models.ForeignKey(
         Venta, on_delete=models.PROTECT, related_name="notas_credito"
     )
@@ -175,6 +189,9 @@ class NotaCredito(models.Model):
     serie = models.CharField(max_length=4)
     numero = models.CharField(max_length=20)
     motivo = models.CharField(max_length=200)
+    motivo_codigo = models.CharField(
+        max_length=2, choices=Motivo.choices, default=Motivo.DEVOLUCION_ITEM
+    )
     base = models.DecimalField(max_digits=18, decimal_places=2, default=0)
     igv = models.DecimalField(max_digits=18, decimal_places=2, default=0)
     total = models.DecimalField(max_digits=18, decimal_places=2, default=0)
@@ -194,6 +211,62 @@ class NotaCredito(models.Model):
 
     def __str__(self) -> str:
         return f"{self.serie}-{self.numero} · {self.venta_id}"
+
+
+class NotaCreditoLinea(models.Model):
+    nota = models.ForeignKey(
+        NotaCredito, on_delete=models.CASCADE, related_name="lineas"
+    )
+    venta_linea = models.ForeignKey(
+        VentaLinea, on_delete=models.PROTECT, related_name="notas_credito"
+    )
+    cantidad = models.DecimalField(max_digits=18, decimal_places=4)
+    base = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    igv = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    total = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    costo_total = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+
+    class Meta:
+        verbose_name = "línea de nota de crédito"
+        verbose_name_plural = "líneas de nota de crédito"
+        ordering = ["nota", "id"]
+
+
+class NotaDebito(models.Model):
+    class Motivo(models.TextChoices):
+        INTERESES = "01", "Intereses por mora"
+        AUMENTO_VALOR = "02", "Aumento en el valor"
+        PENALIDADES = "03", "Penalidades y otros conceptos"
+        AJUSTE_EXPORTACION = "11", "Ajustes de operaciones de exportación"
+        AJUSTE_IVAP = "12", "Ajustes afectos al IVAP"
+
+    venta = models.ForeignKey(
+        Venta, on_delete=models.PROTECT, related_name="notas_debito"
+    )
+    fecha = models.DateField()
+    serie = models.CharField(max_length=4)
+    numero = models.CharField(max_length=20)
+    motivo_codigo = models.CharField(
+        max_length=2, choices=Motivo.choices, default=Motivo.INTERESES
+    )
+    descripcion = models.CharField(max_length=200, blank=True)
+    base = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    igv = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    total = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    creada = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "nota de débito"
+        verbose_name_plural = "notas de débito"
+        ordering = ["-fecha", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["venta", "serie", "numero"], name="nota_debito_unica"
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.serie}-{self.numero}"
 
 
 from .models_guia import GuiaRemision  # noqa: E402,F401

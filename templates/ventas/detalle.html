@@ -100,7 +100,9 @@
       </form>
       <p class="preview-note">Al confirmar se descuenta el stock, se genera el costo y se registra el asiento.</p>
       {% else %}
-      <p class="muted">Esta venta ya está confirmada. Para corregirla se emite una nota de crédito.</p>
+      <p class="muted">Venta confirmada. Para corregirla se emite una nota.</p>
+      <a class="btn btn-ghost btn-block" href="{% url 'ventas:nota_credito' venta.pk %}">Nota de crédito</a>
+      <a class="btn btn-ghost btn-block" href="{% url 'ventas:nota_debito' venta.pk %}">Nota de débito</a>
       {% endif %}
       <a class="btn btn-ghost btn-block" href="{% url 'ventas:lista' %}">Volver a la lista</a>
     </div>

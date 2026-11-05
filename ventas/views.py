@@ -7,6 +7,7 @@ from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db.models import Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
@@ -15,8 +16,9 @@ from contabilidad.calculos import calcular_linea
 from contabilidad.models import Asiento
 from core.context import empresa_actual
 
-from .models import Venta, VentaLinea
+from .models import NotaCredito, NotaCreditoLinea, NotaDebito, Venta, VentaLinea
 from .servicios import VentaError, confirmar
+from .servicios import emitir_nota_credito, emitir_nota_debito
 
 
 def _numero_siguiente(empresa, tipo_doc: str, serie: str) -> str:
@@ -185,6 +187,100 @@ def nueva(request):
     venta.save(update_fields=["subtotal", "igv", "total"])
     messages.success(request, "Borrador creado. Revísalo y confírmalo.")
     return redirect("ventas:detalle", venta.pk)
+
+
+@login_required
+def nota_credito(request, pk: int):
+    venta = get_object_or_404(Venta, pk=pk)
+    lineas = list(venta.lineas.select_related("producto"))
+    acreditado = {
+        fila["venta_linea_id"]: fila["total"]
+        for fila in NotaCreditoLinea.objects.filter(nota__venta=venta)
+        .values("venta_linea_id")
+        .annotate(total=Sum("cantidad"))
+    }
+    for linea in lineas:
+        linea.acreditado = acreditado.get(linea.pk, Decimal("0"))
+        linea.disponible = linea.cantidad - linea.acreditado
+
+    if request.method == "POST":
+        cantidades = {}
+        for linea in lineas:
+            valor = (request.POST.get(f"cantidad_{linea.pk}") or "0").replace(",", ".")
+            try:
+                cantidades[linea.pk] = Decimal(valor)
+            except InvalidOperation:
+                messages.error(request, "Hay una cantidad inválida.")
+                cantidades = None
+                break
+        if cantidades is not None:
+            try:
+                nota = emitir_nota_credito(
+                    venta=venta,
+                    fecha=date.fromisoformat(
+                        request.POST.get("fecha") or date.today().isoformat()
+                    ),
+                    serie=request.POST.get("serie", "FC01").upper()[:4],
+                    numero=request.POST.get("numero", "")[:20],
+                    motivo_codigo=request.POST.get("motivo", "07"),
+                    cantidades=cantidades,
+                    reingresa_stock=bool(request.POST.get("reingresa")),
+                    descripcion=request.POST.get("descripcion", ""),
+                )
+            except VentaError as exc:
+                messages.error(request, str(exc))
+            else:
+                messages.success(request, f"Nota de crédito {nota} registrada.")
+                return redirect("ventas:detalle", venta.pk)
+
+    return render(
+        request,
+        "ventas/nota_credito.html",
+        {
+            "venta": venta,
+            "lineas": lineas,
+            "motivos": NotaCredito.Motivo.choices,
+            "hoy": date.today(),
+        },
+    )
+
+
+@login_required
+def nota_debito(request, pk: int):
+    venta = get_object_or_404(Venta, pk=pk)
+
+    if request.method == "POST":
+        try:
+            base, _igv, _total = calcular_linea(
+                Decimal("1"), Decimal((request.POST.get("base") or "0").replace(",", ".")), False
+            )
+            emitir_nota_debito(
+                venta=venta,
+                fecha=date.fromisoformat(
+                    request.POST.get("fecha") or date.today().isoformat()
+                ),
+                serie=request.POST.get("serie", "FD01").upper()[:4],
+                numero=request.POST.get("numero", "")[:20],
+                motivo_codigo=request.POST.get("motivo", "01"),
+                base=base,
+                igv=_igv,
+                descripcion=request.POST.get("descripcion", ""),
+            )
+        except (VentaError, InvalidOperation) as exc:
+            messages.error(request, f"No se pudo emitir: {exc}")
+        else:
+            messages.success(request, "Nota de débito registrada.")
+            return redirect("ventas:detalle", venta.pk)
+
+    return render(
+        request,
+        "ventas/nota_debito.html",
+        {
+            "venta": venta,
+            "motivos": NotaDebito.Motivo.choices,
+            "hoy": date.today(),
+        },
+    )
 
 
 @login_required

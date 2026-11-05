@@ -29,7 +29,7 @@ from inventario.models import CapaFIFO, ConsumoCapa, MovimientoStock
 from ventas.models import Venta, VentaLinea
 from ventas.models_guia import GuiaRemision
 from ventas.servicios import VentaError, confirmar as confirmar_venta
-from ventas.servicios import emitir_nota_credito
+from ventas.servicios import emitir_nota_credito, emitir_nota_debito
 
 CENT = Decimal("0.01")
 
@@ -277,6 +277,64 @@ class InvarianteIgv(BaseContable):
 
 
 class InvarianteComprobantes(BaseContable):
+    def test_la_nota_de_credito_parcial_prorratea_y_devuelve_stock(self):
+        self.comprar("10", "100")
+        venta = self.vender("2", "250")
+        linea = venta.lineas.get()
+
+        nota = emitir_nota_credito(
+            venta=venta,
+            fecha=date(2026, 11, 25),
+            serie="FC01",
+            numero="0001",
+            motivo_codigo="07",
+            cantidades={linea.pk: Decimal("1")},
+        )
+
+        self.assertEqual(nota.base, Decimal("211.86"))
+        self.assertEqual(nota.igv, Decimal("38.14"))
+        self.assertEqual(nota.total, Decimal("250.00"))
+        self.assertEqual(nota.costo, Decimal("100.00"))
+        self.assertEqual(
+            self.capas().aggregate(s=Sum("cantidad_restante"))["s"], Decimal("9.0000")
+        )
+
+    def test_no_se_puede_acreditar_mas_de_lo_vendido(self):
+        self.comprar("10", "100")
+        venta = self.vender("2", "250")
+        linea = venta.lineas.get()
+
+        with self.assertRaises(VentaError):
+            emitir_nota_credito(
+                venta=venta,
+                fecha=date(2026, 11, 25),
+                serie="FC01",
+                numero="0002",
+                motivo_codigo="07",
+                cantidades={linea.pk: Decimal("3")},
+            )
+
+    def test_la_nota_de_debito_aumenta_el_importe(self):
+        self.comprar("10", "100")
+        venta = self.vender("1", "250")
+
+        nota = emitir_nota_debito(
+            venta=venta,
+            fecha=date(2026, 11, 26),
+            serie="FD01",
+            numero="0001",
+            motivo_codigo="01",
+            base=Decimal("100.00"),
+            igv=Decimal("18.00"),
+            descripcion="Intereses por mora",
+        )
+
+        asiento = Asiento.objects.get(origen_tipo="NOTA_DEBITO", origen_id=nota.pk)
+        importes = {l.cuenta.codigo: (l.debe, l.haber) for l in asiento.lineas.all()}
+        self.assertEqual(importes["1212"], (Decimal("118.00"), Decimal("0.00")))
+        self.assertEqual(importes["7599"], (Decimal("0.00"), Decimal("100.00")))
+        self.assertEqual(importes["40111"], (Decimal("0.00"), Decimal("18.00")))
+
     def test_la_boleta_no_genera_credito_fiscal(self):
         cuenta = Cuenta.objects.get(version="2026", codigo="6391")
         gasto = registrar_gasto(

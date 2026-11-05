@@ -46,6 +46,10 @@ REGLAS = {
         "Nota de crédito de venta",
         [("70911", D, BASE, "Devolución"), ("40111", D, IGV, "IGV"), ("1212", H, TOTAL, "Cobranza revertida"), ("69121", H, COSTO, "Costo revertido"), ("20111", D, COSTO, "Reingreso de inventario")],
     ),
+    "NOTA_DEBITO": (
+        "Nota de débito de venta",
+        [("1212", D, TOTAL, "Por cobrar"), ("7599", H, BASE, "Otros ingresos"), ("40111", H, IGV, "IGV")],
+    ),
     "APORTE_CAPITAL": (
         "Aporte de capital",
         [(None, D, MEDIO, "Ingreso de dinero"), ("1421", H, TOTAL, "Capital suscrito por cobrar")],

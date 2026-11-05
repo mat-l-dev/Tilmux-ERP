@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block titulo %}Nota de crédito{% endblock %}
+{% block titulo_pagina %}Nota de crédito{% endblock %}
+
+{% block contenido %}
+<div class="doc">
+  <div class="doc-main">
+    <section class="card">
+      <header class="card-head">
+        <h2>Nota de crédito sobre {{ venta.serie }}-{{ venta.numero }}</h2>
+        <span class="chip">{{ venta.cliente_nombre }}</span>
+      </header>
+
+      <form method="post" class="form">
+        {% csrf_token %}
+        <div class="grid-fields">
+          <label class="field">
+            <span>Fecha</span>
+            <input type="date" name="fecha" value="{{ hoy|date:'Y-m-d' }}" required>
+          </label>
+          <label class="field">
+            <span>Serie</span>
+            <input type="text" name="serie" value="FC01" maxlength="4" required>
+          </label>
+          <label class="field">
+            <span>Número</span>
+            <input type="text" name="numero" maxlength="20" required>
+          </label>
+          <label class="field field-wide">
+            <span>Motivo (catálogo 09)</span>
+            <select name="motivo" required>
+              {% for codigo, texto in motivos %}
+              <option value="{{ codigo }}" {% if codigo == "07" %}selected{% endif %}>{{ codigo }} · {{ texto }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label class="field field-full">
+            <span>Descripción</span>
+            <input type="text" name="descripcion" maxlength="200" placeholder="Opcional">
+          </label>
+        </div>
+
+        <table class="tabla-doc">
+          <thead>
+            <tr>
+              <th>Producto</th>
+              <th class="der">Vendido</th>
+              <th class="der">Ya acreditado</th>
+              <th class="der">Disponible</th>
+              <th class="der">A acreditar</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for l in lineas %}
+            <tr>
+              <td>{{ l.producto.sku }} · {{ l.producto.nombre }}</td>
+              <td class="num der">{{ l.cantidad }}</td>
+              <td class="num der">{{ l.acreditado }}</td>
+              <td class="num der">{{ l.disponible }}</td>
+              <td>
+                <input class="num der" name="cantidad_{{ l.pk }}" inputmode="decimal"
+                       placeholder="0" {% if l.disponible <= 0 %}disabled{% endif %}>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+        <label class="switch">
+          <input type="checkbox" name="reingresa" checked>
+          <span>El producto vuelve al inventario</span>
+        </label>
+
+        <button class="btn btn-primary" type="submit">Emitir nota de crédito</button>
+      </form>
+    </section>
+  </div>
+
+  <aside class="doc-side">
+    <div class="card sticky">
+      <header class="card-head"><h2>Qué hace</h2></header>
+      <p class="preview-note">
+        Disminuye el importe del comprobante, revierte el IGV y, si el bien vuelve,
+        reingresa el stock al costo original de la venta.
+      </p>
+      <p class="preview-note">
+        Una nota de crédito modifica un solo comprobante. Si necesitas ajustar dos,
+        emites dos notas.
+      </p>
+      <a class="btn btn-ghost btn-block" href="{% url 'ventas:detalle' venta.pk %}">Volver</a>
+    </div>
+  </aside>
+</div>
+{% endblock %}

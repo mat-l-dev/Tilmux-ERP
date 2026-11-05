@@ -6,13 +6,21 @@ from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 
 from django.db import transaction
+from django.db.models import Sum
 from django.utils import timezone
 
 from contabilidad.servicios import Montos, postear
 from inventario.servicios import entrar, salir
 from tesoreria.servicios import registrar
 
-from .models import Cotizacion, NotaCredito, Venta, VentaLinea
+from .models import (
+    Cotizacion,
+    NotaCredito,
+    NotaCreditoLinea,
+    NotaDebito,
+    Venta,
+    VentaLinea,
+)
 
 CENT = Decimal("0.01")
 LIMITE_IDENTIFICACION = Decimal("700.00")
@@ -120,38 +128,92 @@ def emitir_nota_credito(
     fecha: date,
     serie: str,
     numero: str,
-    motivo: str,
+    motivo_codigo: str,
+    cantidades: dict | None = None,
     reingresa_stock: bool = True,
+    descripcion: str = "",
 ) -> NotaCredito:
+    """Emite una nota de crédito total o por ítem, según las cantidades."""
     venta = Venta.objects.get(pk=venta.pk)
     if venta.estado != Venta.Estado.CONFIRMADA:
         raise VentaError("Solo se acredita una venta confirmada.")
 
-    if reingresa_stock:
-        for linea in venta.lineas.select_related("producto"):
-            entrar(
-                empresa=venta.empresa,
-                producto=linea.producto,
-                fecha=fecha,
-                cantidad=linea.cantidad,
-                costo_unitario=linea.costo_unitario,
-                origen_tipo="NOTA_CREDITO",
-                origen_id=venta.pk,
-                glosa=f"Devolución {serie}-{numero}",
+    lineas = list(venta.lineas.select_related("producto"))
+    if not lineas:
+        raise VentaError("La venta no tiene líneas.")
+
+    if cantidades is None:
+        cantidades = {linea.pk: linea.cantidad for linea in lineas}
+
+    acreditado = {
+        fila["venta_linea_id"]: fila["total"]
+        for fila in NotaCreditoLinea.objects.filter(nota__venta=venta)
+        .values("venta_linea_id")
+        .annotate(total=Sum("cantidad"))
+    }
+
+    seleccion = []
+    base_total = Decimal("0.00")
+    igv_total = Decimal("0.00")
+    costo_total = Decimal("0.00")
+
+    for linea in lineas:
+        pedida = Decimal(cantidades.get(linea.pk, 0) or 0)
+        if pedida <= 0:
+            continue
+        disponible = linea.cantidad - acreditado.get(linea.pk, Decimal("0"))
+        if pedida > disponible:
+            raise VentaError(
+                f"No puedes acreditar {pedida} de {linea.producto.sku}: "
+                f"solo quedan {disponible}."
             )
+        proporcion = pedida / linea.cantidad
+        base = (linea.base * proporcion).quantize(CENT)
+        igv = (linea.igv * proporcion).quantize(CENT)
+        costo = (linea.costo_total * proporcion).quantize(CENT)
+        seleccion.append((linea, pedida, base, igv, base + igv, costo))
+        base_total += base
+        igv_total += igv
+        costo_total += costo
+
+    if not seleccion:
+        raise VentaError("No indicaste ninguna cantidad a acreditar.")
 
     nota = NotaCredito.objects.create(
         venta=venta,
         fecha=fecha,
         serie=serie,
         numero=numero,
-        motivo=motivo[:200],
-        base=venta.subtotal,
-        igv=venta.igv,
-        total=venta.total,
-        costo=venta.costo_venta,
+        motivo=(descripcion or dict(NotaCredito.Motivo.choices)[motivo_codigo])[:200],
+        motivo_codigo=motivo_codigo,
+        base=base_total,
+        igv=igv_total,
+        total=base_total + igv_total,
+        costo=costo_total,
         reingresa_stock=reingresa_stock,
     )
+
+    for linea, pedida, base, igv, total, costo in seleccion:
+        NotaCreditoLinea.objects.create(
+            nota=nota,
+            venta_linea=linea,
+            cantidad=pedida,
+            base=base,
+            igv=igv,
+            total=total,
+            costo_total=costo,
+        )
+        if reingresa_stock:
+            entrar(
+                empresa=venta.empresa,
+                producto=linea.producto,
+                fecha=fecha,
+                cantidad=pedida,
+                costo_unitario=linea.costo_unitario,
+                origen_tipo="NOTA_CREDITO",
+                origen_id=nota.pk,
+                glosa=f"Devolución {serie}-{numero}",
+            )
 
     postear(
         empresa=venta.empresa,
@@ -159,12 +221,58 @@ def emitir_nota_credito(
         tipo="NOTA_CREDITO",
         glosa=f"Nota de crédito {serie}-{numero}",
         montos=Montos(
-            base=venta.subtotal,
-            igv=venta.igv,
-            total=venta.total,
-            costo=venta.costo_venta,
+            base=base_total,
+            igv=igv_total,
+            total=base_total + igv_total,
+            costo=costo_total,
         ),
         origen_tipo="NOTA_CREDITO",
+        origen_id=nota.pk,
+    )
+    return nota
+
+
+@transaction.atomic
+def emitir_nota_debito(
+    *,
+    venta: Venta,
+    fecha: date,
+    serie: str,
+    numero: str,
+    motivo_codigo: str,
+    base: Decimal,
+    igv: Decimal,
+    descripcion: str = "",
+) -> NotaDebito:
+    """Nota de débito: aumenta el importe del comprobante original."""
+    venta = Venta.objects.get(pk=venta.pk)
+    if venta.estado != Venta.Estado.CONFIRMADA:
+        raise VentaError("Solo se debita una venta confirmada.")
+
+    base, igv = _cent(base), _cent(igv)
+    total = base + igv
+    if total <= 0:
+        raise VentaError("La nota de débito debe tener un importe mayor a cero.")
+
+    nota = NotaDebito.objects.create(
+        venta=venta,
+        fecha=fecha,
+        serie=serie,
+        numero=numero,
+        motivo_codigo=motivo_codigo,
+        descripcion=descripcion[:200],
+        base=base,
+        igv=igv,
+        total=total,
+    )
+
+    postear(
+        empresa=venta.empresa,
+        fecha=fecha,
+        tipo="NOTA_DEBITO",
+        glosa=f"Nota de débito {serie}-{numero}",
+        montos=Montos(base=base, igv=igv, total=total),
+        origen_tipo="NOTA_DEBITO",
         origen_id=nota.pk,
     )
     return nota
