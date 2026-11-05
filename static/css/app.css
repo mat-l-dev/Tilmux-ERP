@@ -1205,3 +1205,7 @@ select {
   border-color: var(--line);
   background: var(--surface);
 }
+
+.tabla-registro {
+  min-width: 1100px;
+}

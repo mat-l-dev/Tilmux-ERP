@@ -17,7 +17,8 @@
   </header>
 
   {% if filas %}
-  <table class="tabla-doc">
+  <div class="tabla-scroll">
+  <table class="tabla-doc tabla-registro">
     <thead>
       <tr>
         <th>Fecha</th>
@@ -25,6 +26,7 @@
         <th>Serie y número</th>
         <th>RUC</th>
         <th>Proveedor</th>
+        <th>Detalle</th>
         <th>Crédito</th>
         <th class="der">Base</th>
         <th class="der">No gravado</th>
@@ -43,6 +45,7 @@
         <td>{{ f.documento|default:"—" }}</td>
         <td class="num">{{ f.ruc|default:"—" }}</td>
         <td>{{ f.proveedor }}</td>
+        <td class="muted">{{ f.detalle|default:"—"|truncatechars:70 }}</td>
         <td>
           {% if f.credito %}Sí{% else %}<span class="chip chip-warn">No</span>{% endif %}
         </td>
@@ -55,7 +58,7 @@
     </tbody>
     <tfoot>
       <tr>
-        <td colspan="6"><strong>Totales</strong></td>
+        <td colspan="7"><strong>Totales</strong></td>
         <td class="num der"><strong>{{ base|floatformat:2 }}</strong></td>
         <td class="num der"><strong>{{ no_gravado|floatformat:2 }}</strong></td>
         <td class="num der"><strong>{{ igv|floatformat:2 }}</strong></td>
@@ -63,6 +66,7 @@
       </tr>
     </tfoot>
   </table>
+  </div>
   {% if page_obj.has_other_pages %}
   <nav class="paginacion">
     {% if page_obj.has_previous %}<a href="{% querystring page=page_obj.previous_page_number %}">Anterior</a>{% endif %}

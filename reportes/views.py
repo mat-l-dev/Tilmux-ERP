@@ -233,7 +233,7 @@ def registro_compras(request):
             empresa=empresa,
             estado=Compra.Estado.CONFIRMADA,
             fecha__range=(desde, hasta),
-        ).select_related("proveedor"):
+        ).select_related("proveedor").prefetch_related("lineas"):
             usa_credito = (
                 compra.con_credito
                 and compra.estado == Compra.Estado.CONFIRMADA
@@ -242,6 +242,11 @@ def registro_compras(request):
                 and len(compra.proveedor.numero_doc) == 11
             )
             pendiente = compra.estado != Compra.Estado.CONFIRMADA or not usa_credito
+            detalle = compra.glosa or " · ".join(
+                linea.descripcion
+                for linea in compra.lineas.all()[:2]
+                if linea.descripcion
+            )
             filas.append(
                 {
                     "fecha": compra.fecha,
@@ -249,6 +254,7 @@ def registro_compras(request):
                     "documento": f"{compra.serie}-{compra.numero}".strip(" -"),
                     "ruc": compra.proveedor.numero_doc,
                     "proveedor": compra.proveedor.nombre,
+                    "detalle": detalle,
                     "base": compra.subtotal if usa_credito and compra.igv > 0 else 0,
                     "no_gravado": compra.subtotal if usa_credito and compra.igv == 0 else 0,
                     "igv": compra.igv if usa_credito and compra.igv > 0 else 0,
@@ -275,6 +281,7 @@ def registro_compras(request):
                     "documento": f"{gasto.serie}-{gasto.numero}".strip(" -"),
                     "ruc": gasto.proveedor.numero_doc,
                     "proveedor": gasto.proveedor.nombre,
+                    "detalle": gasto.glosa,
                     "base": gasto.base if usa_credito and gasto.igv > 0 else 0,
                     "no_gravado": gasto.base
                     if usa_credito and gasto.igv == 0
