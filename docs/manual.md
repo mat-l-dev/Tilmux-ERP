@@ -101,6 +101,10 @@ Un usuario sin perfil se trata como administrador.
 **Ventas → Nueva venta.** Eliges boleta o factura, el cliente y las líneas. El
 panel derecho muestra el asiento que se generará.
 
+Mientras la venta esté en borrador, el detalle tiene **Editar** para corregir
+descripciones, cantidades o precios. Una venta confirmada no se edita: se corrige
+con nota de crédito o débito, que es lo que exige SUNAT.
+
 Al confirmar: descuenta stock por PEPS, calcula el costo real y registra el cobro.
 
 Una factura exige RUC. Una boleta mayor a S/ 700 exige identificar al comprador.

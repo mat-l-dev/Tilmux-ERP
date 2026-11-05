@@ -277,6 +277,7 @@ def nueva(request):
     compra.serie = datos["serie"].upper()[:4]
     compra.numero = datos["numero"][:20]
     compra.glosa = datos.get("glosa", "")[:255]
+    compra.con_credito = datos["tipo_doc"] == Compra.TipoDoc.FACTURA
     compra.estado = (
         Compra.Estado.PENDIENTE if factura_pendiente else Compra.Estado.BORRADOR
     )
@@ -733,6 +734,13 @@ def corregir(request, pk: int):
         compra.glosa = request.POST.get("glosa", "")[:255]
         tipo = request.POST.get("tipo_doc", "")
         if tipo in Compra.TipoDoc.values:
+            if (tipo == Compra.TipoDoc.FACTURA) != compra.con_credito:
+                messages.error(
+                    request,
+                    "Cambiar el tipo cambiaría el crédito fiscal. Anula la compra "
+                    "y vuelve a registrarla con el tipo correcto.",
+                )
+                return redirect("compras:detalle", compra.pk)
             compra.tipo_doc = tipo
         if not compra.serie.strip():
             compra.serie = request.POST.get("serie", "").upper()[:4]
