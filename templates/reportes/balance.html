@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block titulo %}Balance de comprobación{% endblock %}
+{% block titulo_pagina %}Balance de comprobación{% endblock %}
+
+{% block contenido %}
+{% include "reportes/_tabs.html" %}
+{% include "reportes/_filtro.html" %}
+
+<section class="card">
+  <header class="card-head">
+    <h2>Movimientos por cuenta</h2>
+    <span class="chip">{{ desde|date:"d/m/Y" }} — {{ hasta|date:"d/m/Y" }}</span>
+  </header>
+
+  {% if filas %}
+  <table class="tabla-doc">
+    <thead>
+      <tr>
+        <th>Cuenta</th>
+        <th>Nombre</th>
+        <th class="der">Debe</th>
+        <th class="der">Haber</th>
+        <th class="der">Saldo deudor</th>
+        <th class="der">Saldo acreedor</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for f in filas %}
+      <tr>
+        <td>{{ f.codigo }}</td>
+        <td>{{ f.nombre }}</td>
+        <td class="num der">{{ f.total_debe|floatformat:2 }}</td>
+        <td class="num der">{{ f.total_haber|floatformat:2 }}</td>
+        <td class="num der">{{ f.saldo_deudor|floatformat:2 }}</td>
+        <td class="num der">{{ f.saldo_acreedor|floatformat:2 }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="2"><strong>Totales</strong></td>
+        <td class="num der"><strong>{{ total_debe|floatformat:2 }}</strong></td>
+        <td class="num der"><strong>{{ total_haber|floatformat:2 }}</strong></td>
+        <td colspan="2"></td>
+      </tr>
+    </tfoot>
+  </table>
+  {% else %}
+  <p class="muted">No hay asientos en el rango elegido.</p>
+  {% endif %}
+</section>
+{% endblock %}

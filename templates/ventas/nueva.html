@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+
+{% block titulo %}Nueva venta{% endblock %}
+{% block titulo_pagina %}Nueva venta{% endblock %}
+
+{% block contenido %}
+<form method="post" class="doc">
+  {% csrf_token %}
+
+  <div class="doc-main">
+    {% if errores %}
+    <div class="message error">
+      {% for e in errores %}<div>{{ e }}</div>{% endfor %}
+    </div>
+    {% endif %}
+
+    <section class="card">
+      <header class="card-head"><h2>Comprobante</h2></header>
+      <div class="grid-fields">
+        <label class="field">
+          <span>Fecha</span>
+          <input type="date" name="fecha" value="{{ cabecera.fecha }}" required>
+        </label>
+        <label class="field">
+          <span>Tipo</span>
+          <select name="tipo_doc">
+            <option value="BOLETA" {% if cabecera.tipo_doc == "BOLETA" %}selected{% endif %}>Boleta</option>
+            <option value="FACTURA" {% if cabecera.tipo_doc == "FACTURA" %}selected{% endif %}>Factura</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Serie</span>
+          <input type="text" name="serie" value="{{ cabecera.serie }}" maxlength="4" required>
+        </label>
+        <label class="field">
+          <span>Número</span>
+          <input type="text" name="numero" value="{{ cabecera.numero }}" maxlength="20" required>
+        </label>
+        <label class="field field-wide">
+          <span>Cliente</span>
+          <input type="text" name="cliente_nombre" value="{{ cabecera.cliente_nombre }}" placeholder="Consumidor final">
+        </label>
+        <label class="field">
+          <span>RUC o DNI</span>
+          <input type="text" name="cliente_doc" value="{{ cabecera.cliente_doc }}" maxlength="11" inputmode="numeric">
+        </label>
+        <label class="field">
+          <span>Condición</span>
+          <select name="condicion">
+            <option value="CONTADO" {% if cabecera.condicion == "CONTADO" %}selected{% endif %}>Contado</option>
+            <option value="CREDITO" {% if cabecera.condicion == "CREDITO" %}selected{% endif %}>Crédito</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Cuenta</span>
+          <select name="cuenta">
+            {% for c in cuentas %}
+            <option value="{{ c.pk }}" {% if cabecera.cuenta|stringformat:"s" == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.nombre }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="field">
+          <span>Canal</span>
+          <select name="canal">
+            <option value="TRANSFERENCIA" {% if cabecera.canal == "TRANSFERENCIA" %}selected{% endif %}>Transferencia</option>
+            <option value="YAPE" {% if cabecera.canal == "YAPE" %}selected{% endif %}>Yape</option>
+            <option value="PLIN" {% if cabecera.canal == "PLIN" %}selected{% endif %}>Plin</option>
+            <option value="QR" {% if cabecera.canal == "QR" %}selected{% endif %}>QR</option>
+            <option value="TARJETA" {% if cabecera.canal == "TARJETA" %}selected{% endif %}>Tarjeta</option>
+            <option value="EFECTIVO" {% if cabecera.canal == "EFECTIVO" %}selected{% endif %}>Efectivo</option>
+          </select>
+        </label>
+        <label class="field field-full">
+          <span>Glosa</span>
+          <input type="text" name="glosa" value="{{ cabecera.glosa }}" maxlength="255">
+        </label>
+      </div>
+    </section>
+
+    <section class="card">
+      <header class="card-head">
+        <h2>Líneas</h2>
+        <label class="switch">
+          <input type="checkbox" name="con_igv" id="id_con_igv" {% if con_igv %}checked{% endif %}>
+          <span>Los precios incluyen IGV</span>
+        </label>
+      </header>
+
+      <table class="tabla-doc" data-lineas>
+        <thead>
+          <tr>
+            <th>Producto</th>
+            <th class="der">Cantidad</th>
+            <th class="der">Precio</th>
+            <th class="der">Base</th>
+            <th class="der">IGV</th>
+            <th class="der">Total</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for fila in filas %}
+          <tr data-base="{{ fila.base|default:0 }}" data-igv="{{ fila.igv|default:0 }}" data-total="{{ fila.total|default:0 }}">
+            <td>
+              <select name="linea_producto" class="js-producto">
+                <option value="">—</option>
+                {% for p in productos %}
+                <option value="{{ p.pk }}" {% if fila.seleccionado == p.pk %}selected{% endif %}>{{ p.sku }} · {{ p.nombre }}</option>
+                {% endfor %}
+              </select>
+            </td>
+            <td><input class="js-cantidad num der" name="linea_cantidad" value="{{ fila.cantidad|default:'' }}" inputmode="decimal"></td>
+            <td><input class="js-precio num der" name="linea_precio" value="{{ fila.precio|default:'' }}" inputmode="decimal"></td>
+            <td class="num der js-base">{{ fila.base|default:"0,00" }}</td>
+            <td class="num der js-igv">{{ fila.igv|default:"0,00" }}</td>
+            <td class="num der js-total">{{ fila.total|default:"0,00" }}</td>
+            <td class="accion"><button type="button" class="icon-btn" data-quitar-linea title="Quitar">×</button></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <div class="doc-actions">
+        <button type="button" class="btn btn-ghost" data-agregar-linea>+ Agregar línea</button>
+      </div>
+    </section>
+  </div>
+
+  <aside class="doc-side">
+    <div class="card sticky">
+      <header class="card-head"><h2>Resumen</h2></header>
+      <dl class="totales">
+        <div><dt>Base</dt><dd class="num" data-total-base>0,00</dd></div>
+        <div><dt>IGV</dt><dd class="num" data-total-igv>0,00</dd></div>
+        <div class="total"><dt>Total</dt><dd class="num" data-total-total>0,00</dd></div>
+      </dl>
+
+      <div class="preview">
+        <p class="preview-title">Asiento estimado</p>
+        <div class="preview-row"><span>1212 · Por cobrar</span><b class="num" data-total-cobrar>0,00</b></div>
+        <div class="preview-row"><span>70121 · Ingreso</span><b class="num" data-total-base>0,00</b></div>
+        <div class="preview-row"><span>40111 · IGV</span><b class="num" data-total-igv>0,00</b></div>
+        <p class="preview-note">El costo de venta se calcula al confirmar, con la capa más antigua.</p>
+      </div>
+
+      <button class="btn btn-primary btn-block" type="submit">Guardar borrador</button>
+      <p class="preview-note">Después podrás revisarlo y confirmarlo.</p>
+    </div>
+  </aside>
+</form>
+{% endblock %}

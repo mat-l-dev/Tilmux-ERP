@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block titulo %}Libro mayor{% endblock %}
+{% block titulo_pagina %}Libro mayor{% endblock %}
+
+{% block contenido %}
+{% include "reportes/_tabs.html" %}
+{% include "reportes/_filtro.html" %}
+
+<section class="card">
+  <header class="card-head">
+    <h2>{% if cuenta %}{{ cuenta.codigo }} · {{ cuenta.nombre }}{% else %}Elige una cuenta{% endif %}</h2>
+    {% if cuenta %}<span class="chip">Saldo {{ saldo|floatformat:2 }}</span>{% endif %}
+  </header>
+
+  {% if movimientos %}
+  <table class="tabla-doc">
+    <thead>
+      <tr>
+        <th>Fecha</th>
+        <th>Asiento</th>
+        <th>Glosa</th>
+        <th class="der">Debe</th>
+        <th class="der">Haber</th>
+        <th class="der">Saldo</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for m in movimientos %}
+      <tr>
+        <td>{{ m.linea.asiento.fecha|date:"d/m/Y" }}</td>
+        <td>{{ m.linea.asiento.numero }}</td>
+        <td class="muted">{{ m.linea.glosa }}</td>
+        <td class="num der">{{ m.linea.debe|floatformat:2 }}</td>
+        <td class="num der">{{ m.linea.haber|floatformat:2 }}</td>
+        <td class="num der">{{ m.saldo|floatformat:2 }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% elif codigo %}
+  <p class="muted">Esa cuenta no tiene movimientos en el rango.</p>
+  {% else %}
+  <p class="muted">Escribe un código de cuenta, por ejemplo 1212, y aplica el filtro.</p>
+  {% endif %}
+</section>
+{% endblock %}

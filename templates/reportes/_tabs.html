@@ -1,0 +1,6 @@
+<nav class="tabs">
+  <a class="tab {% if '/reportes/balance' in request.path %}is-active{% endif %}" href="{% url 'reportes:balance' %}">Balance</a>
+  <a class="tab {% if '/reportes/mayor' in request.path %}is-active{% endif %}" href="{% url 'reportes:mayor' %}">Mayor</a>
+  <a class="tab {% if '/reportes/ventas' in request.path %}is-active{% endif %}" href="{% url 'reportes:registro_ventas' %}">Registro de ventas</a>
+  <a class="tab {% if '/reportes/impuestos' in request.path %}is-active{% endif %}" href="{% url 'reportes:impuestos' %}">IGV y RER</a>
+</nav>

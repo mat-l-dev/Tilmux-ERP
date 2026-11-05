@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block titulo %}Ventas{% endblock %}
+{% block titulo_pagina %}Ventas{% endblock %}
+
+{% block contenido %}
+<section class="card">
+  <header class="card-head">
+    <h2>Comprobantes emitidos</h2>
+    <a class="btn btn-primary" href="{% url 'ventas:nueva' %}">Nueva venta</a>
+  </header>
+
+  {% if ventas %}
+  <table class="tabla-doc">
+    <thead>
+      <tr>
+        <th>Fecha</th>
+        <th>Comprobante</th>
+        <th>Cliente</th>
+        <th class="der">Total</th>
+        <th>Estado</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for v in ventas %}
+      <tr>
+        <td>{{ v.fecha|date:"d/m/Y" }}</td>
+        <td><a href="{% url 'ventas:detalle' v.pk %}">{{ v.serie }}-{{ v.numero }}</a></td>
+        <td>{{ v.cliente_nombre|default:"Consumidor final" }}</td>
+        <td class="num der">{{ v.total }}</td>
+        <td><span class="chip {% if v.estado == 'CONFIRMADA' %}chip-ok{% endif %}">{{ v.get_estado_display }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">Todavía no hay ventas registradas.</p>
+  {% endif %}
+</section>
+{% endblock %}

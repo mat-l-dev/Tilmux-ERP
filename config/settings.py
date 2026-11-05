@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     "compras",
     "tesoreria",
     "ventas",
+    "reportes",
 ]
 
 MIDDLEWARE = [

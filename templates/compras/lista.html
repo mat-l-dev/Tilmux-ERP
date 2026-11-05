@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block titulo %}Compras{% endblock %}
+{% block titulo_pagina %}Compras{% endblock %}
+
+{% block contenido %}
+<section class="card">
+  <header class="card-head">
+    <h2>Comprobantes de proveedores</h2>
+    <a class="btn btn-primary" href="{% url 'compras:nueva' %}">Nueva compra</a>
+  </header>
+
+  {% if compras %}
+  <table class="tabla-doc">
+    <thead>
+      <tr>
+        <th>Fecha</th>
+        <th>Comprobante</th>
+        <th>Proveedor</th>
+        <th class="der">Total</th>
+        <th>Estado</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in compras %}
+      <tr>
+        <td>{{ c.fecha|date:"d/m/Y" }}</td>
+        <td><a href="{% url 'compras:detalle' c.pk %}">{{ c.serie }}-{{ c.numero }}</a></td>
+        <td>{{ c.proveedor.nombre }}</td>
+        <td class="num der">{{ c.total }}</td>
+        <td><span class="chip {% if c.estado == 'CONFIRMADA' %}chip-ok{% endif %}">{{ c.get_estado_display }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">Todavía no hay compras registradas.</p>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block titulo %}Nueva compra{% endblock %}
+{% block titulo_pagina %}Nueva compra{% endblock %}
+
+{% block contenido %}
+<form method="post" class="doc">
+  {% csrf_token %}
+
+  <div class="doc-main">
+    {% if errores %}
+    <div class="message error">
+      {% for e in errores %}<div>{{ e }}</div>{% endfor %}
+    </div>
+    {% endif %}
+
+    <section class="card">
+      <header class="card-head"><h2>Comprobante del proveedor</h2></header>
+      <div class="grid-fields">
+        <label class="field">
+          <span>Fecha</span>
+          <input type="date" name="fecha" value="{{ cabecera.fecha }}" required>
+        </label>
+        <label class="field">
+          <span>Tipo</span>
+          <select name="tipo_doc">
+            <option value="FACTURA" {% if cabecera.tipo_doc == "FACTURA" %}selected{% endif %}>Factura</option>
+            <option value="BOLETA" {% if cabecera.tipo_doc == "BOLETA" %}selected{% endif %}>Boleta</option>
+            <option value="OTRO" {% if cabecera.tipo_doc == "OTRO" %}selected{% endif %}>Otro</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Serie</span>
+          <input type="text" name="serie" value="{{ cabecera.serie }}" maxlength="4">
+        </label>
+        <label class="field">
+          <span>Número</span>
+          <input type="text" name="numero" value="{{ cabecera.numero }}" maxlength="20">
+        </label>
+
+        <label class="field field-wide">
+          <span>Proveedor</span>
+          <select name="proveedor">
+            <option value="">— Nuevo proveedor —</option>
+            {% for p in proveedores %}
+            <option value="{{ p.pk }}" {% if cabecera.proveedor|stringformat:"s" == p.pk|stringformat:"s" %}selected{% endif %}>{{ p.nombre }} · {{ p.numero_doc }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="field">
+          <span>RUC del nuevo</span>
+          <input type="text" name="proveedor_ruc" maxlength="11" inputmode="numeric" placeholder="20123456789">
+        </label>
+        <label class="field field-wide">
+          <span>Nombre del nuevo</span>
+          <input type="text" name="proveedor_nombre" placeholder="Razón social">
+        </label>
+        <label class="field field-full">
+          <span>Glosa</span>
+          <input type="text" name="glosa" value="{{ cabecera.glosa }}" maxlength="255">
+        </label>
+      </div>
+    </section>
+
+    <section class="card">
+      <header class="card-head"><h2>Mercadería</h2><span class="chip">Precios sin IGV</span></header>
+      <table class="tabla-doc" data-lineas-compra>
+        <thead>
+          <tr>
+            <th>Producto</th>
+            <th class="der">Cantidad</th>
+            <th class="der">Costo unitario</th>
+            <th class="der">Base</th>
+            <th class="der">IGV</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for fila in filas %}
+          <tr>
+            <td>
+              <select name="linea_producto">
+                <option value="">—</option>
+                {% for p in productos %}
+                <option value="{{ p.pk }}" {% if fila.seleccionado == p.pk %}selected{% endif %}>{{ p.sku }} · {{ p.nombre }}</option>
+                {% endfor %}
+              </select>
+            </td>
+            <td><input class="js-cantidad num der" name="linea_cantidad" value="{{ fila.cantidad|default:'' }}" inputmode="decimal"></td>
+            <td><input class="js-precio num der" name="linea_precio" value="{{ fila.precio|default:'' }}" inputmode="decimal"></td>
+            <td class="num der js-base">0,00</td>
+            <td class="num der js-igv">0,00</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <header class="card-head"><h2>Costos de internamiento</h2><span class="chip">Se prorratean por valor</span></header>
+      <table class="tabla-doc">
+        <thead>
+          <tr><th>Concepto</th><th class="der">Base</th><th class="der">IGV</th></tr>
+        </thead>
+        <tbody>
+          {% for c in costos %}
+          <tr>
+            <td><input name="costo_concepto" value="{{ c.concepto|default:'' }}" placeholder="Flete, aduana, seguro…"></td>
+            <td><input class="num der" name="costo_base" value="{{ c.base|default:'' }}" inputmode="decimal" data-costo-base></td>
+            <td><input class="num der" name="costo_igv" value="{{ c.igv|default:'' }}" inputmode="decimal" data-costo-igv></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+  </div>
+
+  <aside class="doc-side">
+    <div class="card sticky">
+      <header class="card-head"><h2>Resumen</h2></header>
+      <dl class="totales">
+        <div><dt>Base</dt><dd class="num" data-total-base>0,00</dd></div>
+        <div><dt>IGV</dt><dd class="num" data-total-igv>0,00</dd></div>
+        <div class="total"><dt>Total</dt><dd class="num" data-total-total>0,00</dd></div>
+      </dl>
+
+      <div class="preview">
+        <p class="preview-title">Asiento estimado</p>
+        <div class="preview-row"><span>20111 · Inventario</span><b class="num" data-total-base>0,00</b></div>
+        <div class="preview-row"><span>40111 · IGV</span><b class="num" data-total-igv>0,00</b></div>
+        <div class="preview-row"><span>4212 · Por pagar</span><b class="num" data-total-total>0,00</b></div>
+        <p class="preview-note">El costo unitario final incluye los costos de internamiento.</p>
+      </div>
+
+      <button class="btn btn-primary btn-block" type="submit">Guardar borrador</button>
+      <p class="preview-note">Después podrás revisarlo y confirmarlo.</p>
+    </div>
+  </aside>
+</form>
+{% endblock %}

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block titulo %}Registro de ventas{% endblock %}
+{% block titulo_pagina %}Registro de ventas{% endblock %}
+
+{% block contenido %}
+{% include "reportes/_tabs.html" %}
+{% include "reportes/_filtro.html" %}
+
+<section class="card">
+  <header class="card-head">
+    <h2>Ventas confirmadas</h2>
+    <span class="chip">{{ desde|date:"d/m/Y" }} — {{ hasta|date:"d/m/Y" }}</span>
+  </header>
+
+  {% if ventas %}
+  <table class="tabla-doc">
+    <thead>
+      <tr>
+        <th>Fecha</th>
+        <th>Comprobante</th>
+        <th>Cliente</th>
+        <th class="der">Base</th>
+        <th class="der">IGV</th>
+        <th class="der">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for v in ventas %}
+      <tr>
+        <td>{{ v.fecha|date:"d/m/Y" }}</td>
+        <td>{{ v.serie }}-{{ v.numero }}</td>
+        <td>{{ v.cliente_nombre|default:"Consumidor final" }}</td>
+        <td class="num der">{{ v.subtotal|floatformat:2 }}</td>
+        <td class="num der">{{ v.igv|floatformat:2 }}</td>
+        <td class="num der">{{ v.total|floatformat:2 }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="3"><strong>Totales</strong></td>
+        <td class="num der"><strong>{{ base|floatformat:2 }}</strong></td>
+        <td class="num der"><strong>{{ igv|floatformat:2 }}</strong></td>
+        <td class="num der"><strong>{{ total|floatformat:2 }}</strong></td>
+      </tr>
+    </tfoot>
+  </table>
+  {% else %}
+  <p class="muted">No hay ventas confirmadas en el rango.</p>
+  {% endif %}
+</section>
+{% endblock %}

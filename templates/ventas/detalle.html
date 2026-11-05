@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block titulo %}{{ venta.serie }}-{{ venta.numero }}{% endblock %}
+{% block titulo_pagina %}Venta {{ venta.serie }}-{{ venta.numero }}{% endblock %}
+
+{% block contenido %}
+<div class="doc">
+  <div class="doc-main">
+    <section class="card">
+      <header class="card-head">
+        <h2>Comprobante</h2>
+        <span class="chip {% if venta.estado == 'CONFIRMADA' %}chip-ok{% endif %}">{{ venta.get_estado_display }}</span>
+      </header>
+      <dl class="datos">
+        <div><dt>Fecha</dt><dd>{{ venta.fecha|date:"d/m/Y" }}</dd></div>
+        <div><dt>Tipo</dt><dd>{{ venta.get_tipo_doc_display }}</dd></div>
+        <div><dt>Cliente</dt><dd>{{ venta.cliente_nombre|default:"Consumidor final" }}</dd></div>
+        <div><dt>Condición</dt><dd>{{ venta.get_condicion_display }}</dd></div>
+      </dl>
+
+      <table class="tabla-doc">
+        <thead>
+          <tr>
+            <th>Producto</th>
+            <th class="der">Cantidad</th>
+            <th class="der">Precio</th>
+            <th class="der">Base</th>
+            <th class="der">IGV</th>
+            <th class="der">Total</th>
+            <th class="der">Costo</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for l in venta.lineas.all %}
+          <tr>
+            <td>{{ l.producto.sku }} · {{ l.producto.nombre }}</td>
+            <td class="num der">{{ l.cantidad }}</td>
+            <td class="num der">{{ l.precio_unitario }}</td>
+            <td class="num der">{{ l.base }}</td>
+            <td class="num der">{{ l.igv }}</td>
+            <td class="num der">{{ l.total }}</td>
+            <td class="num der">{{ l.costo_total }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <dl class="totales totales-inline">
+        <div><dt>Base</dt><dd class="num">{{ venta.subtotal }}</dd></div>
+        <div><dt>IGV</dt><dd class="num">{{ venta.igv }}</dd></div>
+        <div><dt>Costo de venta</dt><dd class="num">{{ venta.costo_venta }}</dd></div>
+        <div class="total"><dt>Total</dt><dd class="num">{{ venta.total }}</dd></div>
+      </dl>
+    </section>
+
+    {% if asiento %}
+    <section class="card">
+      <header class="card-head"><h2>Asiento contable</h2><span class="chip">N.º {{ asiento.numero }}</span></header>
+      <table class="tabla-doc">
+        <thead><tr><th>Cuenta</th><th>Glosa</th><th class="der">Debe</th><th class="der">Haber</th></tr></thead>
+        <tbody>
+          {% for l in asiento.lineas.all %}
+          <tr>
+            <td>{{ l.cuenta.codigo }} · {{ l.cuenta.nombre }}</td>
+            <td class="muted">{{ l.glosa }}</td>
+            <td class="num der">{{ l.debe }}</td>
+            <td class="num der">{{ l.haber }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+    {% endif %}
+  </div>
+
+  <aside class="doc-side">
+    <div class="card sticky">
+      <header class="card-head"><h2>Acciones</h2></header>
+      {% if venta.estado == "BORRADOR" %}
+      <form method="post" action="{% url 'ventas:confirmar' venta.pk %}">
+        {% csrf_token %}
+        <button class="btn btn-primary btn-block" type="submit">Confirmar venta</button>
+      </form>
+      <p class="preview-note">Al confirmar se descuenta el stock, se genera el costo y se registra el asiento.</p>
+      {% else %}
+      <p class="muted">Esta venta ya está confirmada. Para corregirla se emite una nota de crédito.</p>
+      {% endif %}
+      <a class="btn btn-ghost btn-block" href="{% url 'ventas:lista' %}">Volver a la lista</a>
+    </div>
+  </aside>
+</div>
+{% endblock %}

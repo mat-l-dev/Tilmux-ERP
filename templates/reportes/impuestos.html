@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block titulo %}IGV y RER{% endblock %}
+{% block titulo_pagina %}IGV y RER del periodo{% endblock %}
+
+{% block contenido %}
+{% include "reportes/_tabs.html" %}
+{% include "reportes/_filtro.html" %}
+
+<section class="kpis">
+  <article class="kpi">
+    <span class="kpi-label">IGV de ventas</span>
+    <span class="kpi-value num">S/ {{ ventas_igv|floatformat:2 }}</span>
+    <span class="kpi-note">Base {{ ventas_base|floatformat:2 }}</span>
+  </article>
+  <article class="kpi">
+    <span class="kpi-label">IGV de compras</span>
+    <span class="kpi-value num">S/ {{ compras_igv|floatformat:2 }}</span>
+    <span class="kpi-note">Base {{ compras_base|floatformat:2 }}</span>
+  </article>
+  <article class="kpi">
+    <span class="kpi-label">IGV del periodo</span>
+    <span class="kpi-value num">S/ {{ igv|floatformat:2 }}</span>
+    <span class="kpi-note">{% if igv < 0 %}Saldo a favor{% else %}Por pagar{% endif %}</span>
+  </article>
+  <article class="kpi">
+    <span class="kpi-label">Renta RER</span>
+    <span class="kpi-value num">S/ {{ renta|floatformat:2 }}</span>
+    <span class="kpi-note">1,5 % de {{ ventas_base|floatformat:2 }}</span>
+  </article>
+</section>
+
+<section class="card">
+  <header class="card-head"><h2>Cómo se compone</h2></header>
+  <dl class="totales">
+    <div><dt>Ventas netas (base)</dt><dd class="num">{{ ventas_base|floatformat:2 }}</dd></div>
+    <div><dt>IGV de ventas</dt><dd class="num">{{ ventas_igv|floatformat:2 }}</dd></div>
+    <div><dt>Compras netas (base)</dt><dd class="num">{{ compras_base|floatformat:2 }}</dd></div>
+    <div><dt>IGV de compras</dt><dd class="num">{{ compras_igv|floatformat:2 }}</dd></div>
+    <div class="total"><dt>IGV resultante</dt><dd class="num">{{ igv|floatformat:2 }}</dd></div>
+  </dl>
+  <p class="preview-note">
+    El saldo a favor se arrastra al mes siguiente. La renta RER se calcula sobre ingresos netos,
+    no sobre el resultado contable.
+  </p>
+</section>
+{% endblock %}

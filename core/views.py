@@ -21,6 +21,12 @@ from .context import empresa_actual
 from .models import Empresa, Periodo
 
 TASA_RENTA_RER = Decimal("0.015")
+MESES_CORTOS = ("Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Set", "Oct", "Nov", "Dic")
+
+
+def _meses_atras(anio: int, mes: int, pasos: int) -> tuple[int, int]:
+    total = anio * 12 + (mes - 1) - pasos
+    return total // 12, total % 12 + 1
 
 
 def soles(valor) -> str:
@@ -68,6 +74,33 @@ def panel(request: HttpRequest) -> HttpResponse:
     igv = Decimal(igv_ventas) - Decimal(igv_compras)
     renta = Decimal(ventas_base) * TASA_RENTA_RER
 
+    serie_meses = []
+    maximo = Decimal("0")
+    if empresa:
+        inicio_anio, inicio_mes = _meses_atras(hoy.year, hoy.month, 5)
+        acumulado = {
+            (fila["fecha__year"], fila["fecha__month"]): fila["total"]
+            for fila in Venta.objects.filter(
+                empresa=empresa,
+                estado=Venta.Estado.CONFIRMADA,
+                fecha__gte=date(inicio_anio, inicio_mes, 1),
+            )
+            .values("fecha__year", "fecha__month")
+            .annotate(total=Sum("total"))
+        }
+        for paso in range(5, -1, -1):
+            anio, mes = _meses_atras(hoy.year, hoy.month, paso)
+            valor = Decimal(acumulado.get((anio, mes), 0))
+            maximo = max(maximo, valor)
+            serie_meses.append(
+                {"etiqueta": MESES_CORTOS[mes - 1], "valor": valor, "actual": paso == 0}
+            )
+    for punto in serie_meses:
+        punto["altura"] = (
+            int(punto["valor"] * 100 / maximo) if maximo > 0 else 0
+        )
+        punto["texto"] = soles(punto["valor"])
+
     contexto = {
         "hoy": hoy,
         "cuentas_activas": Cuenta.objects.filter(activa=True).count(),
@@ -85,6 +118,8 @@ def panel(request: HttpRequest) -> HttpResponse:
             if empresa
             else None
         ),
+        "serie_meses": serie_meses,
+        "maximo_mes": soles(maximo),
     }
     return render(request, "core/panel.html", contexto)
 

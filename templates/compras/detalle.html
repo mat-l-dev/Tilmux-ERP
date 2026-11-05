@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block titulo %}Compra {{ compra.pk }}{% endblock %}
+{% block titulo_pagina %}Compra {{ compra.serie }}-{{ compra.numero }}{% endblock %}
+
+{% block contenido %}
+<div class="doc">
+  <div class="doc-main">
+    <section class="card">
+      <header class="card-head">
+        <h2>Comprobante</h2>
+        <span class="chip {% if compra.estado == 'CONFIRMADA' %}chip-ok{% endif %}">{{ compra.get_estado_display }}</span>
+      </header>
+      <dl class="datos">
+        <div><dt>Fecha</dt><dd>{{ compra.fecha|date:"d/m/Y" }}</dd></div>
+        <div><dt>Proveedor</dt><dd>{{ compra.proveedor.nombre }}</dd></div>
+        <div><dt>Documento</dt><dd>{{ compra.serie }}-{{ compra.numero }}</dd></div>
+        <div><dt>Tipo</dt><dd>{{ compra.get_tipo_doc_display }}</dd></div>
+      </dl>
+
+      <table class="tabla-doc">
+        <thead>
+          <tr>
+            <th>Producto</th>
+            <th class="der">Cantidad</th>
+            <th class="der">Costo unitario</th>
+            <th class="der">Costo final</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for l in compra.lineas.all %}
+          <tr>
+            <td>{{ l.producto.sku }} · {{ l.producto.nombre }}</td>
+            <td class="num der">{{ l.cantidad }}</td>
+            <td class="num der">{{ l.precio_unitario }}</td>
+            <td class="num der">{{ l.costo_unitario_final }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      {% if compra.costos.all %}
+      <p class="preview-title" style="margin-top:16px">Costos de internamiento</p>
+      <table class="tabla-doc">
+        <tbody>
+          {% for c in compra.costos.all %}
+          <tr><td>{{ c.concepto }}</td><td class="num der">{{ c.base }}</td><td class="num der">{{ c.igv }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+
+      <dl class="totales totales-inline">
+        <div><dt>Base</dt><dd class="num">{{ compra.subtotal }}</dd></div>
+        <div><dt>IGV</dt><dd class="num">{{ compra.igv }}</dd></div>
+        <div class="total"><dt>Total</dt><dd class="num">{{ compra.total }}</dd></div>
+      </dl>
+    </section>
+
+    {% if asiento %}
+    <section class="card">
+      <header class="card-head"><h2>Asiento contable</h2><span class="chip">N.º {{ asiento.numero }}</span></header>
+      <table class="tabla-doc">
+        <thead><tr><th>Cuenta</th><th>Glosa</th><th class="der">Debe</th><th class="der">Haber</th></tr></thead>
+        <tbody>
+          {% for l in asiento.lineas.all %}
+          <tr>
+            <td>{{ l.cuenta.codigo }} · {{ l.cuenta.nombre }}</td>
+            <td class="muted">{{ l.glosa }}</td>
+            <td class="num der">{{ l.debe }}</td>
+            <td class="num der">{{ l.haber }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+    {% endif %}
+  </div>
+
+  <aside class="doc-side">
+    <div class="card sticky">
+      <header class="card-head"><h2>Acciones</h2></header>
+      {% if compra.estado == "BORRADOR" %}
+      <form method="post" action="{% url 'compras:confirmar' compra.pk %}">
+        {% csrf_token %}
+        <button class="btn btn-primary btn-block" type="submit">Confirmar compra</button>
+      </form>
+      <p class="preview-note">Al confirmar se crean las capas de stock con su costo landed y el asiento.</p>
+      {% else %}
+      <p class="muted">Compra confirmada. El stock y la obligación ya están registrados.</p>
+      {% endif %}
+      <a class="btn btn-ghost btn-block" href="{% url 'compras:lista' %}">Volver a la lista</a>
+    </div>
+  </aside>
+</div>
+{% endblock %}

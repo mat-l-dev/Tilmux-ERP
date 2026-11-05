@@ -7,6 +7,8 @@
   <title>{% block titulo %}Panel{% endblock %} · Tilmux</title>
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
   <script src="{% static 'js/app.js' %}" defer></script>
+  <script src="{% static 'js/documento.js' %}" defer></script>
+  <script src="{% static 'js/compras.js' %}" defer></script>
 </head>
 <body>
 
@@ -40,10 +42,10 @@
       <a class="nav-item {% if url == 'panel' %}is-active{% endif %}" href="{% url 'core:panel' %}">
         <svg class="icon"><use href="#i-panel"></use></svg><span>Panel</span>
       </a>
-      <a class="nav-item" href="{% url 'core:proximamente' %}">
+      <a class="nav-item {% if 'ventas' in request.path %}is-active{% endif %}" href="{% url 'ventas:lista' %}">
         <svg class="icon"><use href="#i-ventas"></use></svg><span>Ventas</span>
       </a>
-      <a class="nav-item" href="{% url 'core:proximamente' %}">
+      <a class="nav-item {% if 'compras' in request.path %}is-active{% endif %}" href="{% url 'compras:lista' %}">
         <svg class="icon"><use href="#i-compras"></use></svg><span>Compras</span>
       </a>
       <a class="nav-item" href="{% url 'core:proximamente' %}">
@@ -54,11 +56,11 @@
       </a>
 
       <p class="nav-title">Control</p>
-      <a class="nav-item" href="{% url 'core:proximamente' %}">
+      <a class="nav-item {% if '/reportes/balance' in request.path %}is-active{% endif %}" href="{% url 'reportes:balance' %}">
         <svg class="icon"><use href="#i-contabilidad"></use></svg><span>Contabilidad</span>
       </a>
-      <a class="nav-item" href="{% url 'core:proximamente' %}">
-        <svg class="icon"><use href="#i-reportes"></use></svg><span>Reportes</span>
+      <a class="nav-item {% if '/reportes/impuestos' in request.path %}is-active{% endif %}" href="{% url 'reportes:impuestos' %}">
+        <svg class="icon"><use href="#i-reportes"></use></svg><span>Impuestos</span>
       </a>
 
       <p class="nav-title">Sistema</p>

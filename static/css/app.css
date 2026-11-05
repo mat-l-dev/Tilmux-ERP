@@ -700,3 +700,349 @@ select {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------- Documentos con líneas ---------- */
+
+.doc {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 288px;
+  gap: 12px;
+  align-items: start;
+}
+
+.doc-main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.doc-side {
+  min-width: 0;
+}
+
+.sticky {
+  position: sticky;
+  top: 78px;
+}
+
+.grid-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.field-wide {
+  grid-column: span 2;
+}
+
+.field-full {
+  grid-column: 1 / -1;
+}
+
+.field select {
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 13.5px;
+}
+
+.field select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.tabla-doc {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.tabla-doc th {
+  padding: 0 8px 8px;
+  border-bottom: 1px solid var(--line);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.tabla-doc td {
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+
+.tabla-doc tbody tr:hover {
+  background: rgba(22, 22, 26, 0.02);
+}
+
+.tabla-doc input,
+.tabla-doc select {
+  width: 100%;
+  height: 32px;
+  padding: 0 7px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 13px;
+}
+
+.tabla-doc input:hover,
+.tabla-doc select:hover {
+  border-color: var(--line);
+}
+
+.tabla-doc input:focus,
+.tabla-doc select:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--surface);
+}
+
+.der {
+  text-align: right;
+}
+
+.tabla-doc input.num {
+  text-align: right;
+}
+
+.tabla-doc .accion {
+  width: 38px;
+  text-align: center;
+}
+
+.doc-actions {
+  margin-top: 10px;
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: var(--line-strong);
+  color: var(--ink-2);
+}
+
+.btn-ghost:hover {
+  background: rgba(22, 22, 26, 0.04);
+  color: var(--ink);
+}
+
+.btn-block {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.totales {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.totales div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+.totales dt {
+  color: var(--ink-2);
+}
+
+.totales dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.totales .total {
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-size: 15px;
+}
+
+.totales-inline {
+  flex-direction: row;
+  justify-content: flex-end;
+  gap: 28px;
+  margin-top: 16px;
+}
+
+.preview {
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(22, 22, 26, 0.018);
+}
+
+.preview-title {
+  margin-bottom: 8px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.preview-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.preview-note {
+  margin-top: 8px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--ink-3);
+}
+
+.switch {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.datos {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.datos dt {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.datos dd {
+  margin: 2px 0 0;
+  font-size: 13.5px;
+}
+
+@media (max-width: 1024px) {
+  .doc {
+    grid-template-columns: 1fr;
+  }
+  .sticky {
+    position: static;
+  }
+  .grid-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .datos {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ---------- Filtros y pestañas ---------- */
+
+.filtro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.filtro .field {
+  min-width: 150px;
+}
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.tab {
+  padding: 8px 12px;
+  border-bottom: 2px solid transparent;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.tab:hover {
+  color: var(--ink);
+}
+
+.tab.is-active {
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+}
+
+.tabla-doc tfoot td {
+  padding-top: 10px;
+  border-bottom: none;
+}
+
+/* ---------- Gráfica de barras ---------- */
+
+.chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  height: 190px;
+  padding-top: 8px;
+}
+
+.chart-col {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  gap: 6px;
+  min-width: 0;
+}
+
+.chart-val {
+  font-size: 10px;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.chart-track {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  flex: 1;
+  width: 100%;
+}
+
+.chart-bar {
+  width: 100%;
+  max-width: 46px;
+  min-height: 2px;
+  border-radius: 4px 4px 0 0;
+  background: rgba(31, 92, 85, 0.16);
+  transition: height 300ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.chart-bar.is-current {
+  background: var(--accent);
+}
+
+.chart-lbl {
+  font-size: 11px;
+  color: var(--ink-3);
+}
