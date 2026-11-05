@@ -51,6 +51,22 @@ servidor y abre el navegador. Detalle en [uso local](docs/uso-local.md).
 `render.yaml` deja preparado un despliegue gratuito en Render, sin tarjeta,
 para cuando quieras abrirlo desde otro dispositivo. Ver [despliegue](docs/despliegue.md).
 
+## Tests
+
+Los invariantes contables se prueban en integración continua contra un PostgreSQL
+local del runner, en segundos:
+
+```
+Actions → Tests
+```
+
+Cubren: asiento cuadrado, rechazo en la base de un asiento descuadrado, costo
+landed, FIFO por capa, conservación del stock, nota de crédito al costo original,
+descomposición del IGV y doble confirmación de una venta.
+
+En local tardan varios minutos porque cada consulta viaja a Supabase. Para una
+verificación rápida, usa el workflow.
+
 ## Respaldo
 
 `.github/workflows/backup.yml` vuelca la base todos los días a las 06:00 UTC y
