@@ -16,7 +16,9 @@ from django.test import TestCase
 
 from catalogo.models import CuentaTesoreria, Producto, Tercero
 from compras.models import Compra, CompraLinea, CostoAdicional
+from compras.models_gasto import Gasto
 from compras.servicios import confirmar as confirmar_compra
+from compras.servicios import registrar_gasto
 from contabilidad.calculos import calcular_linea
 from contabilidad.models import Asiento, AsientoLinea, Cuenta
 from core.models import Empresa, Periodo
@@ -266,6 +268,60 @@ class InvarianteIgv(BaseContable):
         self.assertEqual(venta.subtotal, Decimal("598.31"))
         self.assertEqual(venta.igv, Decimal("107.69"))
         self.assertEqual(venta.subtotal + venta.igv, venta.total)
+
+
+class InvarianteComprobantes(BaseContable):
+    def test_la_boleta_no_genera_credito_fiscal(self):
+        cuenta = Cuenta.objects.get(version="2026", codigo="6391")
+        gasto = registrar_gasto(
+            empresa=self.empresa,
+            proveedor=self.proveedor,
+            fecha=date(2026, 11, 5),
+            tipo_doc="BOLETA",
+            serie="B001",
+            numero="00000001",
+            base=Decimal("167.83"),
+            igv=Decimal("30.21"),
+            total=Decimal("198.04"),
+            cuenta=cuenta,
+            medio=self.bbva,
+            con_credito=False,
+            deducible=False,
+        )
+
+        asiento = Asiento.objects.get(origen_tipo="GASTO", origen_id=gasto.pk)
+        importes = {linea.cuenta.codigo: linea.debe for linea in asiento.lineas.all()}
+
+        self.assertEqual(gasto.base, Decimal("167.83"))
+        self.assertEqual(gasto.igv, Decimal("30.21"))
+        self.assertFalse(gasto.con_credito)
+        self.assertFalse(gasto.deducible)
+        self.assertNotIn("40111", importes)
+        self.assertEqual(importes["6391"], Decimal("198.04"))
+
+    def test_la_factura_separa_el_igv(self):
+        cuenta = Cuenta.objects.get(version="2026", codigo="6391")
+        gasto = registrar_gasto(
+            empresa=self.empresa,
+            proveedor=self.proveedor,
+            fecha=date(2026, 11, 5),
+            tipo_doc="FACTURA",
+            serie="F001",
+            numero="00000002",
+            base=Decimal("167.83"),
+            igv=Decimal("30.21"),
+            total=Decimal("198.04"),
+            cuenta=cuenta,
+            medio=self.bbva,
+            con_credito=True,
+        )
+
+        asiento = Asiento.objects.get(origen_tipo="GASTO", origen_id=gasto.pk)
+        importes = {linea.cuenta.codigo: linea.debe for linea in asiento.lineas.all()}
+
+        self.assertTrue(gasto.con_credito)
+        self.assertEqual(importes["40111"], Decimal("30.21"))
+        self.assertEqual(importes["6391"], Decimal("167.83"))
 
 
 class InvarianteInmutabilidad(BaseContable):

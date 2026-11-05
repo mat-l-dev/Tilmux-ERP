@@ -1,0 +1,29 @@
+name: Tipo de cambio
+
+on:
+  schedule:
+    # 00:01 en Lima (UTC-5) equivale a 05:01 UTC.
+    - cron: "1 5 * * *"
+  workflow_dispatch:
+
+jobs:
+  actualizar:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DJANGO_SECRET_KEY: tarea-programada
+      DJANGO_DEBUG: "false"
+      PYTHONIOENCODING: utf-8
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Instalar dependencias
+        run: uv sync
+
+      - name: Descargar y guardar el tipo de cambio
+        run: uv run python manage.py actualizar_tipo_cambio

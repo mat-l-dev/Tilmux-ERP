@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block titulo %}Importar XML{% endblock %}
+{% block titulo_pagina %}Importar XML{% endblock %}
+
+{% block contenido %}
+<div class="doc">
+  <div class="doc-main">
+    <section class="card">
+      <header class="card-head"><h2>Comprobante electrónico</h2></header>
+      <form method="post" enctype="multipart/form-data" class="form">
+        {% csrf_token %}
+        <label class="field">
+          <span>Archivo XML de SUNAT</span>
+          <input type="file" name="archivo" accept=".xml,application/xml,text/xml" required>
+        </label>
+        <p class="preview-note">
+          Se aceptan facturas, boletas, notas de crédito y guías de remisión.
+          El archivo no se guarda: solo se leen los datos para que los confirmes.
+        </p>
+        <button class="btn btn-primary" type="submit">Leer comprobante</button>
+      </form>
+    </section>
+  </div>
+
+  <aside class="doc-side">
+    <div class="card sticky">
+      <header class="card-head"><h2>Qué pasa después</h2></header>
+      <ul class="checklist">
+        <li><svg class="icon ok"><use href="#i-check"></use></svg><span>Se extraen RUC, serie, número e importes</span></li>
+        <li><svg class="icon ok"><use href="#i-check"></use></svg><span>Eliges la cuenta del gasto</span></li>
+        <li><svg class="icon ok"><use href="#i-check"></use></svg><span>Se registra el asiento y la salida de dinero</span></li>
+      </ul>
+      <p class="preview-note">
+        Una boleta de venta no otorga crédito fiscal ni sustenta gasto: se registra
+        el total. Una factura sí separa base e IGV.
+      </p>
+      <a class="btn btn-ghost btn-block" href="{% url 'compras:lista' %}">Volver a compras</a>
+    </div>
+  </aside>
+</div>
+{% endblock %}

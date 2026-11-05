@@ -199,6 +199,13 @@ def impuestos(request):
         compras_base = compras.aggregate(s=Sum("subtotal"))["s"] or Decimal("0")
         compras_igv = compras.aggregate(s=Sum("igv"))["s"] or Decimal("0")
 
+        # Solo los gastos con comprobante que otorga crédito fiscal (facturas).
+        gastos = Gasto.objects.filter(
+            empresa=empresa, fecha__range=(desde, hasta), con_credito=True
+        )
+        compras_base += gastos.aggregate(s=Sum("base"))["s"] or Decimal("0")
+        compras_igv += gastos.aggregate(s=Sum("igv"))["s"] or Decimal("0")
+
     igv = ventas_igv - compras_igv
     renta = (ventas_base * TASA_RENTA_RER).quantize(Decimal("0.01"))
 

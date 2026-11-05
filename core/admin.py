@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Empresa, Periodo
+from .models import Empresa, Periodo, TipoCambio
 
 
 @admin.register(Empresa)
@@ -15,3 +15,9 @@ class PeriodoAdmin(admin.ModelAdmin):
     list_display = ("empresa", "anio", "mes", "estado", "version_pcge")
     list_filter = ("estado", "anio", "empresa")
     ordering = ("-anio", "-mes")
+
+
+@admin.register(TipoCambio)
+class TipoCambioAdmin(admin.ModelAdmin):
+    list_display = ("fecha", "compra", "venta", "fuente")
+    ordering = ("-fecha",)

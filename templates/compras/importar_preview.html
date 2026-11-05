@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block titulo %}Revisar comprobante{% endblock %}
+{% block titulo_pagina %}Revisar comprobante{% endblock %}
+
+{% block contenido %}
+<div class="doc">
+  <div class="doc-main">
+    <section class="card">
+      <header class="card-head">
+        <h2>{{ datos.tipo|capfirst }} {{ datos.serie }}-{{ datos.numero }}</h2>
+        <span class="chip">{{ datos.fecha }}</span>
+      </header>
+
+      <dl class="datos">
+        <div><dt>Emisor</dt><dd>{{ datos.emisor_nombre }}</dd></div>
+        <div><dt>RUC</dt><dd class="num">{{ datos.emisor_ruc }}</dd></div>
+        <div><dt>Moneda</dt><dd>{{ datos.moneda }}</dd></div>
+        <div><dt>Receptor</dt><dd class="num">20615841961</dd></div>
+      </dl>
+
+      <table class="tabla-doc">
+        <thead><tr><th>Concepto</th><th class="der">Importe</th></tr></thead>
+        <tbody>
+          <tr><td>Base imponible</td><td class="num der">{{ datos.base }}</td></tr>
+          <tr><td>IGV</td><td class="num der">{{ datos.igv }}</td></tr>
+          <tr class="total"><td>Total</td><td class="num der">{{ datos.total }}</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <header class="card-head"><h2>Registrar como gasto</h2></header>
+      <form method="post" class="form">
+        {% csrf_token %}
+        <div class="grid-fields">
+          <label class="field field-wide">
+            <span>Cuenta del gasto</span>
+            <select name="cuenta" required>
+              {% for c in cuentas %}
+              <option value="{{ c.pk }}" {% if sugerida and c.pk == sugerida.pk %}selected{% endif %}>{{ c.codigo }} · {{ c.nombre }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label class="field">
+            <span>Medio de pago</span>
+            <select name="medio" required>
+              {% for m in medios %}
+              <option value="{{ m.pk }}">{{ m.nombre }}</option>
+              {% endfor %}
+            </select>
+          </label>
+        </div>
+        <button class="btn btn-primary" type="submit">Registrar gasto</button>
+      </form>
+    </section>
+  </div>
+
+  <aside class="doc-side">
+    <div class="card sticky">
+      <header class="card-head"><h2>Asiento estimado</h2></header>
+      {% if datos.tipo == "BOLETA" %}
+      <p class="preview-note">
+        Boleta de venta: no otorga crédito fiscal <strong>ni sustenta gasto</strong>
+        para efecto tributario. Se registra el total como gasto contable.
+        Para deducirlo, pide factura con el RUC de la empresa.
+      </p>
+      <div class="preview-row"><span>6xxx · Gasto</span><b class="num">{{ datos.total }}</b></div>
+      <div class="preview-row"><span>10xx · Salida de dinero</span><b class="num">{{ datos.total }}</b></div>
+      {% else %}
+      <div class="preview-row"><span>6xxx · Gasto</span><b class="num">{{ datos.base }}</b></div>
+      <div class="preview-row"><span>40111 · IGV</span><b class="num">{{ datos.igv }}</b></div>
+      <div class="preview-row"><span>10xx · Salida de dinero</span><b class="num">{{ datos.total }}</b></div>
+      {% endif %}
+      <a class="btn btn-ghost btn-block" href="{% url 'compras:importar' %}">Subir otro XML</a>
+    </div>
+  </aside>
+</div>
+{% endblock %}

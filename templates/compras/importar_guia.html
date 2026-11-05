@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block titulo %}Guía de remisión{% endblock %}
+{% block titulo_pagina %}Guía de remisión{% endblock %}
+
+{% block contenido %}
+<div class="doc">
+  <div class="doc-main">
+    <section class="card">
+      <header class="card-head">
+        <h2>{{ guia.documento }}</h2>
+        <span class="chip">{{ guia.tipo }}</span>
+      </header>
+
+      <dl class="datos">
+        <div><dt>Fecha</dt><dd>{{ guia.fecha }}</dd></div>
+        <div><dt>Remitente</dt><dd>{{ guia.remitente_nombre }}</dd></div>
+        <div><dt>RUC remitente</dt><dd class="num">{{ guia.remitente_ruc }}</dd></div>
+        <div><dt>Destinatario</dt><dd>{{ guia.destinatario_nombre }}</dd></div>
+        <div><dt>RUC destinatario</dt><dd class="num">{{ guia.destinatario_ruc }}</dd></div>
+        <div><dt>Documento relacionado</dt><dd>{{ guia.documento_referencia }}</dd></div>
+        <div><dt>Peso bruto</dt><dd class="num">{{ guia.peso_bruto|default:"—" }}</dd></div>
+        <div><dt>Líneas</dt><dd class="num">{{ guia.lineas }}</dd></div>
+      </dl>
+
+      <p class="preview-note">
+        Las guías se leen para vincular la entrega con su comprobante.
+        El registro de traslados y el stock por ubicación llegan en una etapa posterior.
+      </p>
+    </section>
+  </div>
+
+  <aside class="doc-side">
+    <div class="card sticky">
+      <header class="card-head"><h2>Acciones</h2></header>
+      <a class="btn btn-ghost btn-block" href="{% url 'compras:importar' %}">Subir otro XML</a>
+      <a class="btn btn-ghost btn-block" href="{% url 'compras:lista' %}">Volver a compras</a>
+    </div>
+  </aside>
+</div>
+{% endblock %}

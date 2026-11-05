@@ -1,0 +1,212 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<DespatchAdvice xmlns:ext="urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2" xmlns:ds="http://www.w3.org/2000/09/xmldsig#" xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2" xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2" xmlns="urn:oasis:names:specification:ubl:schema:xsd:DespatchAdvice-2"><ext:UBLExtensions xmlns=""><ext:UBLExtension><ext:ExtensionContent><Signature xmlns="http://www.w3.org/2000/09/xmldsig#">
+<SignedInfo>
+  <CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#WithComments"/>
+  <SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha512"/>
+  <Reference URI="">
+    <Transforms>
+      <Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/>
+      <Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#WithComments"/>
+    </Transforms>
+    <DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/>
+    <DigestValue>EPwQpPM4+YTzDuIXKiSHdgDiUd8=</DigestValue>
+  </Reference>
+</SignedInfo>
+    <SignatureValue>Ol/icB9BjGaYQxUXvyxEJ0J0XVkKNe1ifouVDbV6SC5WiJm+sjRLipQkovV2iltyB2KGsiqeU6wQYSR++bBGKJYr8RCbj4I7f12IRe3FdFSP0qaQMDU2Hxgc9+XLoe0zg45Abq0wuEW/KBgsetVoIaE+ryZIofNw14tWQxZQTIaRfSwSJmHUBc0oNQA/mjNXQm0CHNuTr8qyAmCX2fh54snoNUgZ57WGb6vweARKJ3EwoBynsB3BiYKMBoJQgAiPNTGN7JJ/AZFYvytt7UEstpX82gNR2mTPWr2OIGko+iOn7pATAGM2SavKQCy3b/mbo4T2EkHQZVlQ3Eix9Lc5FA==</SignatureValue><KeyInfo><X509Data><X509Certificate>MIIFrjCCBJagAwIBAgIIf9Td7Evg0UswDQYJKoZIhvcNAQELBQAwRjEkMCIGA1UEAwwbTGxhbWEucGUgU0hBMjU2IFN0YW5kYXJkIENBMREwDwYDVQQKDAhMTEFNQS5QRTELMAkGA1UEBhMCUEUwHhcNMjQwODA5MTYxNTM5WhcNMjcwODA5MTYxNTAwWjCCAVQxKzApBgNVBAkMIkFWLiBHQVJDSUxBU08gREUgTEEgVkVHQSBOUk8uIDE0NzIxIjAgBgkqhkiG9w0BCQEWE3JtZXphZ0BzdW5hdC5nb2IucGUxQTA/BgNVBAMMOFNVUEVSSU5ULiBOQUMuIERFIEFEVUFOQVMgWSBERSBBRE1JTklTVFJBQ0lPTiBUUklCVVRBUklBMRwwGgYDVQQLDBNBR0VOVEUgQVVUT01BVElaQURPMS4wLAYDVQQLDCVWYWxpZGFkbyBwb3IgQUJDIElERU5USURBRCBESUdJVEFMIEVSMVQwUgYDVQQKDEtTVVBFUklOVEVOREVOQ0lBIE5BQ0lPTkFMIERFIEFEVUFOQVMgWSBERSBBRE1JTklTVFJBQ0lPTiBUUklCVVRBUklBIC0gU1VOQVQxDTALBgNVBAcMBExJTUExCzAJBgNVBAYTAlBFMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1apapJOwMj9tBpgKAgjRwIloUk+xwvQZxc0s/4yl4mDSrc/F/PKZ3QBmKb43fFwivqPUvsr68fQTfyLKM14B+xXwlbQ/yh3+87sMyulLhOPmtSOU0PE8Rw0PsmGVxf1L0HPAPc3Gvuhq4Z9Dx5ByED6s+VppDmncvctlJ/NrzYZCk9H91OinTTPVZrDtbmqnOYra8PaTRoCI9Fmndeo9Oo7esM7KVX9f53NEd/mNQqzAOrgSXthFuBZN7zOsGxJ4ZGrVzHSlCH/jFLgObEizHrqisgL1cxKj8QvbGLUjNtUuTvR5IY6hwRLCxbliTa84BN10E0jC7hhAnnuEIAFJiwIDAQABo4IBjjCCAYowDAYDVR0TAQH/BAIwADAfBgNVHSMEGDAWgBRdiFut62X7/mii5NlvPVdyou8rmTBnBggrBgEFBQcBAQRbMFkwNQYIKwYBBQUHMAKGKWh0dHA6Ly9jcnQubGxhbWEucGUvbGxhbWFwZXN0YW5kYXJkY2EuY2VyMCAGCCsGAQUFBzABhhRodHRwOi8vb2NzcC5sbGFtYS5wZTAeBgNVHREEFzAVgRNybWV6YWdAc3VuYXQuZ29iLnBlMEYGA1UdIAQ/MD0wOwYNKwYBBAGDl3cAAQADATAqMCgGCCsGAQUFBwIBFhxodHRwczovL2xsYW1hLnBlL3JlcG9zaXRvcnkvMB0GA1UdJQQWMBQGCCsGAQUFBwMCBggrBgEFBQcDBDA6BgNVHR8EMzAxMC+gLaArhilodHRwOi8vY3JsLmxsYW1hLnBlL2xsYW1hcGVzdGFuZGFyZGNhLmNybDAdBgNVHQ4EFgQUuRkPCyM25gAu5se9GraC/UO07X8wDgYDVR0PAQH/BAQDAgbAMA0GCSqGSIb3DQEBCwUAA4IBAQBC8+YM7moZ7bKYCS+VzJ8wzydSboWeNuAs2CfkhI8hRMQr1r5WZg8pDlroCslF/r6SjbkrjuDHcGKJTM2riGEjlOD4CLU9VjOP7Td6CIZyJRLaz63pZYOwE0H0weG/PvYpopDZzJ6AXYzZxwYkJ03/x/vwaCss9ZvmsEn2E1xtGbnMe9MEsg8oF0ul3uRn8Qy5gF37fM7YKuF/r4iBS5uSvBcA5J2FbI/PQls7OgICDyb3W16GeluaT9krY5wQxilJSpGVU++nv5NzmRHkquH3ic2It/KP6MZ9X2tfg6FhpF6JaUz7MSY+J0KnDDcfJlhxgnkgoT5tV3Sr6z5PpQH6</X509Certificate><X509IssuerSerial><X509IssuerName>C=PE, O=LLAMA.PE, CN=Llama.pe SHA256 Standard CA</X509IssuerName><X509SerialNumber>9211231144834552139</X509SerialNumber></X509IssuerSerial></X509Data></KeyInfo><Proposito>Cumple proposito</Proposito><Revocacion>Cumple revocacion</Revocacion><TSL>Cumple tsl</TSL><Expiracion>No ha expirado</Expiracion></Signature></ext:ExtensionContent></ext:UBLExtension></ext:UBLExtensions>
+  <cbc:UBLVersionID>2.1</cbc:UBLVersionID>
+  <cbc:CustomizationID>2.0</cbc:CustomizationID>
+  <cbc:ID><![CDATA[EG07-2]]></cbc:ID>
+  
+  <!-- FECHA Y HORA DE EMISION -->
+  <cbc:IssueDate>2026-10-29</cbc:IssueDate>
+  <cbc:IssueTime>07:52:35</cbc:IssueTime>
+  <cbc:DespatchAdviceTypeCode listAgencyName="PE:SUNAT" listName="Tipo de Documento" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo01">09</cbc:DespatchAdviceTypeCode>
+
+  <!-- DOCUMENTOS ADICIONALES (Catalogo 41)-->
+	<cac:AdditionalDocumentReference>
+		<cbc:ID><![CDATA[E001-2]]></cbc:ID>
+	<cbc:DocumentTypeCode listAgencyName="PE:SUNAT" listName="Documento relacionado al transporte" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo61">01</cbc:DocumentTypeCode>
+	<cbc:DocumentType><![CDATA[Factura]]></cbc:DocumentType>
+	<cac:IssuerParty>
+	<cac:PartyIdentification>
+	<cbc:ID schemeID="6" schemeAgencyName="PE:SUNAT" schemeName="Documento de Identidad" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06"><![CDATA[20615841961]]></cbc:ID>
+	</cac:PartyIdentification>			 
+	</cac:IssuerParty>
+	</cac:AdditionalDocumentReference>
+	
+    <cac:Signature>
+        <cbc:ID><![CDATA[SUNAT]]></cbc:ID>
+        <cac:SignatoryParty>
+            <cac:PartyIdentification>
+                <cbc:ID><![CDATA[20131312955]]></cbc:ID>
+            </cac:PartyIdentification>
+            <cac:PartyName>
+                <cbc:Name><![CDATA[SUNAT]]></cbc:Name>
+            </cac:PartyName>
+        </cac:SignatoryParty>
+        <cac:DigitalSignatureAttachment>
+            <cac:ExternalReference>
+                <cbc:URI>#SUNAT</cbc:URI>
+            </cac:ExternalReference>
+        </cac:DigitalSignatureAttachment>
+    </cac:Signature>
+
+  <!-- DATOS DEL EMISOR (REMITENTE) -->
+  <cac:DespatchSupplierParty>
+     <cac:Party>
+      <cac:PartyIdentification>
+       <cbc:ID schemeID="6" schemeName="Documento de Identidad" schemeAgencyName="PE:SUNAT" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06"><![CDATA[20615841961]]></cbc:ID>
+      </cac:PartyIdentification>
+      <cac:PartyLegalEntity>
+       <cbc:RegistrationName><![CDATA[TILMUX S.A.C.]]></cbc:RegistrationName>
+      </cac:PartyLegalEntity>
+     </cac:Party>
+  </cac:DespatchSupplierParty>
+  
+  <!-- DATOS DEL RECEPTOR (DESTINATARIO) -->
+  <cac:DeliveryCustomerParty>
+     <cac:Party>
+      <cac:PartyIdentification>
+       <cbc:ID schemeID="6" schemeName="Documento de Identidad" schemeAgencyName="PE:SUNAT" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06"><![CDATA[20614892405]]></cbc:ID>
+      </cac:PartyIdentification>
+      <cac:PartyLegalEntity>
+       <cbc:RegistrationName><![CDATA[MAQUINARIAS Y DIVERSOS S.A.C.]]></cbc:RegistrationName>
+      </cac:PartyLegalEntity>
+     </cac:Party>
+  </cac:DeliveryCustomerParty>
+
+
+  <!-- DATOS DEL PROVEEDOR -->
+
+  <!-- DATOS DEL TRASLADO -->
+  <cac:Shipment>
+     <!-- ID OBLIGATORIO POR UBL -->
+     <cbc:ID><![CDATA[SUNAT_Envio]]></cbc:ID>
+       
+     <!-- MOTIVO DEL TRASLADO -->
+     <cbc:HandlingCode listAgencyName="PE:SUNAT" listName="Motivo de traslado" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo20">01</cbc:HandlingCode>
+	    <cbc:HandlingInstructions>Venta</cbc:HandlingInstructions>
+
+        
+     <!-- PESO BRUTO TOTAL DE LA CARGA-->
+     <cbc:GrossWeightMeasure unitCode="KGM">2.7</cbc:GrossWeightMeasure>
+
+        
+
+     <!-- INDICADORES -->
+	 
+     
+	 
+
+
+
+        
+     <cac:ShipmentStage>
+        <!-- MODALIDAD DE TRASLADO  -->
+        <cbc:TransportModeCode listName="Modalidad de traslado" listAgencyName="PE:SUNAT" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo18">01</cbc:TransportModeCode>
+
+        <!-- DATOS DEL TRANSPORTISTA -->
+			<cac:CarrierParty>
+			   <cac:PartyIdentification>
+				  <cbc:ID schemeID="6" schemeName="Documento de Identidad" schemeAgencyName="PE:SUNAT" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06"><![CDATA[20603856725]]></cbc:ID>
+			   </cac:PartyIdentification>
+			   <cac:PartyLegalEntity>
+				  <!-- NOMBRE/RAZON SOCIAL DEL TRANSPORTISTA-->
+				   <cbc:RegistrationName><![CDATA[LOGISTICA-TECH S.A.C.]]></cbc:RegistrationName>
+				  
+				  <!-- NUMERO DE REGISTRO DEL MTC -->
+				   <cbc:CompanyID><![CDATA[15114527CNG]]></cbc:CompanyID>
+			   </cac:PartyLegalEntity>
+			 
+			</cac:CarrierParty>
+
+		<!--FECHA DE ENTREGA DE BIENES AL TRANSPORTISTA-->
+		<cac:LoadingTransportEvent>
+			<cbc:OccurrenceDate>2026-10-29</cbc:OccurrenceDate>
+		</cac:LoadingTransportEvent>
+
+	 </cac:ShipmentStage>
+
+     <cac:Delivery>
+        <!-- DIRECCION DEL PUNTO DE LLEGADA -->
+			<cac:DeliveryAddress>
+			   <!-- UBIGEO DE LLEGADA -->
+			    <cbc:ID schemeName="Ubigeos" schemeAgencyName="PE:INEI"><![CDATA[080105]]></cbc:ID>
+			   
+			   
+			   <!-- DIRECCION COMPLETA Y DETALLADA DE LLEGADA -->
+				   <cac:AddressLine>
+					  <cbc:Line><![CDATA[JIRON TUPAC AMARU MZ L LT 7 POR EL PARADERO VILLA DE BAJADA SN]]></cbc:Line>
+				   </cac:AddressLine>
+
+			</cac:DeliveryAddress>
+        
+			<cac:Despatch>
+			   <!-- DIRECCION DEL PUNTO DE PARTIDA -->
+			   <cac:DespatchAddress>
+				  <!-- UBIGEO DE PARTIDA -->
+				   <cbc:ID schemeName="Ubigeos" schemeAgencyName="PE:INEI"><![CDATA[150115]]></cbc:ID>
+			   
+				  <!-- CODIGO DE ESTABLECIMIENTO ANEXO DE PARTIDA -->
+					  <cbc:AddressTypeCode listID="20615841961" listAgencyName="PE:SUNAT" listName="Establecimientos anexos">0</cbc:AddressTypeCode>
+				  
+				  <!-- DIRECCION COMPLETA Y DETALLADA DE PARTIDA -->
+				  <cac:AddressLine>
+					 <cbc:Line><![CDATA[AV. ESTEBAN CAMPODONICO NRO. 383 DPTO. 1204 URB. SANTA CATALINA LIMA - LIMA - LA VICTORIA]]></cbc:Line>
+				  </cac:AddressLine>
+
+			   </cac:DespatchAddress>
+			   
+
+			</cac:Despatch>
+     </cac:Delivery>
+
+     <cac:TransportHandlingUnit>
+        
+
+
+     </cac:TransportHandlingUnit>
+
+		  <!-- PUERTO O AEROPUERTO DE EMBARQUE / DESEMBARQUE -->
+
+		  <!-- PUERTO O AEROPUERTO DE EMBARQUE / DESEMBARQUE -->
+
+  </cac:Shipment>
+
+  <!-- DETALLES DE BIENES A TRASLADAR -->
+			  <cac:DespatchLine>
+				  <!-- NUMERO DE ORDEN DEL ITEM -->
+					  <cbc:ID><![CDATA[1]]></cbc:ID>
+
+						  <!-- CANTIDAD -->
+						  <cbc:DeliveredQuantity unitCode="NIU" unitCodeListID="UN/ECE rec 20" unitCodeListAgencyName="United Nations Economic Commission for Europe">1</cbc:DeliveredQuantity>
+
+				  <cac:OrderLineReference>
+						  <cbc:LineID>1</cbc:LineID>
+				  </cac:OrderLineReference>
+
+
+				  <cac:Item>
+					  <!-- DESCRIPCION -->
+						  <cbc:Description><![CDATA[STARLINK MINI KIT INTERNET DE ALTA VELOCIDAD Y BAJA LATENCIA]]></cbc:Description>
+					  
+					  	  <!-- CODIGO DEL ITEM -->
+						  <cac:SellersItemIdentification>
+							  <cbc:ID><![CDATA[TIL-000001]]></cbc:ID>
+						  </cac:SellersItemIdentification>
+					  
+
+
+
+						  <!--INDICADOR DE BIEN REGULADO POR SUNAT -->
+						  <cac:AdditionalItemProperty>
+							  <cbc:Name><![CDATA[Indicador de bien regulado por SUNAT]]></cbc:Name>
+							  <cbc:NameCode listAgencyName="PE:SUNAT" listName="Propiedad del item" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo55">7022</cbc:NameCode>
+							  <cbc:Value><![CDATA[0]]></cbc:Value>
+						  </cac:AdditionalItemProperty>
+
+				  </cac:Item>
+			  </cac:DespatchLine>
+
+  
+</DespatchAdvice>

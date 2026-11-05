@@ -37,6 +37,14 @@ class Gasto(models.Model):
         related_name="gastos",
     )
     glosa = models.CharField(max_length=255, blank=True)
+    con_credito = models.BooleanField(
+        default=True,
+        help_text="Una boleta de venta no otorga crédito fiscal al comprador.",
+    )
+    deducible = models.BooleanField(
+        default=True,
+        help_text="Una boleta de venta tampoco sustenta gasto para efecto tributario.",
+    )
     creado = models.DateTimeField(auto_now_add=True)
 
     class Meta:

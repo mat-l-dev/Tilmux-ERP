@@ -7,7 +7,10 @@
 <section class="card">
   <header class="card-head">
     <h2>Comprobantes de proveedores</h2>
-    <a class="btn btn-primary" href="{% url 'compras:nueva' %}">Nueva compra</a>
+    <div class="acciones-head">
+      <a class="btn btn-ghost" href="{% url 'compras:importar' %}">Importar XML</a>
+      <a class="btn btn-primary" href="{% url 'compras:nueva' %}">Nueva compra</a>
+    </div>
   </header>
 
   {% if compras %}

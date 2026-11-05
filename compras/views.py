@@ -7,16 +7,18 @@ from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db import IntegrityError
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from catalogo.models import Producto, Tercero
+from catalogo.models import CuentaTesoreria, Producto, Tercero
 from contabilidad.calculos import calcular_linea
-from contabilidad.models import Asiento
+from contabilidad.models import Asiento, Cuenta
 from core.context import empresa_actual
 
 from .models import Compra, CompraLinea, CostoAdicional
-from .servicios import CompraError, confirmar
+from .servicios import CompraError, confirmar, registrar_gasto
+from documentos.xml_cpe import Guia, XMLInvalido, leer
 
 
 def _decimal(texto: str) -> Decimal:
@@ -200,6 +202,123 @@ def nueva(request):
 
     messages.success(request, "Borrador creado. Revísalo y confírmalo.")
     return redirect("compras:detalle", compra.pk)
+
+
+MAXIMO_XML = 2 * 1024 * 1024
+
+CUENTAS_SUGERIDAS = {"BANCO": "6391", "MERCADOLIBRE": "6311"}
+
+
+def _cuenta_sugerida(emisor: str) -> Cuenta | None:
+    codigo = "6593"
+    nombre = (emisor or "").upper()
+    for clave, valor in CUENTAS_SUGERIDAS.items():
+        if clave in nombre:
+            codigo = valor
+            break
+    return Cuenta.objects.filter(version="2026", codigo=codigo).first()
+
+
+@login_required
+def importar(request):
+    empresa = empresa_actual(request)
+    if request.method == "POST":
+        archivo = request.FILES.get("archivo")
+        if archivo is None:
+            messages.error(request, "Adjunta un archivo XML.")
+        elif archivo.size > MAXIMO_XML:
+            messages.error(request, "El archivo supera los 2 MB.")
+        else:
+            try:
+                documento = leer(archivo.read(MAXIMO_XML))
+            except XMLInvalido as exc:
+                messages.error(request, str(exc))
+            else:
+                if isinstance(documento, Guia):
+                    return render(
+                        request, "compras/importar_guia.html", {"guia": documento}
+                    )
+                request.session["xml_pendiente"] = {
+                    "tipo": documento.tipo,
+                    "serie": documento.serie,
+                    "numero": documento.numero,
+                    "fecha": documento.fecha.isoformat(),
+                    "moneda": documento.moneda,
+                    "emisor_ruc": documento.emisor_ruc,
+                    "emisor_nombre": documento.emisor_nombre,
+                    "base": str(documento.base),
+                    "igv": str(documento.igv),
+                    "total": str(documento.total),
+                }
+                return redirect("compras:importar_preview")
+    return render(request, "compras/importar.html", {"empresa": empresa})
+
+
+@login_required
+def importar_preview(request):
+    empresa = empresa_actual(request)
+    datos = request.session.get("xml_pendiente")
+    if not datos:
+        messages.info(request, "Primero sube un comprobante.")
+        return redirect("compras:importar")
+
+    cuentas = list(
+        Cuenta.objects.filter(
+            version="2026", activa=True, elemento=6, admite_movimiento=True
+        ).order_by("codigo")
+    )
+    medios = list(CuentaTesoreria.objects.filter(empresa=empresa, activa=True))
+    sugerida = _cuenta_sugerida(datos["emisor_nombre"])
+
+    if request.method == "POST":
+        cuenta = Cuenta.objects.filter(pk=request.POST.get("cuenta")).first()
+        medio = CuentaTesoreria.objects.filter(
+            pk=request.POST.get("medio"), empresa=empresa
+        ).first()
+        if cuenta is None or medio is None:
+            messages.error(request, "Elige la cuenta del gasto y el medio de pago.")
+        else:
+            proveedor, _ = Tercero.objects.get_or_create(
+                tipo_doc="RUC",
+                numero_doc=datos["emisor_ruc"],
+                defaults={
+                    "nombre": datos["emisor_nombre"] or "Proveedor",
+                    "rol": "PROVEEDOR",
+                },
+            )
+            try:
+                registrar_gasto(
+                    empresa=empresa,
+                    proveedor=proveedor,
+                    fecha=date.fromisoformat(datos["fecha"]),
+                    tipo_doc=datos["tipo"],
+                    serie=datos["serie"],
+                    numero=datos["numero"],
+                    base=Decimal(datos["base"]),
+                    igv=Decimal(datos["igv"]),
+                    total=Decimal(datos["total"]),
+                    cuenta=cuenta,
+                    medio=medio,
+                    glosa=f"{datos['tipo']} {datos['serie']}-{datos['numero']}",
+                    con_credito=datos["tipo"] == "FACTURA",
+                    deducible=datos["tipo"] == "FACTURA",
+                )
+            except (CompraError, IntegrityError) as exc:
+                messages.error(request, f"No se pudo registrar: {exc}")
+            else:
+                request.session.pop("xml_pendiente", None)
+                messages.success(
+                    request,
+                    f"Gasto registrado: {datos['serie']}-{datos['numero']} "
+                    f"por S/ {datos['total']}.",
+                )
+                return redirect("compras:lista")
+
+    return render(
+        request,
+        "compras/importar_preview.html",
+        {"datos": datos, "cuentas": cuentas, "medios": medios, "sugerida": sugerida},
+    )
 
 
 @login_required

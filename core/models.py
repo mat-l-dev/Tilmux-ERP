@@ -75,3 +75,28 @@ class Periodo(models.Model):
             "julio", "agosto", "setiembre", "octubre", "noviembre", "diciembre",
         )
         return f"{meses[self.mes - 1].capitalize()} {self.anio}"
+
+
+class TipoCambio(models.Model):
+    """Tipo de cambio publicado por SUNAT. Un registro por fecha."""
+
+    fecha = models.DateField(unique=True)
+    compra = models.DecimalField(max_digits=10, decimal_places=3)
+    venta = models.DecimalField(max_digits=10, decimal_places=3)
+    fuente = models.CharField(max_length=40, default="SUNAT")
+    obtenido = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "tipo de cambio"
+        verbose_name_plural = "tipos de cambio"
+        ordering = ["-fecha"]
+
+    def __str__(self) -> str:
+        return f"{self.fecha} · compra {self.compra} · venta {self.venta}"
+
+    @classmethod
+    def del_dia(cls, fecha):
+        registro = cls.objects.filter(fecha__lte=fecha).first()
+        if registro is None:
+            raise ValueError(f"No hay tipo de cambio para {fecha}.")
+        return registro

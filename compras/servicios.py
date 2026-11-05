@@ -122,6 +122,8 @@ def registrar_gasto(
     glosa: str = "",
     origen_tipo: str = "",
     origen_id: int | None = None,
+    con_credito: bool = True,
+    deducible: bool = True,
 ) -> Gasto:
     base, igv, total = _cent(base), _cent(igv), _cent(total)
     if base + igv != total:
@@ -144,15 +146,22 @@ def registrar_gasto(
         cuenta=cuenta,
         medio=medio,
         glosa=glosa[:255],
+        con_credito=con_credito,
+        deducible=deducible,
     )
 
     documento = f"{serie}-{numero}".strip(" -") or "sin comprobante"
+    usa_credito = con_credito and igv > 0
     postear(
         empresa=empresa,
         fecha=fecha,
-        tipo="GASTO_CON_IGV" if igv > 0 else "GASTO_SIN_IGV",
+        tipo="GASTO_CON_IGV" if usa_credito else "GASTO_SIN_IGV",
         glosa=f"{documento} · {proveedor.nombre}"[:255],
-        montos=Montos(base=base, igv=igv, total=total),
+        montos=Montos(
+            base=base if usa_credito else total,
+            igv=igv if usa_credito else Decimal("0.00"),
+            total=total,
+        ),
         origen_tipo=origen_tipo or "GASTO",
         origen_id=origen_id or gasto.pk,
         cuenta_medio=medio.cuenta_contable,
