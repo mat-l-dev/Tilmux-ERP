@@ -3,7 +3,20 @@
 ## Entrar
 
 Doble clic en **Tilmux ERP** del escritorio. Abre `http://127.0.0.1:8000`.
-Para apagarlo, cierra la ventana negra.
+
+## Apagar
+
+Tienes tres formas, de la más simple a la más manual:
+
+1. **Doble clic en «Detener Tilmux ERP»** del escritorio. Es lo recomendado.
+2. Cerrar la ventana negra del servidor.
+3. `Ctrl+C` en esa ventana.
+
+Mientras está encendido ocupa unos **120 MB de RAM**. Al apagarlo no queda nada
+corriendo y los datos siguen intactos en Supabase.
+
+Para comprobar que está apagado, vuelve a abrir «Detener»: si dice *«El servidor
+no está corriendo»*, está limpio.
 
 ## Orden de trabajo
 
