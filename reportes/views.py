@@ -6,19 +6,23 @@ from datetime import date
 from decimal import Decimal, InvalidOperation
 
 from django.contrib.auth.decorators import login_required
-from django.db.models import Sum
-from django.shortcuts import render
+from django.core.paginator import Paginator
+from django.db.models import Q, Sum
+from django.shortcuts import get_object_or_404, render
 
+from catalogo.models import Producto
 from compras.models import Compra
 from compras.models_gasto import Gasto
 from contabilidad.models import Cuenta
 from core.context import empresa_actual
+from inventario.models import CapaFIFO, MovimientoStock
 from ventas.models import NotaCredito, NotaDebito, Venta
 
 from .casillas import calcular
 from .utils import rango
 
 TASA_RENTA_RER = Decimal("0.015")
+CERO = Decimal("0")
 
 
 
@@ -50,12 +54,16 @@ def balance(request):
         fila.saldo_deudor = neto if neto > 0 else Decimal("0")
         fila.saldo_acreedor = -neto if neto < 0 else Decimal("0")
 
+    total_debe = sum((f.total_debe or 0) for f in filas)
+    total_haber = sum((f.total_haber or 0) for f in filas)
+    pagina = Paginator(filas, 25).get_page(request.GET.get("page"))
     contexto = {
-        "filas": filas,
+        "filas": pagina,
+        "page_obj": pagina,
         "desde": desde,
         "hasta": hasta,
-        "total_debe": sum((f.total_debe or 0) for f in filas),
-        "total_haber": sum((f.total_haber or 0) for f in filas),
+        "total_debe": total_debe,
+        "total_haber": total_haber,
     }
     return render(request, "reportes/balance.html", contexto)
 
@@ -85,12 +93,14 @@ def mayor(request):
                 saldo += linea.debe - linea.haber
                 movimientos.append({"linea": linea, "saldo": saldo})
 
+    pagina = Paginator(movimientos, 50).get_page(request.GET.get("page"))
     contexto = {
         "desde": desde,
         "hasta": hasta,
         "codigo": codigo,
         "cuenta": cuenta,
-        "movimientos": movimientos,
+        "movimientos": pagina,
+        "page_obj": pagina,
         "saldo": saldo,
     }
     return render(request, "reportes/mayor.html", contexto)
@@ -155,13 +165,19 @@ def registro_ventas(request):
 
     filas.sort(key=lambda f: (f["fecha"], f["documento"]))
 
+    base = sum((f["base"] for f in filas), Decimal("0"))
+    igv = sum((f["igv"] for f in filas), Decimal("0"))
+    total = sum((f["total"] for f in filas), Decimal("0"))
+    pagina = Paginator(filas, 25).get_page(request.GET.get("page"))
+
     contexto = {
-        "filas": filas,
+        "filas": pagina,
+        "page_obj": pagina,
         "desde": desde,
         "hasta": hasta,
-        "base": sum((f["base"] for f in filas), Decimal("0")),
-        "igv": sum((f["igv"] for f in filas), Decimal("0")),
-        "total": sum((f["total"] for f in filas), Decimal("0")),
+        "base": base,
+        "igv": igv,
+        "total": total,
     }
     return render(request, "reportes/registro_ventas.html", contexto)
 
@@ -211,14 +227,21 @@ def registro_compras(request):
 
     filas.sort(key=lambda f: (f["fecha"], f["documento"]))
 
+    base = sum((f.get("base") or 0) for f in filas)
+    no_gravado = sum((f.get("no_gravado") or 0) for f in filas)
+    igv = sum((f["igv"] or 0) for f in filas)
+    total = sum((f["total"] or 0) for f in filas)
+    pagina = Paginator(filas, 25).get_page(request.GET.get("page"))
+
     contexto = {
-        "filas": filas,
+        "filas": pagina,
+        "page_obj": pagina,
         "desde": desde,
         "hasta": hasta,
-        "base": sum((f.get("base") or 0) for f in filas),
-        "no_gravado": sum((f.get("no_gravado") or 0) for f in filas),
-        "igv": sum((f["igv"] or 0) for f in filas),
-        "total": sum((f["total"] or 0) for f in filas),
+        "base": base,
+        "no_gravado": no_gravado,
+        "igv": igv,
+        "total": total,
     }
     return render(request, "reportes/registro_compras.html", contexto)
 
@@ -322,4 +345,75 @@ def conciliacion(request):
         request,
         "reportes/conciliacion.html",
         {"datos": datos, "filas": filas, "anio": anio, "mes": mes},
+    )
+
+
+@login_required
+def inventario(request):
+    empresa = empresa_actual(request)
+    q = request.GET.get("q", "").strip()
+
+    capas = CapaFIFO.objects.filter(
+        empresa=empresa, cantidad_restante__gt=0
+    ).select_related("producto", "producto__unidad")
+    if q:
+        capas = capas.filter(
+            Q(producto__sku__icontains=q) | Q(producto__nombre__icontains=q)
+        )
+
+    resumen = {}
+    for capa in capas:
+        fila = resumen.setdefault(
+            capa.producto_id,
+            {
+                "producto": capa.producto,
+                "cantidad": CERO,
+                "valor": CERO,
+                "capas": 0,
+            },
+        )
+        fila["cantidad"] += capa.cantidad_restante
+        fila["valor"] += capa.cantidad_restante * capa.costo_unitario
+        fila["capas"] += 1
+
+    filas = sorted(resumen.values(), key=lambda f: f["producto"].sku)
+    for fila in filas:
+        fila["costo_promedio"] = (
+            fila["valor"] / fila["cantidad"] if fila["cantidad"] else CERO
+        )
+
+    return render(
+        request,
+        "reportes/inventario.html",
+        {
+            "filas": filas,
+            "q": q,
+            "total_valor": sum((f["valor"] for f in filas), CERO),
+        },
+    )
+
+
+@login_required
+def kardex(request, pk: int):
+    empresa = empresa_actual(request)
+    producto = get_object_or_404(Producto, pk=pk)
+    movimientos = MovimientoStock.objects.filter(
+        empresa=empresa, producto=producto
+    ).order_by("fecha", "id")
+
+    saldo = CERO
+    filas = []
+    for movimiento in movimientos:
+        if movimiento.tipo == MovimientoStock.Tipo.ENTRADA:
+            saldo += movimiento.cantidad
+        else:
+            saldo -= movimiento.cantidad
+        filas.append({"movimiento": movimiento, "saldo": saldo})
+
+    capas = producto.capas.filter(empresa=empresa, cantidad_restante__gt=0).order_by("fecha", "id")
+
+    return render(
+        request,
+        "reportes/kardex.html",
+        {"producto": producto, "filas": filas, "saldo": saldo, "capas": capas},
     )

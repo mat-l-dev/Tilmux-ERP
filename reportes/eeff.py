@@ -75,17 +75,7 @@ def _saldo(empresa, prefijos: tuple[str, ...], hasta: date) -> Decimal:
     return (filas["debe"] or CERO) - (filas["haber"] or CERO)
 
 
-@login_required
-def estados(request):
-    empresa = empresa_actual(request)
-    hoy = date.today()
-    desde = date(hoy.year, 1, 1)
-    hasta = hoy
-
-    if request.GET.get("hasta"):
-        hasta = date.fromisoformat(request.GET["hasta"])
-    if request.GET.get("desde"):
-        desde = date.fromisoformat(request.GET["desde"])
+def construir(empresa, desde: date, hasta: date) -> dict:
 
     activo_corriente: list[dict] = []
     activo_no_corriente: list[dict] = []
@@ -242,4 +232,20 @@ def estados(request):
         ],
         "flujo_cuadra": efectivo_inicial + flujo_neto - efectivo_final,
     }
+    return contexto
+
+
+@login_required
+def estados(request):
+    empresa = empresa_actual(request)
+    hoy = date.today()
+    desde = date(hoy.year, 1, 1)
+    hasta = hoy
+
+    if request.GET.get("hasta"):
+        hasta = date.fromisoformat(request.GET["hasta"])
+    if request.GET.get("desde"):
+        desde = date.fromisoformat(request.GET["desde"])
+
+    contexto = construir(empresa, desde, hasta)
     return render(request, "reportes/eeff.html", contexto)

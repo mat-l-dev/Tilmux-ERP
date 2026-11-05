@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block titulo %}Kardex{% endblock %}
+{% block titulo_pagina %}Kardex · {{ producto.sku }}{% endblock %}
+
+{% block contenido %}
+{% include "reportes/_tabs.html" %}
+
+<section class="card">
+  <header class="card-head">
+    <h2>{{ producto.sku }} · {{ producto.nombre }}</h2>
+    <span class="chip">Saldo: {{ saldo }} {{ producto.unidad.codigo }}</span>
+  </header>
+
+  {% if filas %}
+  <table class="tabla-doc">
+    <thead>
+      <tr>
+        <th>Fecha</th>
+        <th>Tipo</th>
+        <th>Detalle</th>
+        <th class="der">Cantidad</th>
+        <th class="der">Costo unitario</th>
+        <th class="der">Costo total</th>
+        <th class="der">Saldo</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for f in filas %}
+      <tr>
+        <td>{{ f.movimiento.fecha|date:"d/m/Y" }}</td>
+        <td>{{ f.movimiento.get_tipo_display }}</td>
+        <td class="muted">{{ f.movimiento.glosa|default:"—" }}</td>
+        <td class="num der">{{ f.movimiento.cantidad }}</td>
+        <td class="num der">{{ f.movimiento.costo_unitario|floatformat:4 }}</td>
+        <td class="num der">{{ f.movimiento.costo_total|floatformat:2 }}</td>
+        <td class="num der">{{ f.saldo }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">Este producto no tiene movimientos.</p>
+  {% endif %}
+</section>
+
+{% if capas %}
+<section class="card" style="margin-top:12px">
+  <header class="card-head"><h2>Capas PEPS abiertas</h2></header>
+  <table class="tabla-doc">
+    <thead>
+      <tr><th>Fecha</th><th class="der">Cantidad</th><th class="der">Costo unitario</th><th class="der">Valor</th></tr>
+    </thead>
+    <tbody>
+      {% for capa in capas %}
+      <tr>
+        <td>{{ capa.fecha|date:"d/m/Y" }}</td>
+        <td class="num der">{{ capa.cantidad_restante }}</td>
+        <td class="num der">{{ capa.costo_unitario|floatformat:4 }}</td>
+        <td class="num der">{{ capa.valor|floatformat:2 }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+{% endblock %}

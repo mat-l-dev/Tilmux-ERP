@@ -14,6 +14,11 @@
       {% endfor %}
     </select>
   </label>
+  <label class="field" style="min-width:240px">
+    <span>Buscar</span>
+    <input type="text" name="q" value="{{ q }}" placeholder="Proveedor, RUC o comprobante">
+  </label>
+  <button class="btn btn-ghost" type="submit">Buscar</button>
 </form>
 
 <section class="card">
@@ -54,9 +59,9 @@
 
   {% if page_obj.has_other_pages %}
   <nav class="paginacion">
-    {% if page_obj.has_previous %}<a href="?page={{ page_obj.previous_page_number }}">Anterior</a>{% endif %}
+    {% if page_obj.has_previous %}<a href="{% querystring page=page_obj.previous_page_number %}">Anterior</a>{% endif %}
     <span>Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
-    {% if page_obj.has_next %}<a href="?page={{ page_obj.next_page_number }}">Siguiente</a>{% endif %}
+    {% if page_obj.has_next %}<a href="{% querystring page=page_obj.next_page_number %}">Siguiente</a>{% endif %}
   </nav>
   {% endif %}
 </section>

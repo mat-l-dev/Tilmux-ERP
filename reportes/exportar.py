@@ -13,12 +13,15 @@ from decimal import Decimal
 
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
+from openpyxl import Workbook
+from openpyxl.styles import Font
 
 from compras.models import Compra
 from compras.models_gasto import Gasto
 from core.context import empresa_actual
 from ventas.models import NotaCredito, NotaDebito, Venta
 
+from .eeff import construir
 from .utils import rango
 
 CAMPOS_VENTAS = [
@@ -204,3 +207,77 @@ def compras(request):
     return _csv(
         f"registro-compras-{desde:%Y%m}-{hasta:%Y%m}.csv", CAMPOS_COMPRAS, filas
     )
+
+
+def _hoja(libro, titulo, filas, subtotales=(), totales=()):
+    hoja = libro.create_sheet(titulo)
+    hoja.column_dimensions["A"].width = 46
+    hoja.column_dimensions["B"].width = 16
+    for indice, (concepto, importe) in enumerate(filas, start=1):
+        hoja.cell(row=indice, column=1, value=concepto)
+        celda = hoja.cell(row=indice, column=2, value=float(importe))
+        celda.number_format = "#,##0.00"
+        if concepto in subtotales:
+            hoja.cell(row=indice, column=1).font = Font(bold=True)
+            celda.font = Font(bold=True)
+        if concepto in totales:
+            hoja.cell(row=indice, column=1).font = Font(bold=True, size=12)
+            celda.font = Font(bold=True, size=12)
+    return hoja
+
+
+@login_required
+def eeff_excel(request):
+    empresa = empresa_actual(request)
+    desde, hasta = rango(request)
+    datos = construir(empresa, desde, hasta)
+
+    libro = Workbook()
+    libro.remove(libro.active)
+
+    situacion = [(a["codigo"] + " " + a["nombre"], a["importe"]) for a in datos["activo_corriente"]]
+    situacion.append(("Total activo corriente", datos["total_activo_corriente"]))
+    situacion += [(a["codigo"] + " " + a["nombre"], a["importe"]) for a in datos["activo_no_corriente"]]
+    situacion.append(("Total activo", datos["total_activo"]))
+    situacion += [(p["codigo"] + " " + p["nombre"], p["importe"]) for p in datos["pasivo"]]
+    situacion.append(("Total pasivo", datos["total_pasivo"]))
+    situacion += [(p["codigo"] + " " + p["nombre"], p["importe"]) for p in datos["patrimonio"]]
+    situacion.append(("Resultado acumulado", datos["resultado_acumulado"]))
+    situacion.append(("Total pasivo y patrimonio", datos["total_pasivo_patrimonio"]))
+    _hoja(
+        libro,
+        "Situación",
+        situacion,
+        subtotales={"Total activo corriente", "Total pasivo"},
+        totales={"Total activo", "Total pasivo y patrimonio"},
+    )
+
+    resultados = [
+        ("Ingresos por ventas", datos["ingresos_ventas"]),
+        ("Costo de ventas", -datos["costo_ventas"]),
+        ("Gastos de operación", -datos["gastos_operativos"]),
+        ("Otros ingresos operativos", datos["otros_ingresos"]),
+        ("Resultado de operación", datos["resultado_operacion"]),
+        ("Ingresos financieros", datos["ingresos_financieros"]),
+        ("Gastos financieros", -datos["gastos_financieros"]),
+        ("Resultado antes de impuesto", datos["resultado_antes_impuesto"]),
+        ("Impuesto a las ganancias", -datos["gasto_impuesto"]),
+        ("Resultado del periodo", datos["resultado_neto"]),
+    ]
+    _hoja(
+        libro,
+        "Resultados",
+        resultados,
+        subtotales={"Resultado de operación"},
+        totales={"Resultado del periodo"},
+    )
+
+    _hoja(libro, "Cambios", [(c["concepto"], c["importe"]) for c in datos["cambios"]], totales={"Saldo al cierre"})
+    _hoja(libro, "Flujo", [(f["concepto"], f["importe"]) for f in datos["flujo"]], totales={"Efectivo al cierre"})
+
+    respuesta = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    respuesta["Content-Disposition"] = f'attachment; filename="eeff-{hasta:%Y%m%d}.xlsx"'
+    libro.save(respuesta)
+    return respuesta

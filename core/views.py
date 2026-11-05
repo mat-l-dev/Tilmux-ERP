@@ -94,6 +94,29 @@ def panel(request: HttpRequest) -> HttpResponse:
     igv = Decimal(igv_ventas) - Decimal(igv_compras)
     renta = Decimal(ventas_base) * TASA_RENTA_RER
 
+    ventas_acumulado = Decimal("0")
+    ventas_anterior = Decimal("0")
+    variacion = None
+    if empresa:
+        ventas_acumulado = Venta.objects.filter(
+            empresa=empresa,
+            estado=Venta.Estado.CONFIRMADA,
+            fecha__year=anio,
+            fecha__month__lte=mes,
+        ).aggregate(s=Sum("subtotal"))["s"] or 0
+        ventas_anterior = Venta.objects.filter(
+            empresa=empresa,
+            estado=Venta.Estado.CONFIRMADA,
+            fecha__year=anio - 1,
+            fecha__month=mes,
+        ).aggregate(s=Sum("subtotal"))["s"] or 0
+        if ventas_anterior:
+            variacion = (
+                (Decimal(ventas_base) - Decimal(ventas_anterior))
+                / Decimal(ventas_anterior)
+                * 100
+            ).quantize(Decimal("0.1"))
+
     serie_meses = []
     maximo = Decimal("0")
     if empresa:
@@ -148,6 +171,10 @@ def panel(request: HttpRequest) -> HttpResponse:
         ),
         "serie_meses": serie_meses,
         "maximo_mes": soles(maximo),
+        "ventas_acumulado": soles(ventas_acumulado),
+        "ventas_anterior": soles(ventas_anterior),
+        "variacion": variacion,
+        "anio_anterior": anio - 1,
     }
     return render(request, "core/panel.html", contexto)
 

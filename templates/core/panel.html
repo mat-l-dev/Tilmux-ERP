@@ -84,20 +84,20 @@
 
   <article class="card rise" style="--i:3">
     <header class="card-head">
-      <h2>Primer periodo</h2>
+      <h2>Comparativo</h2>
       <span class="chip">{{ periodo_etiqueta }}</span>
     </header>
-    <p class="muted">
-      Registra una compra para que el stock y el costo empiecen a moverse.
-      Con la primera venta, el libro se llena solo.
-    </p>
-    <div class="steps">
-      <div class="step"><span class="step-n">1</span> Compra</div>
-      <div class="step"><span class="step-n">2</span> Stock</div>
-      <div class="step"><span class="step-n">3</span> Venta</div>
-      <div class="step"><span class="step-n">4</span> Cierre</div>
-    </div>
-    <a class="btn btn-primary btn-block" href="{% url 'compras:nueva' %}">Registrar compra</a>
+    <dl class="totales">
+      <div><dt>Ventas acumuladas del año</dt><dd class="num">S/ {{ ventas_acumulado }}</dd></div>
+      <div><dt>Mismo mes de {{ anio_anterior }}</dt><dd class="num">S/ {{ ventas_anterior }}</dd></div>
+      <div class="total">
+        <dt>Variación contra {{ anio_anterior }}</dt>
+        <dd class="num">
+          {% if variacion is None %}—{% else %}{{ variacion|floatformat:1 }} %{% endif %}
+        </dd>
+      </div>
+    </dl>
+    <a class="btn btn-ghost btn-block" href="{% url 'reportes:balance' %}?periodo={{ periodo_valor }}">Ver balance del mes</a>
   </article>
 </section>
 {% endblock %}

@@ -57,6 +57,13 @@
     Las notas de crédito restan y las de débito suman, igual que en el RVIE.
     Cada nota indica a qué comprobante modifica.
   </p>
+  {% if page_obj.has_other_pages %}
+  <nav class="paginacion">
+    {% if page_obj.has_previous %}<a href="{% querystring page=page_obj.previous_page_number %}">Anterior</a>{% endif %}
+    <span>Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}<a href="{% querystring page=page_obj.next_page_number %}">Siguiente</a>{% endif %}
+  </nav>
+  {% endif %}
   {% else %}
   <p class="muted">No hay documentos en el rango.</p>
   {% endif %}

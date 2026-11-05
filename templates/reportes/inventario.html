@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block titulo %}Inventario{% endblock %}
+{% block titulo_pagina %}Inventario valorizado{% endblock %}
+
+{% block contenido %}
+{% include "reportes/_tabs.html" %}
+
+<form method="get" class="filtro">
+  <label class="field" style="min-width:260px">
+    <span>Buscar producto</span>
+    <input type="text" name="q" value="{{ q }}" placeholder="SKU o nombre">
+  </label>
+  <button class="btn btn-ghost" type="submit">Buscar</button>
+</form>
+
+<section class="card">
+  <header class="card-head">
+    <h2>Existencias por producto</h2>
+    <span class="chip">Valor total: S/ {{ total_valor|floatformat:2 }}</span>  </header>
+
+  {% if filas %}
+  <table class="tabla-doc">
+    <thead>
+      <tr>
+        <th>SKU</th>
+        <th>Producto</th>
+        <th class="der">Cantidad</th>
+        <th class="der">Costo promedio</th>
+        <th class="der">Valor</th>
+        <th class="der">Capas</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for f in filas %}
+      <tr>
+        <td><a href="{% url 'reportes:kardex' f.producto.pk %}">{{ f.producto.sku }}</a></td>
+        <td>{{ f.producto.nombre }}</td>
+        <td class="num der">{{ f.cantidad }} {{ f.producto.unidad.codigo }}</td>
+        <td class="num der">{{ f.costo_promedio|floatformat:4 }}</td>
+        <td class="num der">{{ f.valor|floatformat:2 }}</td>
+        <td class="num der">{{ f.capas }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="4"><strong>Total</strong></td>
+        <td class="num der"><strong>{{ total_valor|floatformat:2 }}</strong></td>
+        <td></td>
+      </tr>
+    </tfoot>
+  </table>
+  {% else %}
+  <p class="muted">No hay stock con ese filtro.</p>
+  {% endif %}
+</section>
+{% endblock %}

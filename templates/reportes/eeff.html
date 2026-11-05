@@ -7,6 +7,10 @@
 {% include "reportes/_tabs.html" %}
 {% include "reportes/_filtro.html" %}
 
+<div class="acciones-head" style="justify-content:flex-end; margin-bottom:10px">
+  <a class="btn btn-ghost" href="{% url 'reportes:exportar_eeff' %}?desde={{ desde|date:'Y-m-d' }}&hasta={{ hasta|date:'Y-m-d' }}">Exportar a Excel</a>
+</div>
+
 {% if descuadre %}
 <div class="message error">El estado no cuadra: diferencia de {{ descuadre|floatformat:2 }}.</div>
 {% endif %}
