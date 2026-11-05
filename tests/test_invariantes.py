@@ -244,7 +244,7 @@ class InvarianteCosto(BaseContable):
             fecha=date(2026, 11, 25),
             serie="FC01",
             numero="0001",
-            motivo="Devolución",
+            motivo_codigo="06",
         )
 
         capa = self.capas().filter(cantidad_restante__gt=0).get()
