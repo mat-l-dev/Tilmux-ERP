@@ -371,8 +371,9 @@ class Command(BaseCommand):
             serie.save(update_fields=["ultimo_numero"])
 
     def _resumen(self, empresa):
-        from contabilidad.models import AsientoLinea
         from django.db.models import Sum
+
+        from contabilidad.models import AsientoLinea
 
         def saldo(codigos):
             filas = AsientoLinea.objects.filter(

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import date
 from decimal import Decimal
 
 from django.contrib.auth.decorators import login_required
@@ -15,20 +14,17 @@ from contabilidad.models import Cuenta
 from core.context import empresa_actual
 from ventas.models import NotaCredito, NotaDebito, Venta
 
+from .utils import rango
+
 TASA_RENTA_RER = Decimal("0.015")
 
 
-def _rango(request) -> tuple[date, date]:
-    hoy = date.today()
-    desde = request.GET.get("desde") or date(hoy.year, 1, 1).isoformat()
-    hasta = request.GET.get("hasta") or hoy.isoformat()
-    return date.fromisoformat(desde), date.fromisoformat(hasta)
 
 
 @login_required
 def balance(request):
     empresa = empresa_actual(request)
-    desde, hasta = _rango(request)
+    desde, hasta = rango(request)
     filas = []
 
     if empresa:
@@ -65,7 +61,7 @@ def balance(request):
 @login_required
 def mayor(request):
     empresa = empresa_actual(request)
-    desde, hasta = _rango(request)
+    desde, hasta = rango(request)
     codigo = request.GET.get("cuenta", "")
     cuenta = None
     movimientos = []
@@ -101,7 +97,7 @@ def mayor(request):
 @login_required
 def registro_ventas(request):
     empresa = empresa_actual(request)
-    desde, hasta = _rango(request)
+    desde, hasta = rango(request)
     filas: list[dict] = []
 
     if empresa:
@@ -171,7 +167,7 @@ def registro_ventas(request):
 @login_required
 def registro_compras(request):
     empresa = empresa_actual(request)
-    desde, hasta = _rango(request)
+    desde, hasta = rango(request)
     filas = []
 
     if empresa:
@@ -228,7 +224,7 @@ def registro_compras(request):
 @login_required
 def impuestos(request):
     empresa = empresa_actual(request)
-    desde, hasta = _rango(request)
+    desde, hasta = rango(request)
     ventas_base = ventas_igv = compras_base = compras_igv = Decimal("0")
 
     if empresa:

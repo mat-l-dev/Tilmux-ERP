@@ -204,7 +204,7 @@ def parsear_guia(contenido: bytes) -> Guia:
         remitente_ruc=_texto(raiz, "cac:DespatchSupplierParty/cac:Party/cac:PartyIdentification/cbc:ID"),
         remitente_nombre=_texto(raiz, "cac:DespatchSupplierParty/cac:Party/cac:PartyLegalEntity/cbc:RegistrationName"),
         destinatario_ruc=_texto(raiz, "cac:DeliveryCustomerParty/cac:Party/cac:PartyIdentification/cbc:ID"),
-        destinatario_nombre=_texto(raiz, "cac:DeliveryCustomerParty/cac:Party/cac:PartyLegalEntity/cbc:RegistrationName"),
+        destinatario_nombre=_texto(raiz, "cac:DeliveryCustomerParty/cac:Party/cac:PartyLegalEntity/cbc:RegistrationName"),  # noqa: E501
         peso_bruto=Decimal(peso).quantize(Decimal("0.001")) if peso else None,
         bultos=int(bultos) if bultos and bultos.isdigit() else None,
         documento_referencia=referencia,

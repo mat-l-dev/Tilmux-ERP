@@ -135,6 +135,7 @@ class Venta(models.Model):
         verbose_name = "venta"
         verbose_name_plural = "ventas"
         ordering = ["-fecha", "-id"]
+        indexes = [models.Index(fields=["empresa", "fecha"])]
         constraints = [
             models.UniqueConstraint(
                 fields=["empresa", "tipo_doc", "serie", "numero"],

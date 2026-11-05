@@ -87,8 +87,8 @@ def confirmar(compra: Compra) -> Compra:
             glosa=f"Compra {compra.serie}-{compra.numero}".strip(" -"),
         )
 
-    base = _cent(sum((l.base for l in lineas), Decimal("0")) + sum((c.base for c in costos), Decimal("0")))
-    igv = _cent(sum((l.igv for l in lineas), Decimal("0")) + sum((c.igv for c in costos), Decimal("0")))
+    base = _cent(sum((linea.base for linea in lineas), Decimal("0")) + sum((c.base for c in costos), Decimal("0")))
+    igv = _cent(sum((linea.igv for linea in lineas), Decimal("0")) + sum((c.igv for c in costos), Decimal("0")))
     total = base + igv
 
     compra.subtotal = base

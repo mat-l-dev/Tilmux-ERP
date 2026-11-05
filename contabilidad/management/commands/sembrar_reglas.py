@@ -24,7 +24,7 @@ REGLAS = {
     ),
     "VENTA": (
         "Venta de mercadería",
-        [("1212", D, TOTAL, "Por cobrar"), ("70121", H, BASE, "Ingreso"), ("40111", H, IGV, "IGV"), ("69121", D, COSTO, "Costo de venta"), ("20111", H, COSTO, "Salida de inventario")],
+        [("1212", D, TOTAL, "Por cobrar"), ("70121", H, BASE, "Ingreso"), ("40111", H, IGV, "IGV"), ("69121", D, COSTO, "Costo de venta"), ("20111", H, COSTO, "Salida de inventario")],  # noqa: E501
     ),
     "PAGO_PROVEEDOR": (
         "Pago a proveedor",
@@ -44,7 +44,7 @@ REGLAS = {
     ),
     "NOTA_CREDITO": (
         "Nota de crédito de venta",
-        [("70911", D, BASE, "Devolución"), ("40111", D, IGV, "IGV"), ("1212", H, TOTAL, "Cobranza revertida"), ("69121", H, COSTO, "Costo revertido"), ("20111", D, COSTO, "Reingreso de inventario")],
+        [("70911", D, BASE, "Devolución"), ("40111", D, IGV, "IGV"), ("1212", H, TOTAL, "Cobranza revertida"), ("69121", H, COSTO, "Costo revertido"), ("20111", D, COSTO, "Reingreso de inventario")],  # noqa: E501
     ),
     "NOTA_DEBITO": (
         "Nota de débito de venta",

@@ -7,6 +7,7 @@ from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.db import IntegrityError
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
@@ -16,13 +17,12 @@ from contabilidad.calculos import calcular_linea
 from contabilidad.models import Asiento, Cuenta
 from contabilidad.moneda import SinTipoCambio, a_soles
 from core.context import empresa_actual
+from documentos.xml_cpe import Guia, XMLInvalido, leer
 from ventas.models import Venta
 from ventas.models_guia import GuiaRemision
 
 from .models import Compra, CompraLinea, CostoAdicional
 from .servicios import CompraError, confirmar, pagar, registrar_gasto
-from contabilidad.moneda import SinTipoCambio
-from documentos.xml_cpe import Guia, XMLInvalido, leer
 
 
 def _decimal(texto: str) -> Decimal:
@@ -32,12 +32,15 @@ def _decimal(texto: str) -> Decimal:
 @login_required
 def lista(request):
     empresa = empresa_actual(request)
-    compras = (
-        Compra.objects.filter(empresa=empresa).select_related("proveedor")[:100]
+    consulta = (
+        Compra.objects.filter(empresa=empresa).select_related("proveedor")
         if empresa
         else Compra.objects.none()
     )
-    return render(request, "compras/lista.html", {"compras": compras})
+    pagina = Paginator(consulta, 25).get_page(request.GET.get("page"))
+    return render(
+        request, "compras/lista.html", {"compras": pagina, "page_obj": pagina}
+    )
 
 
 @login_required
@@ -96,7 +99,7 @@ def nueva(request):
     precios = request.POST.getlist("linea_precio")
 
     for indice, (producto_id, cantidad_txt, precio_txt) in enumerate(
-        zip(productos_ids, cantidades, precios), start=1
+        zip(productos_ids, cantidades, precios, strict=False), start=1
     ):
         if not producto_id and not cantidad_txt and not precio_txt:
             continue
@@ -132,7 +135,7 @@ def nueva(request):
     conceptos = request.POST.getlist("costo_concepto")
     bases = request.POST.getlist("costo_base")
     igvs = request.POST.getlist("costo_igv")
-    for concepto, base_txt, igv_txt in zip(conceptos, bases, igvs):
+    for concepto, base_txt, igv_txt in zip(conceptos, bases, igvs, strict=False):
         if not concepto.strip() and not base_txt:
             continue
         try:
@@ -456,10 +459,10 @@ def importar_compra(request):
                 con_credito=con_credito,
             )
 
-            base_total = sum((Decimal(l["base"]) for l in lineas), Decimal("0.00"))
+            base_total = sum((Decimal(linea["base"]) for linea in lineas), Decimal("0.00"))
             igv_total = Decimal(datos["igv"])
             acumulado = Decimal("0.00")
-            for indice, (linea, producto_id) in enumerate(zip(lineas, elegidos)):
+            for indice, (linea, producto_id) in enumerate(zip(lineas, elegidos, strict=False)):
                 producto = Producto.objects.get(pk=producto_id)
                 base = Decimal(linea["base"])
                 if indice == len(lineas) - 1:

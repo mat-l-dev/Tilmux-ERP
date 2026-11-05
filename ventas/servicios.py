@@ -44,8 +44,8 @@ def confirmar(venta: Venta) -> Venta:
     if not lineas:
         raise VentaError("La venta no tiene líneas.")
 
-    base = _cent(sum((l.base for l in lineas), Decimal("0")))
-    igv = _cent(sum((l.igv for l in lineas), Decimal("0")))
+    base = _cent(sum((linea.base for linea in lineas), Decimal("0")))
+    igv = _cent(sum((linea.igv for linea in lineas), Decimal("0")))
     total = base + igv
 
     if venta.tipo_doc == Venta.TipoDoc.FACTURA:

@@ -16,10 +16,8 @@ from django.test import TestCase
 
 from catalogo.models import CuentaTesoreria, Producto, Tercero
 from compras.models import Compra, CompraLinea, CostoAdicional
-from compras.models_gasto import Gasto
 from compras.servicios import confirmar as confirmar_compra
-from compras.servicios import pagar, registrar_gasto
-from compras.servicios import revaluar
+from compras.servicios import pagar, registrar_gasto, revaluar
 from contabilidad.calculos import calcular_linea
 from contabilidad.models import Asiento, AsientoLinea, Cuenta
 from contabilidad.moneda import a_soles
@@ -28,8 +26,8 @@ from core.models import Empresa, Periodo, TipoCambio
 from inventario.models import CapaFIFO, ConsumoCapa, MovimientoStock
 from ventas.models import Venta, VentaLinea
 from ventas.models_guia import GuiaRemision
-from ventas.servicios import VentaError, confirmar as confirmar_venta
-from ventas.servicios import emitir_nota_credito, emitir_nota_debito
+from ventas.servicios import VentaError, emitir_nota_credito, emitir_nota_debito
+from ventas.servicios import confirmar as confirmar_venta
 
 CENT = Decimal("0.01")
 
@@ -330,7 +328,7 @@ class InvarianteComprobantes(BaseContable):
         )
 
         asiento = Asiento.objects.get(origen_tipo="NOTA_DEBITO", origen_id=nota.pk)
-        importes = {l.cuenta.codigo: (l.debe, l.haber) for l in asiento.lineas.all()}
+        importes = {linea.cuenta.codigo: (linea.debe, linea.haber) for linea in asiento.lineas.all()}
         self.assertEqual(importes["1212"], (Decimal("118.00"), Decimal("0.00")))
         self.assertEqual(importes["7599"], (Decimal("0.00"), Decimal("100.00")))
         self.assertEqual(importes["40111"], (Decimal("0.00"), Decimal("18.00")))
@@ -454,7 +452,7 @@ class InvariantePagos(BaseContable):
         asiento = Asiento.objects.get(
             origen_tipo="COMPRA_PAGO", origen_id=compra.pk
         )
-        importes = {l.cuenta.codigo: (l.debe, l.haber) for l in asiento.lineas.all()}
+        importes = {linea.cuenta.codigo: (linea.debe, linea.haber) for linea in asiento.lineas.all()}
         self.assertEqual(importes["4212"], (Decimal("1180.00"), Decimal("0.00")))
         self.assertEqual(importes["1061"], (Decimal("0.00"), Decimal("1180.00")))
 
@@ -488,7 +486,7 @@ class InvariantePagos(BaseContable):
         asiento = Asiento.objects.get(
             origen_tipo="COMPRA_PAGO", origen_id=compra.pk
         )
-        importes = {l.cuenta.codigo: l.debe for l in asiento.lineas.all()}
+        importes = {linea.cuenta.codigo: linea.debe for linea in asiento.lineas.all()}
         self.assertEqual(importes["4212"], Decimal("345.20"))
         self.assertEqual(importes["6761"], Decimal("4.80"))
 
@@ -524,7 +522,7 @@ class InvarianteRevaluacion(BaseContable):
         self.assertEqual(compra.revaluacion, Decimal("4.80"))
 
         asiento = Asiento.objects.get(origen_tipo="REVALUACION", origen_id=compra.pk)
-        importes = {l.cuenta.codigo: (l.debe, l.haber) for l in asiento.lineas.all()}
+        importes = {linea.cuenta.codigo: (linea.debe, linea.haber) for linea in asiento.lineas.all()}
         self.assertEqual(importes["6761"][0], Decimal("4.80"))
         self.assertEqual(importes["4212"][1], Decimal("4.80"))
 

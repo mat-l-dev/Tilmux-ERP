@@ -51,6 +51,7 @@ class Gasto(models.Model):
         verbose_name = "gasto"
         verbose_name_plural = "gastos"
         ordering = ["-fecha", "-id"]
+        indexes = [models.Index(fields=["empresa", "fecha"])]
         constraints = [
             models.UniqueConstraint(
                 fields=["empresa", "tipo_doc", "serie", "numero"],

@@ -116,8 +116,8 @@ def postear(
             )
         )
 
-    debe = sum((l.debe for l in lineas), ZERO)
-    haber = sum((l.haber for l in lineas), ZERO)
+    debe = sum((linea.debe for linea in lineas), ZERO)
+    haber = sum((linea.haber for linea in lineas), ZERO)
     if debe != haber:
         raise ContabilidadError(
             f"El asiento no cuadra: debe {debe} contra haber {haber}."
@@ -174,8 +174,8 @@ def postear_lineas(
             )
         )
 
-    total_debe = sum((l.debe for l in filas), ZERO)
-    total_haber = sum((l.haber for l in filas), ZERO)
+    total_debe = sum((linea.debe for linea in filas), ZERO)
+    total_haber = sum((linea.haber for linea in filas), ZERO)
     if total_debe != total_haber:
         raise ContabilidadError(
             f"El asiento no cuadra: debe {total_debe} contra haber {total_haber}."

@@ -105,6 +105,32 @@
 </section>
 
 <section class="card" style="margin-top:12px">
+  <header class="card-head">
+    <h2>Estado de flujo de efectivo</h2>
+    <span class="chip">Método indirecto</span>
+  </header>
+  <table class="tabla-doc eeff-tabla">
+    <tbody>
+      {% for f in flujo %}
+      <tr class="{% if f.total %}total{% elif f.subtotal %}subtotal{% endif %}">
+        <td>{{ f.concepto }}</td>
+        <td class="num der">{{ f.importe|floatformat:2 }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if flujo_cuadra %}
+  <div class="message error">
+    El flujo no cuadra con el efectivo: diferencia de {{ flujo_cuadra|floatformat:2 }}.
+  </div>
+  {% endif %}
+  <p class="preview-note">
+    Parte del resultado y ajusta por las variaciones de inventario, cuentas por
+    cobrar y por pagar. La suma debe igualar el efectivo del estado de situación.
+  </p>
+</section>
+
+<section class="card" style="margin-top:12px">
   <header class="card-head"><h2>Notas a los estados financieros</h2></header>
 
   <details class="nota">

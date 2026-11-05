@@ -8,11 +8,11 @@ impuesto a las ganancias y operaciones discontinuadas.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.contrib.auth.decorators import login_required
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.shortcuts import render
 
 from contabilidad.models import AsientoLinea
@@ -57,6 +57,22 @@ def _entrada(fila) -> dict:
 
 def _suma(items) -> Decimal:
     return sum((i["importe"] for i in items), CERO)
+
+
+def _saldo(empresa, prefijos: tuple[str, ...], hasta: date) -> Decimal:
+    """Saldo neto de las cuentas que empiezan con esos códigos."""
+    filtro = Q()
+    for prefijo in prefijos:
+        filtro |= Q(cuenta__codigo__startswith=prefijo)
+
+    filas = AsientoLinea.objects.filter(
+        filtro,
+        asiento__empresa=empresa,
+        asiento__estado="CONFIRMADO",
+        asiento__fecha__lte=hasta,
+    ).aggregate(debe=Sum("debe"), haber=Sum("haber"))
+
+    return (filas["debe"] or CERO) - (filas["haber"] or CERO)
 
 
 @login_required
@@ -145,6 +161,40 @@ def estados(request):
         CERO,
     )
 
+    # --- Flujo de efectivo, método indirecto ---
+    EFECTIVO = ("101", "1031", "1061")
+    INVENTARIO = ("201", "202", "203", "204", "205", "206", "207")
+    POR_COBRAR = ("121", "122", "13", "14")
+    POR_PAGAR = ("40", "41", "42", "43", "44", "45", "46", "47")
+
+    inicio = desde - timedelta(days=1)
+    efectivo_inicial = _saldo(empresa, EFECTIVO, inicio) if empresa else CERO
+    efectivo_final = _saldo(empresa, EFECTIVO, hasta) if empresa else CERO
+    variacion_inventario = (
+        _saldo(empresa, INVENTARIO, hasta) - _saldo(empresa, INVENTARIO, inicio)
+        if empresa
+        else CERO
+    )
+    variacion_cobrar = (
+        _saldo(empresa, POR_COBRAR, hasta) - _saldo(empresa, POR_COBRAR, inicio)
+        if empresa
+        else CERO
+    )
+    variacion_pagar = (
+        -(_saldo(empresa, POR_PAGAR, hasta) - _saldo(empresa, POR_PAGAR, inicio))
+        if empresa
+        else CERO
+    )
+    aportes = CERO
+    if empresa:
+        for fila in _filas(empresa, desde=desde, hasta=hasta):
+            if fila["cuenta__elemento"] == 5:
+                aportes += (fila["haber"] or CERO) - (fila["debe"] or CERO)
+
+    flujo_operacion = resultado_neto - variacion_inventario - variacion_cobrar + variacion_pagar
+    flujo_financiacion = aportes
+    flujo_neto = flujo_operacion + flujo_financiacion
+
     contexto = {
         "desde": desde,
         "hasta": hasta,
@@ -178,5 +228,18 @@ def estados(request):
             {"concepto": "Resultado acumulado", "importe": resultado_acumulado},
             {"concepto": "Saldo al cierre", "importe": total_patrimonio_resultado},
         ],
+        "flujo": [
+            {"concepto": "Resultado del periodo", "importe": resultado_neto},
+            {"concepto": "Variación de inventarios", "importe": -variacion_inventario},
+            {"concepto": "Variación de cuentas por cobrar", "importe": -variacion_cobrar},
+            {"concepto": "Variación de cuentas por pagar", "importe": variacion_pagar},
+            {"concepto": "Flujo de operación", "importe": flujo_operacion, "subtotal": True},
+            {"concepto": "Aportes de capital", "importe": aportes},
+            {"concepto": "Flujo de financiación", "importe": flujo_financiacion, "subtotal": True},
+            {"concepto": "Flujo neto del periodo", "importe": flujo_neto, "subtotal": True},
+            {"concepto": "Efectivo al inicio", "importe": efectivo_inicial},
+            {"concepto": "Efectivo al cierre", "importe": efectivo_final, "total": True},
+        ],
+        "flujo_cuadra": efectivo_inicial + flujo_neto - efectivo_final,
     }
     return render(request, "reportes/eeff.html", contexto)

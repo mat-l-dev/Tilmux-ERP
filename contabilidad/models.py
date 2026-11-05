@@ -165,11 +165,11 @@ class Asiento(models.Model):
 
     @property
     def debe(self):
-        return sum((l.debe for l in self.lineas.all()), 0)
+        return sum((linea.debe for linea in self.lineas.all()), 0)
 
     @property
     def haber(self):
-        return sum((l.haber for l in self.lineas.all()), 0)
+        return sum((linea.haber for linea in self.lineas.all()), 0)
 
 
 class AsientoLinea(models.Model):

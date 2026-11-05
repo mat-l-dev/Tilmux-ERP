@@ -57,6 +57,7 @@ class Compra(models.Model):
         verbose_name = "compra"
         verbose_name_plural = "compras"
         ordering = ["-fecha", "-id"]
+        indexes = [models.Index(fields=["empresa", "fecha"])]
 
     def __str__(self) -> str:
         return f"{self.fecha} · {self.proveedor.nombre} · {self.total}"

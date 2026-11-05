@@ -17,8 +17,9 @@ from django.http import HttpResponse
 from compras.models import Compra
 from compras.models_gasto import Gasto
 from core.context import empresa_actual
-from reportes.views import _rango
 from ventas.models import NotaCredito, NotaDebito, Venta
+
+from .utils import rango
 
 CAMPOS_VENTAS = [
     "periodo",
@@ -73,7 +74,7 @@ def _importe(valor) -> str:
 @login_required
 def ventas(request):
     empresa = empresa_actual(request)
-    desde, hasta = _rango(request)
+    desde, hasta = rango(request)
     filas: list[list] = []
 
     if empresa:
@@ -153,7 +154,7 @@ def ventas(request):
 @login_required
 def compras(request):
     empresa = empresa_actual(request)
-    desde, hasta = _rango(request)
+    desde, hasta = rango(request)
     filas: list[list] = []
 
     if empresa:

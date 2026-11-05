@@ -39,7 +39,7 @@ class LecturaDeComprobante(SimpleTestCase):
 
         self.assertEqual(len(comprobante.lineas), 2)
         self.assertEqual(
-            sum((l.base for l in comprobante.lineas), Decimal("0.00")),
+            sum((linea.base for linea in comprobante.lineas), Decimal("0.00")),
             comprobante.base,
         )
 

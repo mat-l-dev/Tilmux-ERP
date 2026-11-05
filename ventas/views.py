@@ -7,6 +7,7 @@ from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.db.models import Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
@@ -17,8 +18,7 @@ from contabilidad.models import Asiento
 from core.context import empresa_actual
 
 from .models import NotaCredito, NotaCreditoLinea, NotaDebito, Venta, VentaLinea
-from .servicios import VentaError, confirmar
-from .servicios import emitir_nota_credito, emitir_nota_debito
+from .servicios import VentaError, confirmar, emitir_nota_credito, emitir_nota_debito
 
 
 def _numero_siguiente(empresa, tipo_doc: str, serie: str) -> str:
@@ -44,7 +44,7 @@ def _leer_filas(post) -> tuple[list[dict], list[str]]:
     errores: list[str] = []
 
     for indice, (producto_id, cantidad_txt, precio_txt) in enumerate(
-        zip(productos, cantidades, precios), start=1
+        zip(productos, cantidades, precios, strict=False), start=1
     ):
         if not producto_id and not cantidad_txt and not precio_txt:
             continue
@@ -91,12 +91,15 @@ def _leer_filas(post) -> tuple[list[dict], list[str]]:
 @login_required
 def lista(request):
     empresa = empresa_actual(request)
-    ventas = (
-        Venta.objects.filter(empresa=empresa).select_related("cliente")[:100]
+    consulta = (
+        Venta.objects.filter(empresa=empresa).select_related("cliente")
         if empresa
         else Venta.objects.none()
     )
-    return render(request, "ventas/lista.html", {"ventas": ventas})
+    pagina = Paginator(consulta, 25).get_page(request.GET.get("page"))
+    return render(
+        request, "ventas/lista.html", {"ventas": pagina, "page_obj": pagina}
+    )
 
 
 @login_required

@@ -24,8 +24,14 @@ def _cargar_env(ruta: Path) -> None:
 
 _cargar_env(BASE_DIR / ".env")
 
-SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "solo-para-desarrollo-local")
 DEBUG = os.environ.get("DJANGO_DEBUG", "false").lower() in {"1", "true", "yes"}
+
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY")
+if not SECRET_KEY:
+    if not DEBUG:
+        # Nunca arrancar en producción con una clave conocida.
+        raise RuntimeError("Falta DJANGO_SECRET_KEY en el entorno.")
+    SECRET_KEY = "solo-para-desarrollo-local"
 
 ALLOWED_HOSTS = [
     host.strip()

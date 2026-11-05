@@ -15,6 +15,7 @@ from django.views.decorators.http import require_POST
 from compras.models import Compra
 from contabilidad.models import AsientoLinea, Cuenta
 from ventas.models import Venta
+
 from .context import empresa_actual
 from .models import Empresa, Periodo
 
