@@ -22,6 +22,7 @@ from documentos.xml_cpe import Guia, XMLInvalido, leer
 from ventas.models import Venta
 from ventas.models_guia import GuiaRemision
 
+from .forms import CabeceraCompraForm
 from .models import Compra, CompraLinea, CostoAdicional
 from .servicios import CompraError, confirmar, pagar, registrar_gasto
 
@@ -170,14 +171,23 @@ def nueva(request):
     if errores:
         return render(request, "compras/nueva.html", contexto)
 
-    compra = Compra.objects.create(creado_por=usuario_actual.get(), 
+    formulario = CabeceraCompraForm(request.POST)
+    if not formulario.is_valid():
+        for textos in formulario.errors.values():
+            errores.extend(textos)
+        return render(request, "compras/nueva.html", contexto)
+
+    datos = formulario.cleaned_data
+
+    compra = Compra.objects.create(
         empresa=empresa,
         proveedor=proveedor,
-        fecha=date.fromisoformat(request.POST.get("fecha") or hoy.isoformat()),
-        tipo_doc=request.POST.get("tipo_doc", "FACTURA"),
-        serie=request.POST.get("serie", "").upper()[:4],
-        numero=request.POST.get("numero", "")[:20],
-        glosa=request.POST.get("glosa", "")[:255],
+        fecha=datos["fecha"],
+        tipo_doc=datos["tipo_doc"],
+        serie=datos["serie"].upper()[:4],
+        numero=datos["numero"][:20],
+        glosa=datos.get("glosa", "")[:255],
+        creado_por=usuario_actual.get(),
     )
     for orden, fila in enumerate(filas, start=1):
         CompraLinea.objects.create(

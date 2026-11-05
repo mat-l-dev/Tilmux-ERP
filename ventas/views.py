@@ -12,12 +12,13 @@ from django.db.models import Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from catalogo.models import CuentaTesoreria, Producto, Serie
+from catalogo.models import CuentaTesoreria, Producto, Serie, Tercero
 from contabilidad.calculos import calcular_linea
 from contabilidad.models import Asiento
 from core.context import empresa_actual
 from core.contexto import usuario_actual
 
+from .forms import CabeceraVentaForm
 from .models import NotaCredito, NotaCreditoLinea, NotaDebito, Venta, VentaLinea
 from .servicios import VentaError, confirmar, emitir_nota_credito, emitir_nota_debito
 
@@ -138,6 +139,11 @@ def nueva(request):
         return render(request, "ventas/nueva.html", contexto)
 
     filas, errores = _leer_filas(request.POST)
+    formulario = CabeceraVentaForm(request.POST, empresa=empresa)
+    if not formulario.is_valid():
+        for textos in formulario.errors.values():
+            errores.extend(textos)
+
     contexto.update(
         {
             "filas": filas,
@@ -161,18 +167,35 @@ def nueva(request):
     if errores:
         return render(request, "ventas/nueva.html", contexto)
 
-    cuenta_id = request.POST.get("cuenta") or None
-    venta = Venta.objects.create(creado_por=usuario_actual.get(), 
+    datos = formulario.cleaned_data
+
+    cliente = None
+    if datos.get("cliente_doc"):
+        tipo = "RUC" if len(datos["cliente_doc"]) == 11 else "DNI"
+        cliente, _ = Tercero.objects.get_or_create(
+            tipo_doc=tipo,
+            numero_doc=datos["cliente_doc"],
+            defaults={
+                "nombre": datos.get("cliente_nombre") or "Cliente sin nombre",
+                "rol": "CLIENTE",
+            },
+        )
+
+    venta = Venta.objects.create(
         empresa=empresa,
-        cliente_nombre=request.POST.get("cliente_nombre", "")[:200],
-        fecha=date.fromisoformat(request.POST.get("fecha") or hoy.isoformat()),
-        tipo_doc=request.POST.get("tipo_doc", "BOLETA"),
-        serie=request.POST.get("serie", "").upper()[:4],
-        numero=request.POST.get("numero", "")[:20],
-        condicion=request.POST.get("condicion", "CONTADO"),
-        cuenta_id=cuenta_id,
-        canal=request.POST.get("canal", "TRANSFERENCIA"),
-        glosa=request.POST.get("glosa", "")[:255],
+        cliente=cliente,
+        cliente_nombre=(
+            datos.get("cliente_nombre") or (cliente.nombre if cliente else "")
+        )[:200],
+        fecha=datos["fecha"],
+        tipo_doc=datos["tipo_doc"],
+        serie=datos["serie"].upper()[:4],
+        numero=datos["numero"][:20],
+        condicion=datos["condicion"],
+        cuenta=datos.get("cuenta"),
+        canal=datos.get("canal") or "TRANSFERENCIA",
+        glosa=datos.get("glosa", "")[:255],
+        creado_por=usuario_actual.get(),
     )
     for orden, fila in enumerate(filas, start=1):
         VentaLinea.objects.create(
