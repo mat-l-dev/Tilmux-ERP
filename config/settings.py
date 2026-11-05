@@ -32,6 +32,18 @@ ALLOWED_HOSTS = [
     if host.strip()
 ]
 
+_aplicacion_fly = os.environ.get("FLY_APP_NAME")
+if _aplicacion_fly:
+    ALLOWED_HOSTS.append(f"{_aplicacion_fly}.fly.dev")
+
+CSRF_TRUSTED_ORIGINS = [
+    origen.strip()
+    for origen in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",")
+    if origen.strip()
+]
+if _aplicacion_fly:
+    CSRF_TRUSTED_ORIGINS.append(f"https://{_aplicacion_fly}.fly.dev")
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -131,3 +143,13 @@ LOGOUT_REDIRECT_URL = "/cuentas/login/"
 SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_HTTPONLY = False
 X_FRAME_OPTIONS = "DENY"
+
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 31_536_000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True

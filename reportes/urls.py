@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views
+from . import eeff, views
 
 app_name = "reportes"
 
@@ -9,5 +9,6 @@ urlpatterns = [
     path("mayor/", views.mayor, name="mayor"),
     path("ventas/", views.registro_ventas, name="registro_ventas"),
     path("compras/", views.registro_compras, name="registro_compras"),
+    path("eeff/", eeff.estados, name="eeff"),
     path("impuestos/", views.impuestos, name="impuestos"),
 ]

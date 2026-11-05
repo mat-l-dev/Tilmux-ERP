@@ -13,7 +13,8 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
 
 COPY . .
-RUN uv run --no-dev python manage.py collectstatic --noinput
+RUN DATABASE_URL="postgresql://build:build@localhost:5432/build" \
+    uv run --no-dev python manage.py collectstatic --noinput
 
 EXPOSE 8080
 

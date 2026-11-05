@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block titulo %}Estados financieros{% endblock %}
+{% block titulo_pagina %}Estados financieros{% endblock %}
+
+{% block contenido %}
+{% include "reportes/_tabs.html" %}
+{% include "reportes/_filtro.html" %}
+
+{% if descuadre %}
+<div class="message error">El estado no cuadra: diferencia de {{ descuadre|floatformat:2 }}.</div>
+{% endif %}
+
+<div class="eeff">
+  <section class="card">
+    <header class="card-head">
+      <h2>Estado de situación financiera</h2>
+      <span class="chip">{{ hasta|date:"d/m/Y" }}</span>
+    </header>
+
+    <table class="tabla-doc eeff-tabla">
+      <tbody>
+        <tr class="grupo"><td colspan="2">Activo corriente</td></tr>
+        {% for a in activo_corriente %}
+        <tr><td>{{ a.codigo }} · {{ a.nombre }}</td><td class="num der">{{ a.importe|floatformat:2 }}</td></tr>
+        {% endfor %}
+        <tr class="subtotal"><td>Total activo corriente</td><td class="num der">{{ total_activo_corriente|floatformat:2 }}</td></tr>
+
+        <tr class="grupo"><td colspan="2">Activo no corriente</td></tr>
+        {% for a in activo_no_corriente %}
+        <tr><td>{{ a.codigo }} · {{ a.nombre }}</td><td class="num der">{{ a.importe|floatformat:2 }}</td></tr>
+        {% empty %}
+        <tr><td class="muted">Sin activos no corrientes</td><td></td></tr>
+        {% endfor %}
+        <tr class="subtotal"><td>Total activo no corriente</td><td class="num der">{{ total_activo_no_corriente|floatformat:2 }}</td></tr>
+
+        <tr class="total"><td>Total activo</td><td class="num der">{{ total_activo|floatformat:2 }}</td></tr>
+
+        <tr class="grupo"><td colspan="2">Pasivo corriente</td></tr>
+        {% for p in pasivo %}
+        <tr><td>{{ p.codigo }} · {{ p.nombre }}</td><td class="num der">{{ p.importe|floatformat:2 }}</td></tr>
+        {% endfor %}
+        <tr class="subtotal"><td>Total pasivo</td><td class="num der">{{ total_pasivo|floatformat:2 }}</td></tr>
+
+        <tr class="grupo"><td colspan="2">Patrimonio</td></tr>
+        {% for p in patrimonio %}
+        <tr><td>{{ p.codigo }} · {{ p.nombre }}</td><td class="num der">{{ p.importe|floatformat:2 }}</td></tr>
+        {% endfor %}
+        <tr><td>Resultado del periodo</td><td class="num der">{{ resultado_neto|floatformat:2 }}</td></tr>
+        <tr class="subtotal"><td>Total patrimonio</td><td class="num der">{{ total_patrimonio_resultado|floatformat:2 }}</td></tr>
+
+        <tr class="total"><td>Total pasivo y patrimonio</td><td class="num der">{{ total_pasivo_patrimonio|floatformat:2 }}</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="card">
+    <header class="card-head">
+      <h2>Estado de resultados</h2>
+      <span class="chip">NIIF 18</span>
+    </header>
+
+    <table class="tabla-doc eeff-tabla">
+      <tbody>
+        <tr class="grupo"><td colspan="2">Operación</td></tr>
+        <tr><td>Ingresos por ventas</td><td class="num der">{{ ingresos|floatformat:2 }}</td></tr>
+        <tr><td>Costo de ventas y gastos operativos</td><td class="num der">({{ gastos|floatformat:2 }})</td></tr>
+        <tr class="subtotal"><td>Resultado de operación</td><td class="num der">{{ resultado_operacion|floatformat:2 }}</td></tr>
+
+        <tr class="grupo"><td colspan="2">Financiación</td></tr>
+        <tr><td>Resultado financiero</td><td class="num der">{{ resultado_financiacion|floatformat:2 }}</td></tr>
+
+        <tr class="subtotal"><td>Resultado antes de impuesto</td><td class="num der">{{ resultado_antes_impuesto|floatformat:2 }}</td></tr>
+        <tr><td>Impuesto a las ganancias</td><td class="num der">({{ gasto_impuesto|floatformat:2 }})</td></tr>
+        <tr class="total"><td>Resultado del periodo</td><td class="num der">{{ resultado_neto|floatformat:2 }}</td></tr>
+      </tbody>
+    </table>
+
+    <p class="preview-note">
+      Clasificación por las cinco categorías de NIIF 18. La renta RER no genera impuesto
+      diferido porque grava ingresos netos, no el resultado contable.
+    </p>
+  </section>
+</div>
+{% endblock %}

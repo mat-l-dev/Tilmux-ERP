@@ -11,6 +11,16 @@ primary_region = "iad"
   min_machines_running = 0
   processes = ["app"]
 
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "15s"
+    method = "GET"
+    path = "/salud/"
+
+[deploy]
+  release_command = "uv run --no-dev python manage.py migrate"
+
 [[vm]]
   size = "shared-cpu-1x"
   memory = "512mb"

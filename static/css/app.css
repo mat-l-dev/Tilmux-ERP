@@ -1046,3 +1046,45 @@ select {
   font-size: 11px;
   color: var(--ink-3);
 }
+
+/* ---------- Estados financieros ---------- */
+
+.eeff {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.eeff-tabla td {
+  padding: 5px 8px;
+}
+
+.eeff-tabla .grupo td {
+  padding-top: 14px;
+  border-bottom: 1px solid var(--line);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.eeff-tabla .subtotal td {
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-weight: 600;
+}
+
+.eeff-tabla .total td {
+  padding-top: 8px;
+  border-top: 2px solid var(--line-strong);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+@media (max-width: 1024px) {
+  .eeff {
+    grid-template-columns: 1fr;
+  }
+}

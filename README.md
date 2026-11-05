@@ -36,6 +36,28 @@ Abrir http://127.0.0.1:8000
 |---|---|
 | `cargar_pcge` | Carga las 1.636 cuentas del PCGE 2026 |
 | `sembrar_tilmux` | Crea la empresa, sus periodos y activa las 44 cuentas en uso |
+| `sembrar_base` | Unidades, series y cuentas de tesorería |
+| `sembrar_reglas` | Las 15 reglas contables |
+| `sembrar_productos` | Los dos SKUs iniciales |
+| `importar_excel` | Importa las 23 operaciones del Excel de TILMUX |
+
+## Despliegue
+
+```powershell
+flyctl auth login
+flyctl apps create tilmux-erp
+flyctl secrets set DJANGO_DEBUG=false DJANGO_SECRET_KEY=... DATABASE_URL=...
+flyctl deploy --remote-only
+```
+
+`fly.toml` ya incluye migración automática en cada despliegue y la sonda de
+salud en `/salud/`. La máquina se suspende sin tráfico y despierta en menos de
+un segundo con la primera visita.
+
+## Respaldo
+
+`.github/workflows/backup.yml` vuelca la base todos los días a las 06:00 UTC y
+guarda el archivo 30 días. Requiere el secreto `DATABASE_URL` en el repositorio.
 
 ## Decisiones registradas
 

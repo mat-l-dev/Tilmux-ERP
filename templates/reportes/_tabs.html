@@ -3,5 +3,6 @@
   <a class="tab {% if '/reportes/mayor' in request.path %}is-active{% endif %}" href="{% url 'reportes:mayor' %}">Mayor</a>
   <a class="tab {% if '/reportes/ventas' in request.path %}is-active{% endif %}" href="{% url 'reportes:registro_ventas' %}">Ventas</a>
   <a class="tab {% if '/reportes/compras' in request.path %}is-active{% endif %}" href="{% url 'reportes:registro_compras' %}">Compras</a>
+  <a class="tab {% if '/reportes/eeff' in request.path %}is-active{% endif %}" href="{% url 'reportes:eeff' %}">Estados financieros</a>
   <a class="tab {% if '/reportes/impuestos' in request.path %}is-active{% endif %}" href="{% url 'reportes:impuestos' %}">IGV y RER</a>
 </nav>
