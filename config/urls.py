@@ -8,6 +8,8 @@ from core.salud import salud
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("salud/", salud),
+    path("health", salud),
+    path("health/", salud),
     path("cuentas/", include("django.contrib.auth.urls")),
     path("ventas/", include("ventas.urls")),
     path("compras/", include("compras.urls")),

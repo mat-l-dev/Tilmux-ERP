@@ -11,6 +11,7 @@
   </header>
 
   {% if periodos %}
+  <div class="tabla-scroll">
   <table class="tabla-doc">
     <thead>
       <tr>
@@ -34,7 +35,7 @@
         <td class="num der">{{ p.n_asientos }}</td>
         <td class="num der">{{ p.ventas|floatformat:2 }}</td>
         <td class="num der">{{ p.compras|floatformat:2 }}</td>
-        <td class="accion">
+        <td class="accion accion-periodo">
           {% if p.estado == "ABIERTO" %}
           <div class="acciones-fila">
             <form method="post" action="{% url 'core:revaluar_periodo' p.pk %}">
@@ -57,6 +58,7 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
   {% else %}
   <p class="muted">No hay periodos creados.</p>
   {% endif %}
@@ -74,6 +76,7 @@
   </header>
 
   {% if anios %}
+  <div class="tabla-scroll">
   <table class="tabla-doc">
     <thead>
       <tr>
@@ -96,14 +99,14 @@
           {% if a.cerrado %}
           <span class="chip chip-ok">Cerrado</span>
           {% elif a.abiertos %}
-          <span class="chip chip-warn">{{ a.abiertos|length }} mes(es) abierto(s)</span>
+          <span class="chip chip-warn">{{ a.abiertos|length }} mes{{ a.abiertos|length|pluralize:"es" }} abierto{{ a.abiertos|length|pluralize }}</span>
           {% elif a.borradores %}
-          <span class="chip chip-warn">{{ a.borradores }} borrador(es)</span>
+          <span class="chip chip-warn">{{ a.borradores }} borrador{{ a.borradores|pluralize }}</span>
           {% else %}
           <span class="chip">Listo para cerrar</span>
           {% endif %}
         </td>
-        <td class="accion">
+        <td class="accion accion-periodo">
           {% if a.cerrado %}
             {% if request.user.is_superuser %}
             <form method="post" action="{% url 'core:revertir_ejercicio' a.anio %}">
@@ -117,13 +120,14 @@
               <button class="btn btn-ghost" type="submit">Cerrar {{ a.anio }}</button>
             </form>
           {% else %}
-            <span class="muted">Cierra los meses abiertos</span>
+            <button class="btn btn-ghost" type="button" disabled title="Cierra primero los meses abiertos">Cerrar {{ a.anio }}</button>
           {% endif %}
         </td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
+  </div>
   {% else %}
   <p class="muted">Todavía no hay ejercicios con movimientos.</p>
   {% endif %}

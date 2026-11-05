@@ -167,7 +167,7 @@ if not DEBUG:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
-    SECURE_REDIRECT_EXEMPT = [r"salud"]
+    SECURE_REDIRECT_EXEMPT = [r"salud", r"health"]
 
 LOGGING = {
     "version": 1,

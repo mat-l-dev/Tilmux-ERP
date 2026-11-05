@@ -154,7 +154,8 @@ def panel(request: HttpRequest) -> HttpResponse:
         ),
         "saldo_tesoreria": soles(saldo),
         "ventas_mes": soles(ventas_base),
-        "igv_por_pagar": soles(igv),
+        "igv_por_pagar": soles(abs(igv)),
+        "igv_etiqueta": "IGV a favor" if igv < 0 else "IGV por pagar",
         "igv_nota": "Saldo a favor" if igv < 0 else "Después del crédito de compras",
         "renta_mes": soles(renta),
         "periodo_actual": (

@@ -1150,3 +1150,38 @@ select {
   color: var(--ink-3);
   font-weight: 600;
 }
+
+/* Tablas anchas: desplazamiento horizontal sin romper la tarjeta */
+.tabla-scroll {
+  overflow-x: auto;
+  margin: 0 -4px;
+}
+
+.tabla-scroll .tabla-doc {
+  min-width: 760px;
+}
+
+.tabla-doc .accion-periodo {
+  width: 190px;
+  min-width: 190px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* Pestanas de reportes en pantallas angostas */
+.tabs {
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.tab {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* Botones deshabilitados: se nota que no se pueden usar */
+.btn:disabled,
+.btn[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
