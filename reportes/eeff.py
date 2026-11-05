@@ -1,4 +1,10 @@
-"""Estados financieros: situación financiera y resultados (NIIF 18)."""
+"""Estados financieros: situación financiera, resultados y cambios en el patrimonio.
+
+El estado de situación financiera es acumulado hasta la fecha de corte.
+El estado de resultados cubre el periodo elegido.
+Las categorías siguen la NIIF 18: operación, inversión, financiación,
+impuesto a las ganancias y operaciones discontinuadas.
+"""
 
 from __future__ import annotations
 
@@ -18,13 +24,18 @@ ACTIVO_CORRIENTE = (1, 2)
 ACTIVO_NO_CORRIENTE = (3,)
 
 
-def _lineas(empresa, desde: date, hasta: date):
+def _filas(empresa, *, hasta: date, desde: date | None = None):
+    filtro = {
+        "asiento__empresa": empresa,
+        "asiento__estado": "CONFIRMADO",
+    }
+    if desde is None:
+        filtro["asiento__fecha__lte"] = hasta
+    else:
+        filtro["asiento__fecha__range"] = (desde, hasta)
+
     return (
-        AsientoLinea.objects.filter(
-            asiento__empresa=empresa,
-            asiento__estado="CONFIRMADO",
-            asiento__fecha__range=(desde, hasta),
-        )
+        AsientoLinea.objects.filter(**filtro)
         .values(
             "cuenta__codigo",
             "cuenta__nombre",
@@ -34,6 +45,18 @@ def _lineas(empresa, desde: date, hasta: date):
         .annotate(debe=Sum("debe"), haber=Sum("haber"))
         .order_by("cuenta__codigo")
     )
+
+
+def _entrada(fila) -> dict:
+    return {
+        "codigo": fila["cuenta__codigo"],
+        "nombre": fila["cuenta__nombre"],
+        "importe": abs((fila["debe"] or CERO) - (fila["haber"] or CERO)),
+    }
+
+
+def _suma(items) -> Decimal:
+    return sum((i["importe"] for i in items), CERO)
 
 
 @login_required
@@ -48,65 +71,70 @@ def estados(request):
     if request.GET.get("desde"):
         desde = date.fromisoformat(request.GET["desde"])
 
-    activo_corriente, activo_no_corriente = [], []
-    pasivo, patrimonio = [], []
-    operacion, financiacion, impuesto = [], [], []
+    activo_corriente: list[dict] = []
+    activo_no_corriente: list[dict] = []
+    pasivo: list[dict] = []
+    patrimonio: list[dict] = []
+
+    ingresos_ventas = CERO
+    costo_ventas = CERO
+    gastos_operativos = CERO
+    otros_ingresos = CERO
+    gastos_financieros = CERO
+    ingresos_financieros = CERO
+    gasto_impuesto = CERO
+    resultado_acumulado = CERO
 
     if empresa:
-        for fila in _lineas(empresa, desde, hasta):
-            neto = (fila["debe"] or CERO) - (fila["haber"] or CERO)
-            if neto == 0:
-                continue
+        # --- Situación financiera: acumulado hasta la fecha de corte ---
+        for fila in _filas(empresa, hasta=hasta):
             elemento = fila["cuenta__elemento"]
-            registro = {
-                "codigo": fila["cuenta__codigo"],
-                "nombre": fila["cuenta__nombre"],
-                "importe": abs(neto),
-            }
-            if elemento in ACTIVO_CORRIENTE:
-                activo_corriente.append(registro)
-            elif elemento in ACTIVO_NO_CORRIENTE:
-                activo_no_corriente.append(registro)
-            elif elemento == 4:
-                pasivo.append(registro)
-            elif elemento == 5:
-                patrimonio.append(registro)
+            neto = (fila["debe"] or CERO) - (fila["haber"] or CERO)
+            if elemento in ACTIVO_CORRIENTE and neto != 0:
+                activo_corriente.append(_entrada(fila))
+            elif elemento in ACTIVO_NO_CORRIENTE and neto != 0:
+                activo_no_corriente.append(_entrada(fila))
+            elif elemento == 4 and neto != 0:
+                pasivo.append(_entrada(fila))
+            elif elemento == 5 and neto != 0:
+                patrimonio.append(_entrada(fila))
             elif elemento in (6, 7, 8):
-                categoria = fila["cuenta__categoria_financiera"] or "OPERACION"
-                if elemento == 8:
-                    categoria = "IMPUESTO"
-                destino = {
-                    "OPERACION": operacion,
-                    "FINANCIACION": financiacion,
-                    "IMPUESTO": impuesto,
-                }.get(categoria, operacion)
-                destino.append(registro)
+                resultado_acumulado += -neto
 
-    def suma(items) -> Decimal:
-        return sum((i["importe"] for i in items), CERO)
+        # --- Resultados: solo el periodo elegido ---
+        for fila in _filas(empresa, desde=desde, hasta=hasta):
+            codigo = fila["cuenta__codigo"]
+            elemento = fila["cuenta__elemento"]
+            neto = (fila["debe"] or CERO) - (fila["haber"] or CERO)
 
-    total_activo_corriente = suma(activo_corriente)
-    total_activo_no_corriente = suma(activo_no_corriente)
-    total_activo = total_activo_corriente + total_activo_no_corriente
-    total_pasivo = suma(pasivo)
-    total_patrimonio = suma(patrimonio)
+            if elemento == 8:
+                gasto_impuesto += neto
+            elif codigo.startswith("69"):
+                costo_ventas += neto
+            elif codigo.startswith(("63", "64", "65", "68")):
+                gastos_operativos += neto
+            elif codigo.startswith(("75", "76")):
+                otros_ingresos += -neto
+            elif codigo.startswith("67"):
+                gastos_financieros += neto
+            elif codigo.startswith("77"):
+                ingresos_financieros += -neto
+            elif codigo.startswith("70"):
+                ingresos_ventas += -neto
 
-    ingresos = sum((i["importe"] for i in operacion if i["codigo"].startswith("7")), CERO)
-    gastos = sum((i["importe"] for i in operacion if i["codigo"][0] in "68"), CERO)
-    resultado_operacion = ingresos - gastos
-
-    ingresos_fin = sum(
-        (i["importe"] for i in financiacion if i["codigo"].startswith("7")), CERO
+    resultado_operacion = (
+        ingresos_ventas + otros_ingresos - costo_ventas - gastos_operativos
     )
-    gastos_fin = sum(
-        (i["importe"] for i in financiacion if i["codigo"][0] in "68"), CERO
-    )
-    resultado_financiacion = ingresos_fin - gastos_fin
-
+    resultado_financiacion = ingresos_financieros - gastos_financieros
     resultado_antes_impuesto = resultado_operacion + resultado_financiacion
-    gasto_impuesto = suma(impuesto)
     resultado_neto = resultado_antes_impuesto - gasto_impuesto
-    total_patrimonio_resultado = total_patrimonio + resultado_neto
+
+    total_activo_corriente = _suma(activo_corriente)
+    total_activo_no_corriente = _suma(activo_no_corriente)
+    total_activo = total_activo_corriente + total_activo_no_corriente
+    total_pasivo = _suma(pasivo)
+    total_patrimonio = _suma(patrimonio)
+    total_patrimonio_resultado = total_patrimonio + resultado_acumulado
 
     efectivo = sum(
         (
@@ -130,20 +158,24 @@ def estados(request):
         "total_pasivo": total_pasivo,
         "total_patrimonio": total_patrimonio,
         "total_pasivo_patrimonio": total_pasivo + total_patrimonio_resultado,
-        "ingresos": ingresos,
-        "gastos": gastos,
+        "resultado_acumulado": resultado_acumulado,
+        "ingresos_ventas": ingresos_ventas,
+        "costo_ventas": costo_ventas,
+        "gastos_operativos": gastos_operativos,
+        "otros_ingresos": otros_ingresos,
         "resultado_operacion": resultado_operacion,
+        "gastos_financieros": gastos_financieros,
+        "ingresos_financieros": ingresos_financieros,
         "resultado_financiacion": resultado_financiacion,
         "resultado_antes_impuesto": resultado_antes_impuesto,
         "gasto_impuesto": gasto_impuesto,
         "resultado_neto": resultado_neto,
-        "total_patrimonio_resultado": total_patrimonio_resultado,
         "descuadre": total_activo - (total_pasivo + total_patrimonio_resultado),
         "efectivo": efectivo,
         "cambios": [
             {"concepto": "Saldo al inicio del ejercicio", "importe": total_patrimonio},
             {"concepto": "Aportes de capital del periodo", "importe": CERO},
-            {"concepto": "Resultado del periodo", "importe": resultado_neto},
+            {"concepto": "Resultado acumulado", "importe": resultado_acumulado},
             {"concepto": "Saldo al cierre", "importe": total_patrimonio_resultado},
         ],
     }

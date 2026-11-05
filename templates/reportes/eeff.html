@@ -46,7 +46,7 @@
         {% for p in patrimonio %}
         <tr><td>{{ p.codigo }} · {{ p.nombre }}</td><td class="num der">{{ p.importe|floatformat:2 }}</td></tr>
         {% endfor %}
-        <tr><td>Resultado del periodo</td><td class="num der">{{ resultado_neto|floatformat:2 }}</td></tr>
+        <tr><td>Resultado acumulado</td><td class="num der">{{ resultado_acumulado|floatformat:2 }}</td></tr>
         <tr class="subtotal"><td>Total patrimonio</td><td class="num der">{{ total_patrimonio_resultado|floatformat:2 }}</td></tr>
 
         <tr class="total"><td>Total pasivo y patrimonio</td><td class="num der">{{ total_pasivo_patrimonio|floatformat:2 }}</td></tr>
@@ -63,15 +63,19 @@
     <table class="tabla-doc eeff-tabla">
       <tbody>
         <tr class="grupo"><td colspan="2">Operación</td></tr>
-        <tr><td>Ingresos por ventas</td><td class="num der">{{ ingresos|floatformat:2 }}</td></tr>
-        <tr><td>Costo de ventas y gastos operativos</td><td class="num der">({{ gastos|floatformat:2 }})</td></tr>
+        <tr><td>Ingresos por ventas</td><td class="num der">{{ ingresos_ventas|floatformat:2 }}</td></tr>
+        <tr><td>Costo de ventas</td><td class="num der">({{ costo_ventas|floatformat:2 }})</td></tr>
+        <tr><td>Gastos de operación</td><td class="num der">({{ gastos_operativos|floatformat:2 }})</td></tr>
+        <tr><td>Otros ingresos operativos</td><td class="num der">{{ otros_ingresos|floatformat:2 }}</td></tr>
         <tr class="subtotal"><td>Resultado de operación</td><td class="num der">{{ resultado_operacion|floatformat:2 }}</td></tr>
 
         <tr class="grupo"><td colspan="2">Financiación</td></tr>
-        <tr><td>Resultado financiero</td><td class="num der">{{ resultado_financiacion|floatformat:2 }}</td></tr>
-
+        <tr><td>Ingresos financieros</td><td class="num der">{{ ingresos_financieros|floatformat:2 }}</td></tr>
+        <tr><td>Gastos financieros</td><td class="num der">({{ gastos_financieros|floatformat:2 }})</td></tr>
         <tr class="subtotal"><td>Resultado antes de impuesto</td><td class="num der">{{ resultado_antes_impuesto|floatformat:2 }}</td></tr>
-        <tr><td>Impuesto a las ganancias</td><td class="num der">({{ gasto_impuesto|floatformat:2 }})</td></tr>
+
+        <tr class="grupo"><td colspan="2">Impuesto a las ganancias</td></tr>
+        <tr><td>Impuesto del periodo</td><td class="num der">({{ gasto_impuesto|floatformat:2 }})</td></tr>
         <tr class="total"><td>Resultado del periodo</td><td class="num der">{{ resultado_neto|floatformat:2 }}</td></tr>
       </tbody>
     </table>

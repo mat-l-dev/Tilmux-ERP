@@ -1001,6 +1001,12 @@ select {
   justify-content: flex-end;
 }
 
+.acciones-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .nota {
   border-top: 1px solid var(--line);
   padding: 10px 0;

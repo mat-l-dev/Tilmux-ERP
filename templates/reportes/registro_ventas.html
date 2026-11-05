@@ -10,7 +10,10 @@
 <section class="card">
   <header class="card-head">
     <h2>Ventas, notas de crédito y débito</h2>
-    <span class="chip">{{ desde|date:"d/m/Y" }} — {{ hasta|date:"d/m/Y" }}</span>
+    <div class="acciones-head">
+      <a class="btn btn-ghost" href="{% url 'reportes:exportar_ventas' %}?desde={{ desde|date:'Y-m-d' }}&hasta={{ hasta|date:'Y-m-d' }}">Exportar CSV</a>
+      <span class="chip">{{ desde|date:"d/m/Y" }} — {{ hasta|date:"d/m/Y" }}</span>
+    </div>
   </header>
 
   {% if filas %}
