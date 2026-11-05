@@ -31,8 +31,10 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
           mkdir -p out
+          # Solo el esquema public: las extensiones de Supabase no existen en un
+          # Postgres limpio y no son nuestros datos.
           docker run --rm -v "$PWD/out:/out" postgres:17 \
-            pg_dump "$DATABASE_URL" -Fc -f /out/tilmux.dump
+            pg_dump "$DATABASE_URL" -Fc -n public -f /out/tilmux.dump
           ls -lh out/tilmux.dump
 
       - name: Restaurar en una base vacía
