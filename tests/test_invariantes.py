@@ -19,6 +19,7 @@ from compras.models import Compra, CompraLinea, CostoAdicional
 from compras.servicios import CompraError, pagar, registrar_gasto, revaluar
 from compras.servicios import confirmar as confirmar_compra
 from contabilidad.calculos import calcular_linea
+from contabilidad.cierre import cerrar, estado, revertir
 from contabilidad.models import Asiento, AsientoLinea, Cuenta
 from contabilidad.moneda import a_soles
 from contabilidad.servicios import ContabilidadError
@@ -26,6 +27,7 @@ from core.contexto import usuario_actual
 from core.models import Empresa, Periodo, TipoCambio
 from inventario.models import CapaFIFO, ConsumoCapa, MovimientoStock
 from reportes.casillas import calcular
+from reportes.eeff import construir
 from ventas.models import Venta, VentaLinea
 from ventas.models_guia import GuiaRemision
 from ventas.servicios import VentaError, emitir_nota_credito, emitir_nota_debito
@@ -671,3 +673,45 @@ class InvarianteCreditoFiscal(BaseContable):
 
         self.assertEqual(datos["no_gravado"], Decimal("50.00"))
         self.assertEqual(datos["compras_base"], Decimal("0"))
+
+class InvarianteCierre(BaseContable):
+    def cerrar_meses(self, anio: int = 2026) -> None:
+        Periodo.objects.filter(empresa=self.empresa, anio=anio).update(
+            estado=Periodo.Estado.CERRADO
+        )
+
+    def test_el_cierre_no_cambia_el_resultado_del_anio(self):
+        self.comprar("10", "100")
+        self.vender("2", "250")
+        antes = construir(self.empresa, date(2026, 1, 1), date(2026, 12, 31))
+
+        self.cerrar_meses()
+        asientos = cerrar(self.empresa, 2026)
+
+        despues = construir(self.empresa, date(2026, 1, 1), date(2026, 12, 31))
+        self.assertEqual(len(asientos), 2)
+        self.assertEqual(despues["resultado_neto"], antes["resultado_neto"])
+        self.assertEqual(despues["descuadre"], antes["descuadre"])
+        self.assertEqual(despues["resultado_acumulado"], Decimal("0"))
+        self.assertEqual(
+            sum(p["importe"] for p in despues["patrimonio"] if p["codigo"] == "591"),
+            antes["resultado_neto"],
+        )
+
+    def test_no_cierra_si_hay_un_mes_abierto(self):
+        self.comprar("1", "100")
+
+        with self.assertRaises(ContabilidadError):
+            cerrar(self.empresa, 2026)
+
+    def test_revertir_permite_volver_a_cerrar(self):
+        self.comprar("10", "100")
+        self.vender("2", "250")
+        self.cerrar_meses()
+        cerrar(self.empresa, 2026)
+
+        total = revertir(self.empresa, 2026)
+
+        self.assertEqual(total, 2)
+        self.assertFalse(estado(self.empresa, 2026)["cerrado"])
+        self.assertEqual(len(cerrar(self.empresa, 2026)), 2)

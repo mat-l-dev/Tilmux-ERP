@@ -13,7 +13,10 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from compras.models import Compra
+from contabilidad.cierre import cerrar, revertir
+from contabilidad.cierre import estado as estado_cierre
 from contabilidad.models import Asiento, AsientoLinea, Cuenta
+from contabilidad.servicios import ContabilidadError
 from ventas.models import Venta
 
 from .context import empresa_actual
@@ -208,7 +211,15 @@ def periodos(request: HttpRequest) -> HttpResponse:
             ).aggregate(s=Sum("total"))["s"]
             or 0
         )
-    return render(request, "core/periodos.html", {"periodos": lista})
+
+    anios = []
+    if empresa:
+        for anio in sorted({p.anio for p in lista}, reverse=True):
+            anios.append(estado_cierre(empresa, anio))
+
+    return render(
+        request, "core/periodos.html", {"periodos": lista, "anios": anios}
+    )
 
 
 @login_required
@@ -271,6 +282,46 @@ def reabrir_periodo(request: HttpRequest, pk: int) -> HttpResponse:
     periodo.estado = Periodo.Estado.ABIERTO
     periodo.save(update_fields=["estado"])
     messages.success(request, f"Periodo {periodo.etiqueta} reabierto.")
+    return redirect("core:periodos")
+
+
+@login_required
+@requiere_escritura
+@require_POST
+def cerrar_ejercicio(request: HttpRequest, anio: int) -> HttpResponse:
+    empresa = empresa_actual(request)
+    try:
+        asientos = cerrar(empresa, anio, usuario=request.user)
+    except ContabilidadError as exc:
+        messages.error(request, str(exc))
+    else:
+        messages.success(
+            request,
+            f"Ejercicio {anio} cerrado con {len(asientos)} asiento(s) de cierre.",
+        )
+    return redirect("core:periodos")
+
+
+@login_required
+@require_POST
+def revertir_ejercicio(request: HttpRequest, anio: int) -> HttpResponse:
+    if not request.user.is_superuser:
+        messages.error(
+            request, "Solo el administrador puede revertir el cierre anual."
+        )
+        return redirect("core:periodos")
+
+    empresa = empresa_actual(request)
+    try:
+        total = revertir(empresa, anio)
+    except ContabilidadError as exc:
+        messages.error(request, str(exc))
+    else:
+        messages.warning(
+            request,
+            f"Cierre {anio} anulado: {total} asiento(s). Reabre diciembre si "
+            "necesitas ajustar y vuelve a cerrar.",
+        )
     return redirect("core:periodos")
 
 

@@ -72,6 +72,7 @@ class Regla(models.Model):
         CAPITAL_SUSCRITO = "CAPITAL_SUSCRITO", "Capital suscrito"
         REEMBOLSO_SOCIO = "REEMBOLSO_SOCIO", "Dinero de socio por reembolsar"
         COMISION_PASARELA = "COMISION_PASARELA", "Comisión de pasarela"
+        CIERRE = "CIERRE", "Cierre del ejercicio"
 
     tipo = models.CharField(max_length=20, choices=Tipo.choices, unique=True)
     nombre = models.CharField(max_length=120)

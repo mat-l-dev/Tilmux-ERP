@@ -24,7 +24,7 @@ ACTIVO_CORRIENTE = (1, 2)
 ACTIVO_NO_CORRIENTE = (3,)
 
 
-def _filas(empresa, *, hasta: date, desde: date | None = None):
+def _filas(empresa, *, hasta: date, desde: date | None = None, excluir_cierre: bool = False):
     filtro = {
         "asiento__empresa": empresa,
         "asiento__estado": "CONFIRMADO",
@@ -34,9 +34,12 @@ def _filas(empresa, *, hasta: date, desde: date | None = None):
     else:
         filtro["asiento__fecha__range"] = (desde, hasta)
 
+    consulta = AsientoLinea.objects.filter(**filtro)
+    if excluir_cierre:
+        consulta = consulta.exclude(asiento__origen_tipo="CIERRE")
+
     return (
-        AsientoLinea.objects.filter(**filtro)
-        .values(
+        consulta.values(
             "cuenta__codigo",
             "cuenta__nombre",
             "cuenta__elemento",
@@ -107,8 +110,8 @@ def construir(empresa, desde: date, hasta: date) -> dict:
             elif elemento in (6, 7, 8):
                 resultado_acumulado += -neto
 
-        # --- Resultados: solo el periodo elegido ---
-        for fila in _filas(empresa, desde=desde, hasta=hasta):
+        # --- Resultados: solo el periodo elegido, sin el asiento de cierre ---
+        for fila in _filas(empresa, desde=desde, hasta=hasta, excluir_cierre=True):
             codigo = fila["cuenta__codigo"]
             elemento = fila["cuenta__elemento"]
             neto = (fila["debe"] or CERO) - (fila["haber"] or CERO)
@@ -176,8 +179,12 @@ def construir(empresa, desde: date, hasta: date) -> dict:
         else CERO
     )
     aportes = CERO
+    patrimonio_inicial = CERO
     if empresa:
-        for fila in _filas(empresa, desde=desde, hasta=hasta):
+        patrimonio_inicial = -_saldo(empresa, ("5",), desde - timedelta(days=1))
+        for fila in _filas(
+            empresa, desde=desde, hasta=hasta, excluir_cierre=True
+        ):
             if fila["cuenta__elemento"] == 5:
                 aportes += (fila["haber"] or CERO) - (fila["debe"] or CERO)
 
@@ -236,13 +243,18 @@ def construir(empresa, desde: date, hasta: date) -> dict:
         "resultado_antes_impuesto": resultado_antes_impuesto,
         "gasto_impuesto": gasto_impuesto,
         "resultado_neto": resultado_neto,
+        "patrimonio_inicial": patrimonio_inicial,
+        "aportes": aportes,
         "descuadre": total_activo - (total_pasivo + total_patrimonio_resultado),
         "efectivo": efectivo,
         "cambios": [
-            {"concepto": "Saldo al inicio del ejercicio", "importe": total_patrimonio},
-            {"concepto": "Aportes de capital del periodo", "importe": CERO},
-            {"concepto": "Resultado acumulado", "importe": resultado_acumulado},
-            {"concepto": "Saldo al cierre", "importe": total_patrimonio_resultado},
+            {"concepto": "Saldo al inicio del ejercicio", "importe": patrimonio_inicial},
+            {"concepto": "Aportes y retiros de capital", "importe": aportes},
+            {"concepto": "Resultado del periodo", "importe": resultado_neto},
+            {
+                "concepto": "Saldo al cierre",
+                "importe": patrimonio_inicial + aportes + resultado_neto,
+            },
         ],
         "flujo": [
             {"concepto": "Resultado del periodo", "importe": resultado_neto},

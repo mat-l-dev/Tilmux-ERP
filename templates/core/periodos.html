@@ -66,4 +66,73 @@
     periodo requiere ser administrador y deja rastro en el asiento.
   </p>
 </section>
+
+<section class="card" style="margin-top:12px">
+  <header class="card-head">
+    <h2>Cierre anual</h2>
+    <span class="chip">Transfiere el resultado a la cuenta 59</span>
+  </header>
+
+  {% if anios %}
+  <table class="tabla-doc">
+    <thead>
+      <tr>
+        <th>Ejercicio</th>
+        <th class="der">Ingresos</th>
+        <th class="der">Gastos</th>
+        <th class="der">Resultado</th>
+        <th>Estado</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for a in anios %}
+      <tr>
+        <td class="num">{{ a.anio }}</td>
+        <td class="num der">{{ a.ingresos|floatformat:2 }}</td>
+        <td class="num der">{{ a.gastos|floatformat:2 }}</td>
+        <td class="num der">{{ a.resultado|floatformat:2 }}</td>
+        <td>
+          {% if a.cerrado %}
+          <span class="chip chip-ok">Cerrado</span>
+          {% elif a.abiertos %}
+          <span class="chip chip-warn">{{ a.abiertos|length }} mes(es) abierto(s)</span>
+          {% elif a.borradores %}
+          <span class="chip chip-warn">{{ a.borradores }} borrador(es)</span>
+          {% else %}
+          <span class="chip">Listo para cerrar</span>
+          {% endif %}
+        </td>
+        <td class="accion">
+          {% if a.cerrado %}
+            {% if request.user.is_superuser %}
+            <form method="post" action="{% url 'core:revertir_ejercicio' a.anio %}">
+              {% csrf_token %}
+              <button class="btn btn-ghost" type="submit">Revertir cierre</button>
+            </form>
+            {% endif %}
+          {% elif a.puede_cerrar %}
+            <form method="post" action="{% url 'core:cerrar_ejercicio' a.anio %}">
+              {% csrf_token %}
+              <button class="btn btn-ghost" type="submit">Cerrar {{ a.anio }}</button>
+            </form>
+          {% else %}
+            <span class="muted">Cierra los meses abiertos</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">Todavía no hay ejercicios con movimientos.</p>
+  {% endif %}
+
+  <p class="preview-note">
+    Al cerrar, las cuentas de resultado se llevan a la 89 y de ahí a la 59.
+    El estado de resultados sigue mostrando el resultado del año: el cierre no
+    se cuenta dos veces. Para corregir algo después, revierte el cierre, reabre
+    diciembre y vuelve a cerrar.
+  </p>
+</section>
 {% endblock %}

@@ -106,6 +106,30 @@ Cada nota modifica un solo comprobante y usa los catálogos 09 y 10 de SUNAT.
 
 Un periodo cerrado rechaza asientos nuevos. Reabrirlo exige ser administrador.
 
+## Cierre anual
+
+Después de cerrar diciembre, en **Periodos → Cierre anual** verás el ejercicio
+con sus ingresos, gastos y resultado. El botón **Cerrar 2026** genera dos
+asientos al 31 de diciembre:
+
+1. Las cuentas de ingreso (7) se debitan y las de gasto (6 y 8) se acreditan;
+   la diferencia va a la cuenta 89.
+2. El saldo de la 89 pasa a resultados acumulados: 591 si hubo utilidad o 592
+   si hubo pérdida.
+
+No se puede cerrar si queda un mes abierto o un comprobante en borrador. Para
+corregir algo después, **Revertir cierre** (solo administrador), reabre
+diciembre, ajusta y vuelve a cerrar. El estado de resultados sigue mostrando el
+resultado del año: el asiento de cierre no se cuenta dos veces.
+
+También se puede hacer por consola:
+
+```
+python manage.py cerrar_anio --anio 2026
+python manage.py cerrar_anio --anio 2026 --revertir
+```
+
+
 ## Tipo de cambio
 
 Se descarga solo todos los días a las 00:01 desde SUNAT y se guarda por fecha.

@@ -133,7 +133,8 @@ def generar(datos, empresa) -> bytes:
         "<b>1. Base de preparación.</b> Estados financieros preparados conforme a la "
         "Norma Peruana de Información Financiera para las Microempresas (Resolución CNC "
         "N° 001-2024-EF/30), con el PCGE 2026 aplicado anticipadamente conforme a la "
-        "Resolución CNC N° 002-2026-EF/30. Se presentan en soles.",
+        "Resolución CNC N° 002-2026-EF/30. Se presentan en soles. Al 31 de diciembre "
+        "el resultado del ejercicio se transfiere a resultados acumulados (cuenta 59).",
         f"<b>2. Efectivo.</b> El saldo de S/ {_importe(datos['efectivo'])} incluye caja, "
         "efectivo en tránsito y depósitos bancarios.",
         "<b>3. Inventarios.</b> Valorizados al costo de adquisición con costos de "
