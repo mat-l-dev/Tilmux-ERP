@@ -729,3 +729,14 @@ class InvarianteCierre(BaseContable):
         self.assertEqual(total, 2)
         self.assertFalse(estado(self.empresa, 2026)["cerrado"])
         self.assertEqual(len(cerrar(self.empresa, 2026)), 2)
+
+class InvarianteEstados(BaseContable):
+    def test_el_balance_cuadra_con_igv_a_favor(self):
+        self.comprar("10", "100", fecha=date(2026, 9, 18))
+
+        datos = construir(self.empresa, date(2026, 1, 1), date(2026, 9, 30))
+
+        self.assertEqual(datos["descuadre"], Decimal("0"))
+        self.assertTrue(
+            any(c["codigo"] == "40111" for c in datos["activo_corriente"])
+        )

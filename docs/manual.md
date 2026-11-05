@@ -26,11 +26,10 @@ no está corriendo»*, está limpio.
 4. Cobros y pagos.
 5. Cierre del mes.
 
-**Constitución y aportes.** El capital suscrito se registra en la fecha de la
-escritura de constitución (cuenta 1421 contra 5011), aunque la empresa empiece a
-operar meses después. Los aportes en efectivo se registran cuando entran al banco
-y cancelan la 1421. Por eso puede aparecer un mes anterior al primer mes de
-operaciones con un solo asiento de capital, sin dinero ni ventas.
+**Constitución y aportes.** El capital suscrito se registra cuando se suscribe:
+si la escritura de constitución es anterior al inicio de actividades, la
+suscripción se registra al activar el RUC. Los aportes en efectivo se registran
+cuando entran al banco y cancelan la cuenta 1421.
 
 ## Catálogos
 

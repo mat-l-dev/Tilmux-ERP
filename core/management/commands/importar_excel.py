@@ -67,6 +67,16 @@ class Command(BaseCommand):
         empresa = Empresa.objects.get(ruc="20615841961")
         hojas = load_workbook(ruta, data_only=True)
         hoja = hojas["Operaciones"]
+
+        # La escritura de constitución puede ser anterior al inicio de
+        # actividades. El capital se suscribe cuando la empresa empieza a
+        # operar, no necesariamente en la fecha de la escritura.
+        primer_mes = None
+        for fila_parametro in hojas["Parámetros"].iter_rows(values_only=True):
+            if fila_parametro and fila_parametro[0] == "Primer mes del libro":
+                primer_mes = fecha_de(fila_parametro[1])
+                break
+
         cabeceras = {
             celda.value: celda.column
             for celda in hoja[1]
@@ -101,6 +111,8 @@ class Command(BaseCommand):
             numero_fila = int(fila[0])
 
             if tipo == "Capital suscrito en la constitución":
+                if primer_mes and fecha < primer_mes:
+                    fecha = primer_mes
                 postear(
                     empresa=empresa,
                     fecha=fecha,

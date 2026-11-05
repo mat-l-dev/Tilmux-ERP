@@ -50,11 +50,12 @@ def _filas(empresa, *, hasta: date, desde: date | None = None, excluir_cierre: b
     )
 
 
-def _entrada(fila) -> dict:
+def _entrada(fila, *, acreedora: bool = False) -> dict:
+    neto = (fila["debe"] or CERO) - (fila["haber"] or CERO)
     return {
         "codigo": fila["cuenta__codigo"],
         "nombre": fila["cuenta__nombre"],
-        "importe": abs((fila["debe"] or CERO) - (fila["haber"] or CERO)),
+        "importe": -neto if acreedora else neto,
     }
 
 
@@ -103,10 +104,13 @@ def construir(empresa, desde: date, hasta: date) -> dict:
                 activo_corriente.append(_entrada(fila))
             elif elemento in ACTIVO_NO_CORRIENTE and neto != 0:
                 activo_no_corriente.append(_entrada(fila))
-            elif elemento == 4 and neto != 0:
-                pasivo.append(_entrada(fila))
+            elif elemento == 4 and neto > 0:
+                # Saldo deudor de un tributo: crédito fiscal por recuperar.
+                activo_corriente.append(_entrada(fila))
+            elif elemento == 4 and neto < 0:
+                pasivo.append(_entrada(fila, acreedora=True))
             elif elemento == 5 and neto != 0:
-                patrimonio.append(_entrada(fila))
+                patrimonio.append(_entrada(fila, acreedora=True))
             elif elemento in (6, 7, 8):
                 resultado_acumulado += -neto
 
