@@ -15,8 +15,8 @@
       <dl class="datos">
         <div><dt>Moneda</dt><dd>{{ compra.moneda }}</dd></div>
         <div><dt>Registrado</dt><dd class="num">{{ compra.total }}</dd></div>
-        <div><dt>Tipo de cambio</dt><dd class="num">{{ compra.tipo_cambio }}</dd></div>
-        <div><dt>Monto en origen</dt><dd class="num">{{ compra.total_moneda_origen }}</dd></div>
+        <div><dt>Pagado</dt><dd class="num">{{ compra.monto_pagado }}</dd></div>
+        <div><dt>Saldo</dt><dd class="num">{{ saldo }}</dd></div>
       </dl>
 
       <form method="post" class="form">
@@ -49,6 +49,10 @@
             <input type="text" name="tipo_cambio" inputmode="decimal" placeholder="3.500">
           </label>
           {% endif %}
+          <label class="field">
+            <span>Importe a pagar</span>
+            <input type="text" name="importe" inputmode="decimal" placeholder="{{ saldo }}" value="{{ saldo }}">
+          </label>
         </div>
         <button class="btn btn-primary" type="submit">Registrar pago</button>
       </form>

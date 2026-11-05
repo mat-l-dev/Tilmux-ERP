@@ -51,6 +51,7 @@ class Compra(models.Model):
     revaluacion = models.DecimalField(max_digits=18, decimal_places=2, default=0)
     pagada = models.BooleanField(default=False)
     fecha_pago = models.DateField(null=True, blank=True)
+    monto_pagado = models.DecimalField(max_digits=18, decimal_places=2, default=0)
     creado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

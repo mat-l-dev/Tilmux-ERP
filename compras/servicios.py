@@ -215,28 +215,42 @@ def pagar(
     fecha,
     canal: str = "TRANSFERENCIA",
     tipo_cambio_pago=None,
+    importe=None,
 ):
-    """Paga una compra y reconoce la diferencia de cambio si la hay."""
+    """Paga total o parcialmente una compra, con diferencia de cambio."""
     compra = Compra.objects.select_for_update().get(pk=compra.pk)
     if compra.estado != Compra.Estado.CONFIRMADA:
         raise CompraError("Solo se paga una compra confirmada.")
-    if compra.pagada:
-        raise CompraError("La compra ya está pagada.")
     if cuenta.cuenta_contable is None:
         raise CompraError("La cuenta de tesorería no tiene cuenta contable.")
 
+    total_pen = _cent(Decimal(compra.total) + Decimal(compra.revaluacion))
+    pagado_previo = _cent(compra.monto_pagado)
+    saldo = _cent(total_pen - pagado_previo)
+    if saldo <= 0:
+        raise CompraError("La compra ya está pagada.")
+
+    monto = saldo if importe is None else _cent(importe)
+    if monto <= 0:
+        raise CompraError("El importe debe ser mayor a cero.")
+    if monto > saldo:
+        raise CompraError(f"El saldo pendiente es {saldo}.")
+
     if compra.moneda == "PEN":
-        llevado = _cent(compra.total)
-        pagado = _cent(compra.total)
+        llevado = monto
+        pagado = monto
         diferencia = Decimal("0.00")
     else:
-        llevado = _cent(Decimal(compra.total) + Decimal(compra.revaluacion))
         tasa = (
             Decimal(tipo_cambio_pago)
             if tipo_cambio_pago
             else tipo_cambio_de(fecha).venta
         )
-        pagado = _cent(Decimal(compra.total_moneda_origen) * tasa)
+        porcion = (
+            Decimal(compra.total_moneda_origen) * monto / total_pen
+        ).quantize(Decimal("0.0001"))
+        pagado = _cent(porcion * tasa)
+        llevado = monto
         diferencia = _cent(pagado - llevado)
 
     cuentas = {
@@ -291,9 +305,11 @@ def pagar(
         origen_id=compra.pk,
     )
 
-    compra.pagada = True
-    compra.fecha_pago = fecha
-    compra.save(update_fields=["pagada", "fecha_pago"])
+    compra.monto_pagado = pagado_previo + llevado
+    compra.pagada = compra.monto_pagado >= total_pen
+    if compra.pagada:
+        compra.fecha_pago = fecha
+    compra.save(update_fields=["monto_pagado", "pagada", "fecha_pago"])
     return pagado, diferencia
 
 

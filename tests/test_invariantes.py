@@ -16,8 +16,8 @@ from django.test import TestCase
 
 from catalogo.models import CuentaTesoreria, Producto, Tercero
 from compras.models import Compra, CompraLinea, CostoAdicional
+from compras.servicios import CompraError, pagar, registrar_gasto, revaluar
 from compras.servicios import confirmar as confirmar_compra
-from compras.servicios import pagar, registrar_gasto, revaluar
 from contabilidad.calculos import calcular_linea
 from contabilidad.models import Asiento, AsientoLinea, Cuenta
 from contabilidad.moneda import a_soles
@@ -451,6 +451,7 @@ class InvariantePagos(BaseContable):
         self.assertEqual(pagado, Decimal("1180.00"))
         self.assertEqual(diferencia, Decimal("0.00"))
         self.assertTrue(compra.pagada)
+        self.assertEqual(compra.monto_pagado, Decimal("1180.00"))
 
         asiento = Asiento.objects.get(
             origen_tipo="COMPRA_PAGO", origen_id=compra.pk
@@ -458,6 +459,44 @@ class InvariantePagos(BaseContable):
         importes = {linea.cuenta.codigo: (linea.debe, linea.haber) for linea in asiento.lineas.all()}
         self.assertEqual(importes["4212"], (Decimal("1180.00"), Decimal("0.00")))
         self.assertEqual(importes["1061"], (Decimal("0.00"), Decimal("1180.00")))
+
+    def test_un_pago_parcial_deja_saldo(self):
+        compra = self.comprar("10", "100")
+
+        pagado, _ = pagar(
+            compra,
+            cuenta=self.bbva,
+            fecha=date(2026, 11, 15),
+            importe=Decimal("500.00"),
+        )
+        compra.refresh_from_db()
+
+        self.assertEqual(pagado, Decimal("500.00"))
+        self.assertFalse(compra.pagada)
+        self.assertEqual(compra.monto_pagado, Decimal("500.00"))
+
+        pagado, _ = pagar(
+            compra,
+            cuenta=self.bbva,
+            fecha=date(2026, 11, 20),
+            importe=Decimal("680.00"),
+        )
+        compra.refresh_from_db()
+
+        self.assertEqual(pagado, Decimal("680.00"))
+        self.assertTrue(compra.pagada)
+        self.assertEqual(compra.monto_pagado, Decimal("1180.00"))
+
+    def test_no_se_puede_pagar_mas_que_el_saldo(self):
+        compra = self.comprar("10", "100")
+
+        with self.assertRaises(CompraError):
+            pagar(
+                compra,
+                cuenta=self.bbva,
+                fecha=date(2026, 11, 15),
+                importe=Decimal("2000.00"),
+            )
 
     def test_la_diferencia_de_cambio_se_reconoce(self):
         compra = Compra.objects.create(

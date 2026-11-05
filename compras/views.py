@@ -546,6 +546,7 @@ def pagar_compra(request, pk: int):
                     ),
                     canal=request.POST.get("canal", "TRANSFERENCIA"),
                     tipo_cambio_pago=request.POST.get("tipo_cambio") or None,
+                    importe=request.POST.get("importe") or None,
                 )
             except (CompraError, SinTipoCambio) as exc:
                 messages.error(request, str(exc))
@@ -559,7 +560,12 @@ def pagar_compra(request, pk: int):
     return render(
         request,
         "compras/pagar.html",
-        {"compra": compra, "cuentas": cuentas, "hoy": hoy},
+        {
+            "compra": compra,
+            "cuentas": cuentas,
+            "hoy": hoy,
+            "saldo": (compra.total + compra.revaluacion) - compra.monto_pagado,
+        },
     )
 
 
