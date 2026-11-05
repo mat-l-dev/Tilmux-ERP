@@ -163,7 +163,7 @@ Estas son las normas que usa el ERP y que conviene tener a mano:
 | Tema | Norma | Qué implica en el sistema |
 |---|---|---|
 | Plan de cuentas | Resolución CNC N° 002-2026-EF/30 | PCGE 2026 aplicado anticipadamente; su vigencia obligatoria es el 1/1/2028, pero la norma permite adelantarlo |
-| Estados financieros | Resolución CNC N° 001-2024-EF/30 (NPIF) | Vigente desde el 1/1/2025 para microempresas: situación financiera, resultados, cambios en el patrimonio, flujo de efectivo y notas |
+| Estados financieros | Resolución CNC N° 001-2024-EF/30 (NPIF) | Vigente desde el 1/1/2025 para microempresas (hasta 150 UIT de ingresos anuales: S/ 825 000 en 2026): situación financiera, resultados, cambios en el patrimonio, flujo de efectivo y notas |
 | Renta | Ley del Impuesto a la Renta, capítulo XV | RER: 1,5 % de los ingresos netos mensuales; sin declaración anual |
 | Límites del RER | SUNAT | Ingresos o compras hasta S/ 525 000 al año, activos fijos hasta S/ 126 000 y máximo 10 trabajadores por turno |
 | IGV | TUO de la Ley del IGV, artículos 18 y 19 | 18 % (16 % IGV + 2 % IPM); el crédito fiscal exige factura y destino a operaciones gravadas |
