@@ -697,6 +697,10 @@ class InvarianteCierre(BaseContable):
             sum(p["importe"] for p in despues["patrimonio"] if p["codigo"] == "591"),
             antes["resultado_neto"],
         )
+        self.assertEqual(
+            despues["cambios"][-1]["importe"],
+            despues["total_patrimonio_resultado"],
+        )
 
     def test_no_cierra_si_hay_un_mes_abierto(self):
         self.comprar("1", "100")
