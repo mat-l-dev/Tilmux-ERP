@@ -9,16 +9,18 @@
 
 <section class="card">
   <header class="card-head">
-    <h2>Ventas confirmadas</h2>
+    <h2>Ventas, notas de crédito y débito</h2>
     <span class="chip">{{ desde|date:"d/m/Y" }} — {{ hasta|date:"d/m/Y" }}</span>
   </header>
 
-  {% if ventas %}
+  {% if filas %}
   <table class="tabla-doc">
     <thead>
       <tr>
         <th>Fecha</th>
-        <th>Comprobante</th>
+        <th>Tipo</th>
+        <th>Serie y número</th>
+        <th>Modifica a</th>
         <th>Cliente</th>
         <th class="der">Base</th>
         <th class="der">IGV</th>
@@ -26,28 +28,34 @@
       </tr>
     </thead>
     <tbody>
-      {% for v in ventas %}
+      {% for f in filas %}
       <tr>
-        <td>{{ v.fecha|date:"d/m/Y" }}</td>
-        <td>{{ v.serie }}-{{ v.numero }}</td>
-        <td>{{ v.cliente_nombre|default:"Consumidor final" }}</td>
-        <td class="num der">{{ v.subtotal|floatformat:2 }}</td>
-        <td class="num der">{{ v.igv|floatformat:2 }}</td>
-        <td class="num der">{{ v.total|floatformat:2 }}</td>
+        <td>{{ f.fecha|date:"d/m/Y" }}</td>
+        <td>{{ f.tipo }}</td>
+        <td>{{ f.documento }}</td>
+        <td class="muted">{{ f.referencia|default:"—" }}</td>
+        <td>{{ f.cliente }}</td>
+        <td class="num der">{{ f.base|floatformat:2 }}</td>
+        <td class="num der">{{ f.igv|floatformat:2 }}</td>
+        <td class="num der">{{ f.total|floatformat:2 }}</td>
       </tr>
       {% endfor %}
     </tbody>
     <tfoot>
       <tr>
-        <td colspan="3"><strong>Totales</strong></td>
+        <td colspan="5"><strong>Totales del periodo</strong></td>
         <td class="num der"><strong>{{ base|floatformat:2 }}</strong></td>
         <td class="num der"><strong>{{ igv|floatformat:2 }}</strong></td>
         <td class="num der"><strong>{{ total|floatformat:2 }}</strong></td>
       </tr>
     </tfoot>
   </table>
+  <p class="preview-note">
+    Las notas de crédito restan y las de débito suman, igual que en el RVIE.
+    Cada nota indica a qué comprobante modifica.
+  </p>
   {% else %}
-  <p class="muted">No hay ventas confirmadas en el rango.</p>
+  <p class="muted">No hay documentos en el rango.</p>
   {% endif %}
 </section>
 {% endblock %}

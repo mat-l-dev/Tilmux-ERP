@@ -13,7 +13,7 @@ from compras.models import Compra
 from compras.models_gasto import Gasto
 from contabilidad.models import Cuenta
 from core.context import empresa_actual
-from ventas.models import Venta
+from ventas.models import NotaCredito, NotaDebito, Venta
 
 TASA_RENTA_RER = Decimal("0.015")
 
@@ -102,23 +102,68 @@ def mayor(request):
 def registro_ventas(request):
     empresa = empresa_actual(request)
     desde, hasta = _rango(request)
-    ventas = []
+    filas: list[dict] = []
+
     if empresa:
-        ventas = Venta.objects.filter(
+        for venta in Venta.objects.filter(
             empresa=empresa,
             estado=Venta.Estado.CONFIRMADA,
             fecha__range=(desde, hasta),
-        ).order_by("fecha", "serie", "numero")
+        ).order_by("fecha", "serie", "numero"):
+            filas.append(
+                {
+                    "fecha": venta.fecha,
+                    "tipo": venta.get_tipo_doc_display(),
+                    "documento": f"{venta.serie}-{venta.numero}",
+                    "referencia": "",
+                    "cliente": venta.cliente_nombre or "Consumidor final",
+                    "base": venta.subtotal,
+                    "igv": venta.igv,
+                    "total": venta.total,
+                }
+            )
 
-    base = ventas.aggregate(s=Sum("subtotal"))["s"] if ventas else 0
-    igv = ventas.aggregate(s=Sum("igv"))["s"] if ventas else 0
+        for nota in NotaCredito.objects.filter(
+            venta__empresa=empresa, fecha__range=(desde, hasta)
+        ).select_related("venta"):
+            filas.append(
+                {
+                    "fecha": nota.fecha,
+                    "tipo": "Nota de crédito (07)",
+                    "documento": f"{nota.serie}-{nota.numero}",
+                    "referencia": f"{nota.venta.serie}-{nota.venta.numero}",
+                    "cliente": nota.venta.cliente_nombre or "Consumidor final",
+                    "base": -nota.base,
+                    "igv": -nota.igv,
+                    "total": -nota.total,
+                }
+            )
+
+        for nota in NotaDebito.objects.filter(
+            venta__empresa=empresa, fecha__range=(desde, hasta)
+        ).select_related("venta"):
+            filas.append(
+                {
+                    "fecha": nota.fecha,
+                    "tipo": "Nota de débito (08)",
+                    "documento": f"{nota.serie}-{nota.numero}",
+                    "referencia": f"{nota.venta.serie}-{nota.venta.numero}",
+                    "cliente": nota.venta.cliente_nombre or "Consumidor final",
+                    "base": nota.base,
+                    "igv": nota.igv,
+                    "total": nota.total,
+                }
+            )
+
+    filas.sort(key=lambda f: (f["fecha"], f["documento"]))
+
     contexto = {
-        "ventas": ventas,
+        "filas": filas,
         "desde": desde,
         "hasta": hasta,
-        "base": base or 0,
-        "igv": igv or 0,
-        "total": (base or 0) + (igv or 0),
+        "base": sum((f["base"] for f in filas), Decimal("0")),
+        "igv": sum((f["igv"] for f in filas), Decimal("0")),
+        "total": sum((f["total"] for f in filas), Decimal("0")),
     }
     return render(request, "reportes/registro_ventas.html", contexto)
 
@@ -192,6 +237,19 @@ def impuestos(request):
         )
         ventas_base = ventas.aggregate(s=Sum("subtotal"))["s"] or Decimal("0")
         ventas_igv = ventas.aggregate(s=Sum("igv"))["s"] or Decimal("0")
+
+        # Las notas ajustan el débito fiscal del periodo.
+        creditos = NotaCredito.objects.filter(
+            venta__empresa=empresa, fecha__range=(desde, hasta)
+        ).aggregate(b=Sum("base"), i=Sum("igv"))
+        ventas_base -= creditos["b"] or Decimal("0")
+        ventas_igv -= creditos["i"] or Decimal("0")
+
+        debitos = NotaDebito.objects.filter(
+            venta__empresa=empresa, fecha__range=(desde, hasta)
+        ).aggregate(b=Sum("base"), i=Sum("igv"))
+        ventas_base += debitos["b"] or Decimal("0")
+        ventas_igv += debitos["i"] or Decimal("0")
 
         compras = Compra.objects.filter(
             empresa=empresa, estado=Compra.Estado.CONFIRMADA, fecha__range=(desde, hasta)
