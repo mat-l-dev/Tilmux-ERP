@@ -19,7 +19,7 @@ class CostoAdicionalInline(admin.TabularInline):
 
 @admin.register(Gasto)
 class GastoAdmin(admin.ModelAdmin):
-    list_display = ("fecha", "proveedor", "tipo_doc", "serie", "numero", "total", "medio")
+    list_display = ("fecha", "proveedor", "tipo_doc", "serie", "numero", "total", "medio", "creado_por")
     list_filter = ("empresa", "tipo_doc", "cuenta")
     search_fields = ("proveedor__nombre", "serie", "numero", "glosa")
     date_hierarchy = "fecha"
@@ -28,7 +28,7 @@ class GastoAdmin(admin.ModelAdmin):
 
 @admin.register(Compra)
 class CompraAdmin(admin.ModelAdmin):
-    list_display = ("fecha", "proveedor", "serie", "numero", "total", "estado")
+    list_display = ("fecha", "proveedor", "serie", "numero", "total", "estado", "creado_por")
     list_filter = ("empresa", "estado", "tipo_doc")
     search_fields = ("proveedor__nombre", "numero", "serie")
     date_hierarchy = "fecha"

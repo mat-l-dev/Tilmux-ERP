@@ -9,6 +9,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from django.db import transaction
 from django.db.models import Max
 
+from core.contexto import usuario_actual
 from core.models import Empresa, Periodo
 
 from .models import Asiento, AsientoLinea, Cuenta, Regla, ReglaLinea
@@ -59,6 +60,7 @@ def postear(
     cuenta_medio: Cuenta | None = None,
     cuenta_destino: Cuenta | None = None,
     cuenta_gasto: Cuenta | None = None,
+    usuario=None,
 ) -> Asiento:
     """Crea el asiento a partir de la regla del tipo de operación."""
     periodo = periodo_de(empresa, fecha)
@@ -79,6 +81,7 @@ def postear(
         glosa=glosa[:255],
         origen_tipo=origen_tipo,
         origen_id=origen_id,
+        creado_por=usuario or usuario_actual.get(),
     )
 
     lineas: list[AsientoLinea] = []
@@ -139,6 +142,7 @@ def postear_lineas(
     lineas: list[tuple[Cuenta, Decimal, Decimal, str]],
     origen_tipo: str = "",
     origen_id: int | None = None,
+    usuario=None,
 ) -> Asiento:
     """Asiento con líneas explícitas: (cuenta, debe, haber, glosa)."""
     periodo = periodo_de(empresa, fecha)
@@ -154,6 +158,7 @@ def postear_lineas(
         glosa=glosa[:255],
         origen_tipo=origen_tipo,
         origen_id=origen_id,
+        creado_por=usuario or usuario_actual.get(),
     )
 
     filas = []

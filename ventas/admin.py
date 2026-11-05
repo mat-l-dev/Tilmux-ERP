@@ -28,7 +28,7 @@ class VentaLineaInline(admin.TabularInline):
 
 @admin.register(Venta)
 class VentaAdmin(admin.ModelAdmin):
-    list_display = ("fecha", "serie", "numero", "cliente_nombre", "total", "estado")
+    list_display = ("fecha", "serie", "numero", "cliente_nombre", "total", "estado", "creado_por")
     list_filter = ("empresa", "estado", "tipo_doc", "condicion")
     search_fields = ("serie", "numero", "cliente_nombre", "cliente__nombre")
     date_hierarchy = "fecha"

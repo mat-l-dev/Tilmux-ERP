@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from django.conf import settings
 from django.db import models
 
 
@@ -128,6 +129,13 @@ class Venta(models.Model):
     igv = models.DecimalField(max_digits=18, decimal_places=2, default=0)
     total = models.DecimalField(max_digits=18, decimal_places=2, default=0)
     costo_venta = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    creado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ventas",
+    )
     creada = models.DateTimeField(auto_now_add=True)
     confirmada_en = models.DateTimeField(null=True, blank=True)
 

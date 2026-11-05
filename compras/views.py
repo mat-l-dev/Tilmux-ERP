@@ -17,6 +17,7 @@ from contabilidad.calculos import calcular_linea
 from contabilidad.models import Asiento, Cuenta
 from contabilidad.moneda import SinTipoCambio, a_soles
 from core.context import empresa_actual
+from core.contexto import usuario_actual
 from documentos.xml_cpe import Guia, XMLInvalido, leer
 from ventas.models import Venta
 from ventas.models_guia import GuiaRemision
@@ -169,7 +170,7 @@ def nueva(request):
     if errores:
         return render(request, "compras/nueva.html", contexto)
 
-    compra = Compra.objects.create(
+    compra = Compra.objects.create(creado_por=usuario_actual.get(), 
         empresa=empresa,
         proveedor=proveedor,
         fecha=date.fromisoformat(request.POST.get("fecha") or hoy.isoformat()),
@@ -448,7 +449,7 @@ def importar_compra(request):
                     "rol": "PROVEEDOR",
                 },
             )
-            compra = Compra.objects.create(
+            compra = Compra.objects.create(creado_por=usuario_actual.get(), 
                 empresa=empresa,
                 proveedor=proveedor,
                 fecha=date.fromisoformat(datos["fecha"]),

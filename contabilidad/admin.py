@@ -42,7 +42,7 @@ class AsientoLineaInline(admin.TabularInline):
 
 @admin.register(Asiento)
 class AsientoAdmin(admin.ModelAdmin):
-    list_display = ("numero", "fecha", "tipo_operacion", "glosa", "estado")
+    list_display = ("numero", "fecha", "tipo_operacion", "glosa", "estado", "creado_por")
     list_filter = ("empresa", "tipo_operacion", "estado")
     search_fields = ("glosa",)
     date_hierarchy = "fecha"

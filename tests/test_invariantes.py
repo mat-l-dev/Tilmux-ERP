@@ -20,6 +20,7 @@ from compras.servicios import confirmar as confirmar_compra
 from compras.servicios import pagar, registrar_gasto, revaluar
 from contabilidad.calculos import calcular_linea
 from contabilidad.models import Asiento, AsientoLinea, Cuenta
+from core.contexto import usuario_actual
 from contabilidad.moneda import a_soles
 from contabilidad.servicios import ContabilidadError
 from core.models import Empresa, Periodo, TipoCambio
@@ -84,6 +85,7 @@ class BaseContable(TestCase):
             serie="F001",
             numero=f"{Compra.objects.count() + 1:04d}",
             con_credito=con_credito,
+            creado_por=usuario_actual.get(),
         )
         CompraLinea.objects.create(
             compra=compra,
@@ -124,6 +126,7 @@ class BaseContable(TestCase):
             tipo_doc="FACTURA",
             serie="E001",
             numero=f"{Venta.objects.count() + 1:04d}",
+            creado_por=usuario_actual.get(),
             condicion="CONTADO",
             cuenta=self.pasarela,
             canal="TARJETA",
@@ -546,6 +549,24 @@ class InvariantePeriodos(BaseContable):
             self.comprar("1", "100")
 
         self.assertEqual(Compra.objects.filter(estado=Compra.Estado.CONFIRMADA).count(), 0)
+
+
+class InvarianteAuditoria(BaseContable):
+    def test_el_asiento_registra_quien_lo_creo(self):
+        from django.contrib.auth import get_user_model
+
+        from core.contexto import usuario_actual
+
+        usuario = get_user_model().objects.create_user("tester", password="clave-de-prueba")
+        token = usuario_actual.set(usuario)
+        try:
+            compra = self.comprar("1", "100")
+        finally:
+            usuario_actual.reset(token)
+
+        asiento = Asiento.objects.get(origen_tipo="COMPRA", origen_id=compra.pk)
+        self.assertEqual(asiento.creado_por, usuario)
+        self.assertEqual(compra.creado_por, usuario)
 
 
 class InvarianteInmutabilidad(BaseContable):

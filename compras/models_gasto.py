@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from django.conf import settings
 from django.db import models
 
 
@@ -44,6 +45,13 @@ class Gasto(models.Model):
     deducible = models.BooleanField(
         default=True,
         help_text="Una boleta de venta tampoco sustenta gasto para efecto tributario.",
+    )
+    creado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="gastos",
     )
     creado = models.DateTimeField(auto_now_add=True)
 

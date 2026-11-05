@@ -12,6 +12,7 @@ from django.utils import timezone
 from contabilidad.models import Cuenta
 from contabilidad.moneda import tipo_cambio_de
 from contabilidad.servicios import Montos, postear, postear_lineas
+from core.contexto import usuario_actual
 from core.models import TipoCambio
 from inventario.servicios import entrar
 from tesoreria.servicios import anotar
@@ -152,7 +153,7 @@ def registrar_gasto(
     if cuenta is None:
         raise CompraError("El gasto necesita una cuenta contable.")
 
-    gasto = Gasto.objects.create(
+    gasto = Gasto.objects.create(creado_por=usuario_actual.get(), 
         empresa=empresa,
         proveedor=proveedor,
         fecha=fecha,

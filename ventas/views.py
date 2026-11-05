@@ -16,6 +16,7 @@ from catalogo.models import CuentaTesoreria, Producto, Serie
 from contabilidad.calculos import calcular_linea
 from contabilidad.models import Asiento
 from core.context import empresa_actual
+from core.contexto import usuario_actual
 
 from .models import NotaCredito, NotaCreditoLinea, NotaDebito, Venta, VentaLinea
 from .servicios import VentaError, confirmar, emitir_nota_credito, emitir_nota_debito
@@ -161,7 +162,7 @@ def nueva(request):
         return render(request, "ventas/nueva.html", contexto)
 
     cuenta_id = request.POST.get("cuenta") or None
-    venta = Venta.objects.create(
+    venta = Venta.objects.create(creado_por=usuario_actual.get(), 
         empresa=empresa,
         cliente_nombre=request.POST.get("cliente_nombre", "")[:200],
         fecha=date.fromisoformat(request.POST.get("fecha") or hoy.isoformat()),

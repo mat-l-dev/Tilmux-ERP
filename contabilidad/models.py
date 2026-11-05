@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from django.conf import settings
 from django.db import models
 
 
@@ -146,6 +147,13 @@ class Asiento(models.Model):
     origen_id = models.BigIntegerField(null=True, blank=True)
     estado = models.CharField(
         max_length=10, choices=Estado.choices, default=Estado.CONFIRMADO
+    )
+    creado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="asientos",
     )
     creado = models.DateTimeField(auto_now_add=True)
 
