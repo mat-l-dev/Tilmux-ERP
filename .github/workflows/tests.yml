@@ -27,6 +27,7 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
       DJANGO_DEBUG: "true"
       DJANGO_SECRET_KEY: solo-para-integracion-continua
+      DJANGO_DB_SSLMODE: disable
       PYTHONIOENCODING: utf-8
 
     steps:
