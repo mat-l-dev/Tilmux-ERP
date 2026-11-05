@@ -11,6 +11,8 @@ from django.core.paginator import Paginator
 from django.db import IntegrityError
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from catalogo.models import CuentaTesoreria, Producto, Tercero
@@ -19,8 +21,11 @@ from contabilidad.models import Asiento, Cuenta
 from contabilidad.moneda import SinTipoCambio, a_soles
 from core.context import empresa_actual
 from core.contexto import usuario_actual
+from core.models import HistorialDocumento
 from core.permisos import requiere_escritura
 from documentos.xml_cpe import Guia, XMLInvalido, leer
+from inventario.models import CapaFIFO, ConsumoCapa, MovimientoStock
+from reportes.casillas import casillas_documento
 from ventas.models import Venta
 from ventas.models_guia import GuiaRemision
 
@@ -70,6 +75,16 @@ def nueva(request):
         messages.error(request, "Primero configura una empresa.")
         return redirect("core:panel")
 
+    compra_edit = None
+    editar_id = request.GET.get("editar") or request.POST.get("compra_id")
+    if editar_id:
+        compra_edit = get_object_or_404(Compra, pk=editar_id, empresa=empresa)
+        if compra_edit.estado not in (Compra.Estado.BORRADOR, Compra.Estado.PENDIENTE):
+            messages.error(
+                request, "Solo se edita una compra en borrador o pendiente."
+            )
+            return redirect("compras:detalle", compra_edit.pk)
+
     productos = list(Producto.objects.filter(activo=True))
     proveedores = list(
         Tercero.objects.filter(rol__in=["PROVEEDOR", "AMBOS"], activo=True)
@@ -80,8 +95,10 @@ def nueva(request):
         "productos": productos,
         "proveedores": proveedores,
         "hoy": hoy,
+        "con_igv": False,
         "filas": [{} for _ in range(4)],
         "costos": [{} for _ in range(2)],
+        "compra": compra_edit,
         "cabecera": {
             "fecha": hoy.isoformat(),
             "tipo_doc": "FACTURA",
@@ -89,8 +106,45 @@ def nueva(request):
             "numero": "",
             "proveedor": "",
             "glosa": "",
+            "factura_pendiente": False,
         },
     }
+
+    if compra_edit is not None:
+        filas_edit = [
+            {
+                "seleccionado": linea.producto_id,
+                "cantidad": linea.cantidad,
+                "precio": linea.precio_unitario,
+                "descripcion": linea.descripcion,
+            }
+            for linea in compra_edit.lineas.all()
+        ]
+        costos_edit = [
+            {
+                "concepto": costo.concepto,
+                "base": costo.base,
+                "igv": costo.igv,
+            }
+            for costo in compra_edit.costos.all()
+        ]
+        contexto["filas"] = filas_edit or contexto["filas"]
+        contexto["costos"] = costos_edit or contexto["costos"]
+        primera = compra_edit.lineas.first()
+        if primera and primera.cantidad:
+            contexto["con_igv"] = (
+                abs(primera.precio_unitario * primera.cantidad - primera.total)
+                < Decimal("0.01")
+            )
+        contexto["cabecera"] = {
+            "fecha": compra_edit.fecha.isoformat(),
+            "tipo_doc": compra_edit.tipo_doc,
+            "serie": compra_edit.serie,
+            "numero": compra_edit.numero,
+            "proveedor": compra_edit.proveedor_id,
+            "glosa": compra_edit.glosa,
+            "factura_pendiente": compra_edit.estado == Compra.Estado.PENDIENTE,
+        }
 
     if request.method != "POST":
         return render(request, "compras/nueva.html", contexto)
@@ -117,13 +171,22 @@ def nueva(request):
     productos_ids = request.POST.getlist("linea_producto")
     cantidades = request.POST.getlist("linea_cantidad")
     precios = request.POST.getlist("linea_precio")
+    descripciones = request.POST.getlist("linea_descripcion")
+    con_igv = bool(request.POST.get("con_igv"))
 
     for indice, (producto_id, cantidad_txt, precio_txt) in enumerate(
         zip(productos_ids, cantidades, precios, strict=False), start=1
     ):
         if not producto_id and not cantidad_txt and not precio_txt:
             continue
-        fila = {"producto_id": producto_id, "cantidad": cantidad_txt, "precio": precio_txt}
+        fila = {
+            "producto_id": producto_id,
+            "cantidad": cantidad_txt,
+            "precio": precio_txt,
+            "descripcion": (
+                descripciones[indice - 1] if indice <= len(descripciones) else ""
+            ),
+        }
         try:
             producto = Producto.objects.get(pk=int(producto_id))
             cantidad = _decimal(cantidad_txt)
@@ -134,7 +197,7 @@ def nueva(request):
             errores.append(f"Línea {indice}: revisa producto, cantidad y precio.")
             filas.append(fila)
             continue
-        base, igv, total = calcular_linea(cantidad, precio, con_igv=False)
+        base, igv, total = calcular_linea(cantidad, precio, con_igv)
         fila.update(
             {
                 "producto": producto,
@@ -176,6 +239,8 @@ def nueva(request):
             "filas": filas,
             "costos": costos,
             "errores": errores,
+            "con_igv": con_igv,
+            "compra": compra_edit,
             "cabecera": {
                 "fecha": request.POST.get("fecha", hoy.isoformat()),
                 "tipo_doc": request.POST.get("tipo_doc", "FACTURA"),
@@ -183,6 +248,7 @@ def nueva(request):
                 "numero": request.POST.get("numero", ""),
                 "proveedor": proveedor_id,
                 "glosa": request.POST.get("glosa", ""),
+                "factura_pendiente": bool(request.POST.get("factura_pendiente")),
             },
         }
     )
@@ -196,22 +262,34 @@ def nueva(request):
         return render(request, "compras/nueva.html", contexto)
 
     datos = formulario.cleaned_data
+    factura_pendiente = bool(request.POST.get("factura_pendiente"))
 
-    compra = Compra.objects.create(
-        empresa=empresa,
-        proveedor=proveedor,
-        fecha=datos["fecha"],
-        tipo_doc=datos["tipo_doc"],
-        serie=datos["serie"].upper()[:4],
-        numero=datos["numero"][:20],
-        glosa=datos.get("glosa", "")[:255],
-        creado_por=usuario_actual.get(),
+    if compra_edit is None:
+        compra = Compra(empresa=empresa, creado_por=usuario_actual.get())
+    else:
+        compra = compra_edit
+        compra.lineas.all().delete()
+        compra.costos.all().delete()
+
+    compra.proveedor = proveedor
+    compra.fecha = datos["fecha"]
+    compra.tipo_doc = datos["tipo_doc"]
+    compra.serie = datos["serie"].upper()[:4]
+    compra.numero = datos["numero"][:20]
+    compra.glosa = datos.get("glosa", "")[:255]
+    compra.estado = (
+        Compra.Estado.PENDIENTE if factura_pendiente else Compra.Estado.BORRADOR
     )
+    compra.modificado_por = usuario_actual.get()
+    compra.modificado_en = timezone.now()
+    compra.save()
+
     for orden, fila in enumerate(filas, start=1):
         CompraLinea.objects.create(
             compra=compra,
             orden=orden,
             producto=fila["producto"],
+            descripcion=fila.get("descripcion", "")[:200],
             cantidad=fila["cantidad"],
             precio_unitario=fila["precio"],
             base=fila["base"],
@@ -236,7 +314,24 @@ def nueva(request):
     compra.total = compra.subtotal + compra.igv
     compra.save(update_fields=["subtotal", "igv", "total"])
 
-    messages.success(request, "Borrador creado. Revísalo y confírmalo.")
+    HistorialDocumento.objects.create(
+        empresa=empresa,
+        tipo="COMPRA",
+        documento_id=compra.pk,
+        usuario=usuario_actual.get(),
+        accion="EDICION" if compra_edit else "CREACION",
+        detalle=f"{compra.serie}-{compra.numero} · total {compra.total}",
+    )
+    messages.success(
+        request,
+        (
+            "Compra actualizada."
+            if compra_edit
+            else "Compra registrada. Completa la factura antes de confirmar."
+            if factura_pendiente
+            else "Borrador creado. Revísalo y confírmalo."
+        ),
+    )
     return redirect("compras:detalle", compra.pk)
 
 
@@ -596,10 +691,19 @@ def pagar_compra(request, pk: int):
 def detalle(request, pk: int):
     compra = get_object_or_404(Compra, pk=pk)
     asiento = Asiento.objects.filter(
-        origen_tipo="COMPRA", origen_id=compra.pk
+        origen_tipo="COMPRA", origen_id=compra.pk, tipo_operacion="COMPRA"
     ).first()
     return render(
-        request, "compras/detalle.html", {"compra": compra, "asiento": asiento}
+        request,
+        "compras/detalle.html",
+        {
+            "compra": compra,
+            "asiento": asiento,
+            "casillas_621": casillas_documento(compra),
+            "historial": HistorialDocumento.objects.filter(
+                empresa=compra.empresa, tipo="COMPRA", documento_id=compra.pk
+            ).order_by("-fecha")[:10],
+        },
     )
 
 
@@ -614,4 +718,107 @@ def confirmar_compra(request, pk: int):
         messages.error(request, str(exc))
     else:
         messages.success(request, "Compra confirmada: stock y asiento generados.")
+    return redirect("compras:detalle", compra.pk)
+
+
+@login_required
+@requiere_escritura
+def corregir(request, pk: int):
+    compra = get_object_or_404(Compra, pk=pk)
+    if compra.estado != Compra.Estado.CONFIRMADA:
+        messages.info(request, "Esta compra todavía se puede editar completa.")
+        return redirect(f"{reverse('compras:nueva')}?editar={compra.pk}")
+
+    if request.method == "POST":
+        compra.glosa = request.POST.get("glosa", "")[:255]
+        tipo = request.POST.get("tipo_doc", "")
+        if tipo in Compra.TipoDoc.values:
+            compra.tipo_doc = tipo
+        if not compra.serie.strip():
+            compra.serie = request.POST.get("serie", "").upper()[:4]
+        if not compra.numero.strip():
+            compra.numero = request.POST.get("numero", "")[:20]
+        compra.modificado_por = usuario_actual.get()
+        compra.modificado_en = timezone.now()
+        compra.save(
+            update_fields=[
+                "glosa",
+                "tipo_doc",
+                "serie",
+                "numero",
+                "modificado_por",
+                "modificado_en",
+            ]
+        )
+
+        for linea in compra.lineas.all():
+            nueva = request.POST.get(f"desc_{linea.pk}")
+            if nueva is not None:
+                linea.descripcion = nueva[:200]
+                linea.save(update_fields=["descripcion"])
+
+        HistorialDocumento.objects.create(
+            empresa=compra.empresa,
+            tipo="COMPRA",
+            documento_id=compra.pk,
+            usuario=usuario_actual.get(),
+            accion="CORRECCION",
+            detalle="Completados datos de factura o descripción",
+        )
+        messages.success(request, "Datos de la compra actualizados.")
+        return redirect("compras:detalle", compra.pk)
+
+    return render(request, "compras/corregir.html", {"compra": compra})
+
+
+@login_required
+@requiere_escritura
+@require_POST
+def anular(request, pk: int):
+    compra = get_object_or_404(Compra, pk=pk)
+    if compra.estado != Compra.Estado.CONFIRMADA:
+        messages.error(request, "Solo se anula una compra confirmada.")
+        return redirect("compras:detalle", compra.pk)
+    if compra.pagada or compra.monto_pagado > 0:
+        messages.error(
+            request,
+            "La compra tiene pagos registrados. Corrige con una nota de crédito "
+            "del proveedor o regulariza el pago antes de anular.",
+        )
+        return redirect("compras:detalle", compra.pk)
+
+    capas = CapaFIFO.objects.filter(
+        empresa=compra.empresa, origen_tipo="COMPRA", origen_id=compra.pk
+    )
+    if ConsumoCapa.objects.filter(capa__in=capas).exists():
+        messages.error(
+            request,
+            "La mercadería de esta compra ya se vendió o consumió. No se puede "
+            "anular sin ajustar el stock.",
+        )
+        return redirect("compras:detalle", compra.pk)
+
+    Asiento.objects.filter(
+        empresa=compra.empresa, origen_tipo="COMPRA", origen_id=compra.pk
+    ).update(estado=Asiento.Estado.ANULADO)
+    MovimientoStock.objects.filter(
+        empresa=compra.empresa, origen_tipo="COMPRA", origen_id=compra.pk
+    ).delete()
+    capas.delete()
+    compra.estado = Compra.Estado.ANULADA
+    compra.modificado_por = usuario_actual.get()
+    compra.modificado_en = timezone.now()
+    compra.save(update_fields=["estado", "modificado_por", "modificado_en"])
+    HistorialDocumento.objects.create(
+        empresa=compra.empresa,
+        tipo="COMPRA",
+        documento_id=compra.pk,
+        usuario=usuario_actual.get(),
+        accion="ANULACION",
+        detalle="Compra anulada y asiento revertido",
+    )
+    messages.warning(
+        request,
+        "Compra anulada. El asiento quedó anulado y el stock se retiró.",
+    )
     return redirect("compras:detalle", compra.pk)

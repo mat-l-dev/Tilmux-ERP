@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 
-{% block titulo %}Nueva compra{% endblock %}
-{% block titulo_pagina %}Nueva compra{% endblock %}
+{% block titulo %}{% if compra %}Editar compra{% else %}Nueva compra{% endif %}{% endblock %}
+{% block titulo_pagina %}{% if compra %}Editar compra{% else %}Nueva compra{% endif %}{% endblock %}
 
 {% block contenido %}
 <form method="post" class="doc">
   {% csrf_token %}
+  {% if compra %}<input type="hidden" name="compra_id" value="{{ compra.pk }}">{% endif %}
 
   <div class="doc-main">
     {% if errores %}
@@ -59,15 +60,27 @@
           <span>Glosa</span>
           <input type="text" name="glosa" value="{{ cabecera.glosa }}" maxlength="255">
         </label>
+        <label class="switch field-full">
+          <input type="checkbox" name="factura_pendiente" {% if cabecera.factura_pendiente %}checked{% endif %}>
+          <span>La factura aún no llega; guardar como pendiente de factura</span>
+        </label>
       </div>
     </section>
 
     <section class="card">
-      <header class="card-head"><h2>Mercadería</h2><span class="chip">Precios sin IGV</span></header>
-      <table class="tabla-doc" data-lineas-compra>
+      <header class="card-head">
+        <h2>Mercadería</h2>
+        <label class="switch">
+          <input type="checkbox" name="con_igv" id="id_con_igv" {% if con_igv %}checked{% endif %}>
+          <span>Los precios incluyen IGV</span>
+        </label>
+      </header>
+      <div class="tabla-scroll">
+      <table class="tabla-doc tabla-lineas" data-lineas-compra>
         <thead>
           <tr>
             <th>Producto</th>
+            <th>Descripción</th>
             <th class="der">Cantidad</th>
             <th class="der">Costo unitario</th>
             <th class="der">Base</th>
@@ -85,6 +98,7 @@
                 {% endfor %}
               </select>
             </td>
+            <td><input name="linea_descripcion" value="{{ fila.descripcion|default:'' }}" maxlength="200" placeholder="Descripción de la línea"></td>
             <td><input class="js-cantidad num der" name="linea_cantidad" value="{{ fila.cantidad|default:'' }}" inputmode="decimal"></td>
             <td><input class="js-precio num der" name="linea_precio" value="{{ fila.precio|default:'' }}" inputmode="decimal"></td>
             <td class="num der js-base">0,00</td>
@@ -93,6 +107,7 @@
           {% endfor %}
         </tbody>
       </table>
+      </div>
     </section>
 
     <section class="card">
@@ -131,8 +146,8 @@
         <p class="preview-note">El costo unitario final incluye los costos de internamiento.</p>
       </div>
 
-      <button class="btn btn-primary btn-block" type="submit">Guardar borrador</button>
-      <p class="preview-note">Después podrás revisarlo y confirmarlo.</p>
+      <button class="btn btn-primary btn-block" type="submit">{% if compra %}Guardar cambios{% else %}Guardar compra{% endif %}</button>
+      <p class="preview-note">{% if compra %}Los cambios se guardan en el borrador.{% else %}Queda como borrador o pendiente hasta que la confirmes.{% endif %}</p>
     </div>
   </aside>
 </form>

@@ -63,6 +63,9 @@
       <a class="nav-item {% if '/reportes/impuestos' in request.path %}is-active{% endif %}" href="{% url 'reportes:impuestos' %}">
         <svg class="icon"><use href="#i-reportes"></use></svg><span>Impuestos</span>
       </a>
+      <a class="nav-item {% if '/pendientes' in request.path %}is-active{% endif %}" href="{% url 'core:pendientes' %}">
+        <svg class="icon"><use href="#i-check"></use></svg><span>Pendientes</span>
+      </a>
 
       <p class="nav-title">Sistema</p>
       <a class="nav-item {% if '/periodos' in request.path %}is-active{% endif %}" href="{% url 'core:periodos' %}">

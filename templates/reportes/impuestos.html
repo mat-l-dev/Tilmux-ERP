@@ -19,9 +19,9 @@
     <span class="kpi-note">Base {{ compras_base|floatformat:2 }}</span>
   </article>
   <article class="kpi">
-    <span class="kpi-label">{% if igv_por_pagar < 0 %}IGV a favor{% else %}IGV por pagar{% endif %}</span>
-    <span class="kpi-value num">S/ {{ igv_por_pagar_abs|floatformat:2 }}</span>
-    <span class="kpi-note">Resultante del mes: S/ {{ igv_resultante_abs|floatformat:2 }}</span>
+    <span class="kpi-label">{% if c184 < 0 %}IGV a favor{% else %}IGV por pagar{% endif %}</span>
+    <span class="kpi-value num">S/ {{ c184_abs|floatformat:2 }}</span>
+    <span class="kpi-note">PDT 621 · Libro: S/ {{ igv_por_pagar_abs|floatformat:2 }}</span>
   </article>
   <article class="kpi">
     <span class="kpi-label">Renta RER del mes</span>
@@ -31,23 +31,45 @@
 </section>
 
 <section class="card">
-  <header class="card-head"><h2>Cómo se compone</h2></header>
-  <dl class="totales">
-    <div><dt>Ventas netas (base)</dt><dd class="num">{{ ventas_base|floatformat:2 }}</dd></div>
-    <div><dt>IGV de ventas</dt><dd class="num">{{ ventas_igv|floatformat:2 }}</dd></div>
-    <div><dt>Compras netas (base)</dt><dd class="num">{{ compras_base|floatformat:2 }}</dd></div>
-    <div><dt>IGV de compras</dt><dd class="num">{{ compras_igv|floatformat:2 }}</dd></div>
-    <div><dt>Saldo de IGV del mes anterior</dt><dd class="num">{{ igv_anterior|floatformat:2 }}</dd></div>
-    <div><dt>IGV del mes</dt><dd class="num">{{ igv|floatformat:2 }}</dd></div>
-    <div class="total"><dt>IGV resultante</dt><dd class="num">{{ igv_resultante|floatformat:2 }}</dd></div>
-    {% if igv_por_pagar != igv_resultante %}
-    <div><dt>IGV por pagar después de pagos</dt><dd class="num">{{ igv_por_pagar|floatformat:2 }}</dd></div>
-    {% endif %}
-  </dl>
+  <header class="card-head">
+    <h2>PDT 621 · IGV y Renta</h2>
+    {% if es_mes %}<span class="chip">{{ mes }}/{{ anio }}</span>{% endif %}
+  </header>
+
+  {% if es_mes %}
+  <table class="tabla-doc">
+    <thead>
+      <tr><th>Casilla</th><th>Concepto</th><th class="der">Importe</th></tr>
+    </thead>
+    <tbody>
+      <tr><td class="num">100</td><td>Ventas netas gravadas (base)</td><td class="num der">{{ ventas_base|floatformat:2 }}</td></tr>
+      <tr><td class="num">101</td><td>IGV de ventas</td><td class="num der">{{ ventas_igv|floatformat:2 }}</td></tr>
+      <tr><td class="num">102</td><td>Descuentos y devoluciones de ventas anteriores (base)</td><td class="num der">{{ descuentos_base|floatformat:2 }}</td></tr>
+      <tr><td class="num">103</td><td>IGV de descuentos anteriores</td><td class="num der">{{ descuentos_igv|floatformat:2 }}</td></tr>
+      <tr><td class="num">107</td><td>Compras netas gravadas (base)</td><td class="num der">{{ compras_base|floatformat:2 }}</td></tr>
+      <tr><td class="num">108</td><td>IGV de compras</td><td class="num der">{{ compras_igv|floatformat:2 }}</td></tr>
+      <tr><td class="num">120</td><td>Compras no gravadas</td><td class="num der">{{ no_gravado|floatformat:2 }}</td></tr>
+      <tr class="subtotal"><td class="num">140</td><td>IGV resultante (101 - 103 - 108)</td><td class="num der">{{ c140|floatformat:2 }}</td></tr>
+      <tr><td class="num">145</td><td>Saldo a favor del periodo anterior</td><td class="num der">{{ c145|floatformat:2 }}</td></tr>
+      <tr class="total"><td class="num">184</td><td>IGV a pagar o saldo a favor (140 - 145)</td><td class="num der">{{ c184|floatformat:2 }}</td></tr>
+      <tr><td colspan="3"><strong>Renta RER</strong></td></tr>
+      <tr><td class="num">301</td><td>Ingresos netos (base)</td><td class="num der">{{ c301|floatformat:2 }}</td></tr>
+      <tr><td class="num">312</td><td>Renta RER (1,5 %)</td><td class="num der">{{ c312|floatformat:2 }}</td></tr>
+      <tr><td class="num">303</td><td>Saldo a favor anterior de renta</td><td class="num der">{{ c303|floatformat:2 }}</td></tr>
+      <tr class="total"><td class="num">304</td><td>Renta a pagar (312 - 303)</td><td class="num der">{{ c304|floatformat:2 }}</td></tr>
+    </tbody>
+  </table>
   <p class="preview-note">
-    El saldo a favor se arrastra al mes siguiente; un saldo negativo es a favor.
-    La renta RER se calcula sobre ingresos netos, no sobre el resultado contable.
+    Solo suman las compras con RUC, serie y número. Las pendientes de factura o sin
+    comprobante no entran en 107/108. El 184 es lo que se declara; el 140 es antes
+    del saldo a favor anterior. Si el libro muestra otro IGV por pagar, revisa si
+    quedó una declaración anterior sin pagar.
   </p>
+  {% else %}
+  <p class="preview-note">
+    El PDT 621 es mensual. Elige un mes en el filtro para ver las casillas.
+  </p>
+  {% endif %}
 </section>
 
 <section class="card" style="margin-top:12px">

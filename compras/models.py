@@ -9,6 +9,7 @@ from django.db import models
 class Compra(models.Model):
     class Estado(models.TextChoices):
         BORRADOR = "BORRADOR", "Borrador"
+        PENDIENTE = "PENDIENTE", "Pendiente de factura"
         CONFIRMADA = "CONFIRMADA", "Confirmada"
         ANULADA = "ANULADA", "Anulada"
 
@@ -61,6 +62,14 @@ class Compra(models.Model):
     )
     creado = models.DateTimeField(auto_now_add=True)
     confirmado_en = models.DateTimeField(null=True, blank=True)
+    modificado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="compras_modificadas",
+    )
+    modificado_en = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         verbose_name = "compra"

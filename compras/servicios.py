@@ -38,8 +38,22 @@ def _cent(valor) -> Decimal:
 @transaction.atomic
 def confirmar(compra: Compra) -> Compra:
     compra = Compra.objects.select_for_update().get(pk=compra.pk)
+    if compra.estado == Compra.Estado.PENDIENTE:
+        raise CompraError(
+            "La compra está pendiente de factura: completa los datos y desmarca "
+            "la pendiente antes de confirmar."
+        )
     if compra.estado != Compra.Estado.BORRADOR:
         raise CompraError("Solo se confirma una compra en borrador.")
+    if compra.con_credito:
+        if not compra.serie.strip() or not compra.numero.strip():
+            raise CompraError(
+                "Completa la serie y el número del comprobante antes de confirmar."
+            )
+        if len(compra.proveedor.numero_doc) != 11:
+            raise CompraError(
+                "Una compra con crédito fiscal exige el RUC de 11 dígitos del proveedor."
+            )
 
     lineas = list(compra.lineas.select_related("producto", "producto__unidad"))
     if not lineas:

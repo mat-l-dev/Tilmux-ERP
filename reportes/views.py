@@ -34,7 +34,7 @@ from core.permisos import requiere_escritura
 from inventario.models import CapaFIFO, MovimientoStock
 from ventas.models import NotaCredito, NotaDebito, Venta
 
-from .casillas import TASA_RENTA_RER, calcular
+from .casillas import calcular
 from .sire import ArchivoInvalido, leer_filas, sumar
 from .utils import rango
 
@@ -55,6 +55,16 @@ def _es_mes(desde: date, hasta: date) -> bool:
         and desde.day == 1
         and hasta.day == calendar.monthrange(hasta.year, hasta.month)[1]
     )
+
+
+def _meses_del_rango(desde: date, hasta: date):
+    anio, mes = desde.year, desde.month
+    while (anio, mes) <= (hasta.year, hasta.month):
+        yield anio, mes
+        mes += 1
+        if mes > 12:
+            mes = 1
+            anio += 1
 
 
 @login_required
@@ -224,7 +234,14 @@ def registro_compras(request):
             estado=Compra.Estado.CONFIRMADA,
             fecha__range=(desde, hasta),
         ).select_related("proveedor"):
-            usa_credito = compra.con_credito
+            usa_credito = (
+                compra.con_credito
+                and compra.estado == Compra.Estado.CONFIRMADA
+                and bool(compra.serie.strip())
+                and bool(compra.numero.strip())
+                and len(compra.proveedor.numero_doc) == 11
+            )
+            pendiente = compra.estado != Compra.Estado.CONFIRMADA or not usa_credito
             filas.append(
                 {
                     "fecha": compra.fecha,
@@ -237,13 +254,20 @@ def registro_compras(request):
                     "igv": compra.igv if usa_credito and compra.igv > 0 else 0,
                     "total": compra.total,
                     "credito": usa_credito,
+                    "pendiente": pendiente,
                     "clase": "Mercadería",
                 }
             )
         for gasto in Gasto.objects.filter(
             empresa=empresa, fecha__range=(desde, hasta)
         ).select_related("proveedor"):
-            usa_credito = gasto.con_credito and gasto.tipo_doc != "OTRO"
+            usa_credito = (
+                gasto.con_credito
+                and gasto.tipo_doc != "OTRO"
+                and bool(gasto.serie.strip())
+                and bool(gasto.numero.strip())
+                and len(gasto.proveedor.numero_doc) == 11
+            )
             filas.append(
                 {
                     "fecha": gasto.fecha,
@@ -287,50 +311,34 @@ def registro_compras(request):
 def impuestos(request):
     empresa = empresa_actual(request)
     desde, hasta = rango(request)
-    ventas_base = ventas_igv = compras_base = compras_igv = Decimal("0")
-
+    totales = {
+        "ventas_base": Decimal("0"),
+        "ventas_igv": Decimal("0"),
+        "descuentos_base": Decimal("0"),
+        "descuentos_igv": Decimal("0"),
+        "compras_base": Decimal("0"),
+        "compras_igv": Decimal("0"),
+        "no_gravado": Decimal("0"),
+        "base_renta": Decimal("0"),
+        "renta": Decimal("0"),
+        "resultado": Decimal("0"),
+    }
     if empresa:
-        ventas = Venta.objects.filter(
-            empresa=empresa, estado=Venta.Estado.CONFIRMADA, fecha__range=(desde, hasta)
-        )
-        ventas_base = ventas.aggregate(s=Sum("subtotal"))["s"] or Decimal("0")
-        ventas_igv = ventas.aggregate(s=Sum("igv"))["s"] or Decimal("0")
+        for anio, mes in _meses_del_rango(desde, hasta):
+            parte = calcular(empresa, anio, mes)
+            for clave in totales:
+                totales[clave] += parte[clave]
 
-        # Las notas ajustan el débito fiscal del periodo.
-        creditos = NotaCredito.objects.filter(
-            venta__empresa=empresa, fecha__range=(desde, hasta)
-        ).aggregate(b=Sum("base"), i=Sum("igv"))
-        ventas_base -= creditos["b"] or Decimal("0")
-        ventas_igv -= creditos["i"] or Decimal("0")
-
-        debitos = NotaDebito.objects.filter(
-            venta__empresa=empresa, fecha__range=(desde, hasta)
-        ).aggregate(b=Sum("base"), i=Sum("igv"))
-        ventas_base += debitos["b"] or Decimal("0")
-        ventas_igv += debitos["i"] or Decimal("0")
-
-        compras = Compra.objects.filter(
-            empresa=empresa,
-            estado=Compra.Estado.CONFIRMADA,
-            fecha__range=(desde, hasta),
-            con_credito=True,
-        )
-        compras_gravadas = compras.filter(igv__gt=0)
-        compras_base = compras_gravadas.aggregate(s=Sum("subtotal"))["s"] or Decimal("0")
-        compras_igv = compras_gravadas.aggregate(s=Sum("igv"))["s"] or Decimal("0")
-
-        # Solo los gastos con comprobante que otorga crédito fiscal (facturas).
-        gastos = Gasto.objects.filter(
-            empresa=empresa,
-            fecha__range=(desde, hasta),
-            con_credito=True,
-            igv__gt=0,
-        ).exclude(tipo_doc="OTRO")
-        compras_base += gastos.aggregate(s=Sum("base"))["s"] or Decimal("0")
-        compras_igv += gastos.aggregate(s=Sum("igv"))["s"] or Decimal("0")
-
-    igv = ventas_igv - compras_igv
-    renta = (ventas_base * TASA_RENTA_RER).quantize(Decimal("0.01"))
+    ventas_base = totales["ventas_base"]
+    ventas_igv = totales["ventas_igv"]
+    descuentos_base = totales["descuentos_base"]
+    descuentos_igv = totales["descuentos_igv"]
+    compras_base = totales["compras_base"]
+    compras_igv = totales["compras_igv"]
+    no_gravado = totales["no_gravado"]
+    base_renta = totales["base_renta"]
+    igv = totales["resultado"]
+    renta = totales["renta"]
 
     es_mes = _es_mes(desde, hasta)
     igv_anterior = Decimal("0")
@@ -346,6 +354,8 @@ def impuestos(request):
             asiento = asiento_renta(empresa, desde.year, desde.month)
             monto_asentado = monto_renta_asentada(asiento)
     igv_resultante = igv_anterior + igv
+    c145 = max(-igv_anterior, Decimal("0"))
+    c184 = igv - c145
     puede_asentar = bool(empresa and es_mes and renta > 0 and asiento is None)
 
     contexto = {
@@ -356,14 +366,25 @@ def impuestos(request):
         "es_mes": es_mes,
         "ventas_base": ventas_base,
         "ventas_igv": ventas_igv,
+        "descuentos_base": descuentos_base,
+        "descuentos_igv": descuentos_igv,
         "compras_base": compras_base,
         "compras_igv": compras_igv,
+        "no_gravado": no_gravado,
         "igv": igv,
         "igv_anterior": igv_anterior,
         "igv_resultante": igv_resultante,
         "igv_resultante_abs": abs(igv_resultante),
         "igv_por_pagar": igv_por_pagar,
         "igv_por_pagar_abs": abs(igv_por_pagar),
+        "c140": igv,
+        "c145": c145,
+        "c184": c184,
+        "c184_abs": abs(c184),
+        "c301": base_renta,
+        "c312": renta,
+        "c303": Decimal("0"),
+        "c304": renta,
         "renta": renta,
         "ir_por_pagar": ir_por_pagar,
         "asiento": asiento,

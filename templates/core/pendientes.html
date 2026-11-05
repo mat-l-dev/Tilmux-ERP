@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block titulo %}Pendientes{% endblock %}
+{% block titulo_pagina %}Comprobantes por completar{% endblock %}
+
+{% block contenido %}
+<section class="card">
+  <header class="card-head">
+    <h2>Pendientes</h2>
+    <span class="chip">{{ items|length }} comprobante{{ items|length|pluralize }}</span>
+  </header>
+
+  {% if items %}
+  <div class="tabla-scroll">
+  <table class="tabla-doc">
+    <thead>
+      <tr>
+        <th>Tipo</th>
+        <th>Documento</th>
+        <th>Tercero</th>
+        <th>Qué falta</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for i in items %}
+      <tr>
+        <td>{{ i.tipo }}</td>
+        <td>{{ i.etiqueta }}</td>
+        <td>{{ i.tercero }}</td>
+        <td><span class="chip chip-warn">{{ i.faltantes }}</span></td>
+        <td class="accion"><a class="btn btn-ghost" href="{{ i.url }}">Completar</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <p class="preview-note">
+    Un comprobante en borrador no mueve stock ni contabilidad. Una compra
+    pendiente de factura se registra, pero no entra al PDT 621 hasta completar
+    RUC, serie y número.
+  </p>
+  {% else %}
+  <p class="muted">Todo completo: no hay comprobantes pendientes.</p>
+  {% endif %}
+</section>
+{% endblock %}

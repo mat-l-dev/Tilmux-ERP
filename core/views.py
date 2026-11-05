@@ -11,6 +11,7 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Sum
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from compras.models import Compra
@@ -42,6 +43,69 @@ def soles(valor) -> str:
     numero = Decimal(valor or 0).quantize(Decimal("0.01"))
     texto = f"{numero:,.2f}"
     return texto.replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def _pendientes(empresa) -> list[dict]:
+    """Comprobantes que necesitan datos o confirmación."""
+    if empresa is None:
+        return []
+
+    items = []
+    compras = (
+        Compra.objects.filter(empresa=empresa)
+        .exclude(estado=Compra.Estado.ANULADA)
+        .select_related("proveedor")
+        .prefetch_related("lineas")
+    )
+    for compra in compras:
+        faltantes = []
+        if compra.estado == Compra.Estado.PENDIENTE:
+            faltantes.append("factura pendiente")
+        if compra.estado == Compra.Estado.BORRADOR:
+            faltantes.append("borrador sin confirmar")
+        if not compra.serie.strip():
+            faltantes.append("serie")
+        if not compra.numero.strip():
+            faltantes.append("número")
+        if len(compra.proveedor.numero_doc) != 11:
+            faltantes.append("RUC")
+        if not compra.lineas.exists():
+            faltantes.append("líneas")
+        if faltantes:
+            if compra.estado == Compra.Estado.CONFIRMADA:
+                url = reverse("compras:corregir", args=[compra.pk])
+            else:
+                url = f"{reverse('compras:nueva')}?editar={compra.pk}"
+            items.append(
+                {
+                    "tipo": "Compra",
+                    "documento": compra,
+                    "etiqueta": (
+                        f"{compra.serie}-{compra.numero}".strip(" -")
+                        or f"Compra #{compra.pk}"
+                    ),
+                    "tercero": compra.proveedor.nombre,
+                    "faltantes": ", ".join(faltantes),
+                    "url": url,
+                }
+            )
+
+    for venta in Venta.objects.filter(
+        empresa=empresa, estado=Venta.Estado.BORRADOR
+    ).select_related("cliente"):
+        items.append(
+            {
+                "tipo": "Venta",
+                "documento": venta,
+                "etiqueta": f"{venta.serie}-{venta.numero}".strip(" -")
+                or f"Venta #{venta.pk}",
+                "tercero": venta.cliente_nombre
+                or (venta.cliente.nombre if venta.cliente else "Consumidor final"),
+                "faltantes": "borrador sin confirmar",
+                "url": f"{reverse('ventas:nueva')}?editar={venta.pk}",
+            }
+        )
+    return items
 
 
 @login_required
@@ -187,8 +251,17 @@ def panel(request: HttpRequest) -> HttpResponse:
         "ventas_anterior": soles(ventas_anterior),
         "variacion": variacion,
         "anio_anterior": anio - 1,
+        "pendientes_count": len(_pendientes(empresa)),
     }
     return render(request, "core/panel.html", contexto)
+
+
+@login_required
+def pendientes(request: HttpRequest) -> HttpResponse:
+    empresa = empresa_actual(request)
+    return render(
+        request, "core/pendientes.html", {"items": _pendientes(empresa)}
+    )
 
 
 @login_required

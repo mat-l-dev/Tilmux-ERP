@@ -1185,3 +1185,23 @@ select {
   opacity: 0.45;
   cursor: not-allowed;
 }
+
+/* Tabla de líneas de compra/venta: columnas legibles */
+.tabla-lineas {
+  min-width: 980px;
+}
+
+.tabla-lineas th:nth-child(1) {
+  width: 220px;
+}
+
+.tabla-lineas th:nth-child(2) {
+  width: 200px;
+}
+
+/* En los formularios, las líneas deben verse como campos, no como texto */
+.doc .tabla-doc input,
+.doc .tabla-doc select {
+  border-color: var(--line);
+  background: var(--surface);
+}

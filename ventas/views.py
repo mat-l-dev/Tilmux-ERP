@@ -10,6 +10,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Q, Sum
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from catalogo.models import CuentaTesoreria, Producto, Serie, Tercero
@@ -17,7 +18,9 @@ from contabilidad.calculos import calcular_linea
 from contabilidad.models import Asiento
 from core.context import empresa_actual
 from core.contexto import usuario_actual
+from core.models import HistorialDocumento
 from core.permisos import requiere_escritura
+from reportes.casillas import casillas_documento
 
 from .forms import CabeceraVentaForm
 from .models import NotaCredito, NotaCreditoLinea, NotaDebito, Venta, VentaLinea
@@ -41,6 +44,7 @@ def _leer_filas(post) -> tuple[list[dict], list[str]]:
     productos = post.getlist("linea_producto")
     cantidades = post.getlist("linea_cantidad")
     precios = post.getlist("linea_precio")
+    descripciones = post.getlist("linea_descripcion")
     con_igv = bool(post.get("con_igv"))
 
     filas: list[dict] = []
@@ -55,6 +59,9 @@ def _leer_filas(post) -> tuple[list[dict], list[str]]:
             "producto_id": producto_id,
             "cantidad": cantidad_txt,
             "precio": precio_txt,
+            "descripcion": (
+                descripciones[indice - 1] if indice <= len(descripciones) else ""
+            ),
         }
         try:
             producto = Producto.objects.get(pk=int(producto_id))
@@ -89,6 +96,24 @@ def _leer_filas(post) -> tuple[list[dict], list[str]]:
     if not filas:
         errores.append("Agrega al menos una línea.")
     return filas, errores
+
+
+def _filas_desde_venta(venta: Venta) -> list[dict]:
+    filas = []
+    for linea in venta.lineas.all():
+        precio = (
+            (linea.total / linea.cantidad) if linea.cantidad else linea.precio_unitario
+        )
+        filas.append(
+            {
+                "producto_id": linea.producto_id,
+                "seleccionado": linea.producto_id,
+                "cantidad": linea.cantidad,
+                "precio": precio,
+                "descripcion": linea.descripcion,
+            }
+        )
+    return filas or _filas_vacias()
 
 
 @login_required
@@ -143,12 +168,21 @@ def nueva(request):
     cuentas = list(CuentaTesoreria.objects.filter(empresa=empresa, activa=True))
     hoy = date.today()
 
+    venta_edit = None
+    editar_id = request.GET.get("editar") or request.POST.get("venta_id")
+    if editar_id:
+        venta_edit = get_object_or_404(Venta, pk=editar_id, empresa=empresa)
+        if venta_edit.estado != Venta.Estado.BORRADOR:
+            messages.error(request, "Solo se puede editar una venta en borrador.")
+            return redirect("ventas:detalle", venta_edit.pk)
+
     contexto = {
         "productos": productos,
         "cuentas": cuentas,
         "hoy": hoy,
         "con_igv": True,
         "filas": _filas_vacias(),
+        "venta": venta_edit,
         "cabecera": {
             "tipo_doc": "BOLETA",
             "serie": "B001",
@@ -162,6 +196,23 @@ def nueva(request):
             "glosa": "",
         },
     }
+
+    if venta_edit is not None:
+        contexto["filas"] = _filas_desde_venta(venta_edit)
+        contexto["cabecera"] = {
+            "tipo_doc": venta_edit.tipo_doc,
+            "serie": venta_edit.serie,
+            "numero": venta_edit.numero,
+            "condicion": venta_edit.condicion,
+            "fecha": venta_edit.fecha.isoformat(),
+            "cuenta": venta_edit.cuenta_id or "",
+            "canal": venta_edit.canal,
+            "cliente_nombre": venta_edit.cliente_nombre,
+            "cliente_doc": (
+                venta_edit.cliente.numero_doc if venta_edit.cliente else ""
+            ),
+            "glosa": venta_edit.glosa,
+        }
 
     if request.method != "POST":
         return render(request, "ventas/nueva.html", contexto)
@@ -209,27 +260,34 @@ def nueva(request):
             },
         )
 
-    venta = Venta.objects.create(
-        empresa=empresa,
-        cliente=cliente,
-        cliente_nombre=(
-            datos.get("cliente_nombre") or (cliente.nombre if cliente else "")
-        )[:200],
-        fecha=datos["fecha"],
-        tipo_doc=datos["tipo_doc"],
-        serie=datos["serie"].upper()[:4],
-        numero=datos["numero"][:20],
-        condicion=datos["condicion"],
-        cuenta=datos.get("cuenta"),
-        canal=datos.get("canal") or "TRANSFERENCIA",
-        glosa=datos.get("glosa", "")[:255],
-        creado_por=usuario_actual.get(),
-    )
+    if venta_edit is None:
+        venta = Venta(empresa=empresa, creado_por=usuario_actual.get())
+    else:
+        venta = venta_edit
+        venta.lineas.all().delete()
+
+    venta.cliente = cliente
+    venta.cliente_nombre = (
+        datos.get("cliente_nombre") or (cliente.nombre if cliente else "")
+    )[:200]
+    venta.fecha = datos["fecha"]
+    venta.tipo_doc = datos["tipo_doc"]
+    venta.serie = datos["serie"].upper()[:4]
+    venta.numero = datos["numero"][:20]
+    venta.condicion = datos["condicion"]
+    venta.cuenta = datos.get("cuenta")
+    venta.canal = datos.get("canal") or "TRANSFERENCIA"
+    venta.glosa = datos.get("glosa", "")[:255]
+    venta.modificado_por = usuario_actual.get()
+    venta.modificado_en = timezone.now()
+    venta.save()
+
     for orden, fila in enumerate(filas, start=1):
         VentaLinea.objects.create(
             venta=venta,
             orden=orden,
             producto=fila["producto"],
+            descripcion=fila.get("descripcion", "")[:200],
             cantidad=fila["cantidad"],
             precio_unitario=fila["precio"],
             base=fila["base"],
@@ -240,7 +298,19 @@ def nueva(request):
     venta.igv = sum((f["igv"] for f in filas), Decimal("0"))
     venta.total = venta.subtotal + venta.igv
     venta.save(update_fields=["subtotal", "igv", "total"])
-    messages.success(request, "Borrador creado. Revísalo y confírmalo.")
+
+    HistorialDocumento.objects.create(
+        empresa=empresa,
+        tipo="VENTA",
+        documento_id=venta.pk,
+        usuario=usuario_actual.get(),
+        accion="EDICION" if venta_edit else "CREACION",
+        detalle=f"{venta.serie}-{venta.numero} · total {venta.total}",
+    )
+    messages.success(
+        request,
+        "Venta actualizada." if venta_edit else "Borrador creado. Revísalo y confírmalo.",
+    )
     return redirect("ventas:detalle", venta.pk)
 
 
@@ -344,10 +414,19 @@ def nota_debito(request, pk: int):
 def detalle(request, pk: int):
     venta = get_object_or_404(Venta, pk=pk)
     asiento = Asiento.objects.filter(
-        origen_tipo="VENTA", origen_id=venta.pk
+        origen_tipo="VENTA", origen_id=venta.pk, tipo_operacion="VENTA"
     ).first()
     return render(
-        request, "ventas/detalle.html", {"venta": venta, "asiento": asiento}
+        request,
+        "ventas/detalle.html",
+        {
+            "venta": venta,
+            "asiento": asiento,
+            "casillas_621": casillas_documento(venta),
+            "historial": HistorialDocumento.objects.filter(
+                empresa=venta.empresa, tipo="VENTA", documento_id=venta.pk
+            ).order_by("-fecha")[:10],
+        },
     )
 
 

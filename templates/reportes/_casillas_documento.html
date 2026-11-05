@@ -1,0 +1,29 @@
+<section class="card">
+  <header class="card-head">
+    <h2>PDT 621</h2>
+    <span class="chip">Lo que aporta este comprobante</span>
+  </header>
+
+  {% if casillas_621 %}
+  <table class="tabla-doc">
+    <thead>
+      <tr><th>Casilla</th><th>Concepto</th><th class="der">Importe</th></tr>
+    </thead>
+    <tbody>
+      {% for c in casillas_621 %}
+      <tr>
+        <td class="num">{{ c.casilla }}</td>
+        <td>{{ c.concepto }}</td>
+        <td class="num der">{% if c.importe is None %}—{% else %}{{ c.importe|floatformat:2 }}{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="preview-note">
+    Las compras sin RUC, serie o número no suman en 107/108. Una boleta de compra
+    no otorga crédito fiscal.
+  </p>
+  {% else %}
+  <p class="muted">No afecta al PDT 621.</p>
+  {% endif %}
+</section>

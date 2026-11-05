@@ -1,0 +1,23 @@
+{% if historial %}
+<section class="card">
+  <header class="card-head">
+    <h2>Historial</h2>
+    <span class="chip">Cambios y acciones</span>
+  </header>
+  <table class="tabla-doc">
+    <thead>
+      <tr><th>Fecha</th><th>Acción</th><th>Detalle</th><th>Usuario</th></tr>
+    </thead>
+    <tbody>
+      {% for h in historial %}
+      <tr>
+        <td>{{ h.fecha|date:"d/m/Y H:i" }}</td>
+        <td>{{ h.accion }}</td>
+        <td class="muted">{{ h.detalle }}</td>
+        <td>{{ h.usuario|default:"—" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}

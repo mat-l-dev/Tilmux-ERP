@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 
-{% block titulo %}Nueva venta{% endblock %}
-{% block titulo_pagina %}Nueva venta{% endblock %}
+{% block titulo %}{% if venta %}Editar venta{% else %}Nueva venta{% endif %}{% endblock %}
+{% block titulo_pagina %}{% if venta %}Editar venta{% else %}Nueva venta{% endif %}{% endblock %}
 
 {% block contenido %}
 <form method="post" class="doc">
   {% csrf_token %}
+  {% if venta %}<input type="hidden" name="venta_id" value="{{ venta.pk }}">{% endif %}
 
   <div class="doc-main">
     {% if errores %}
@@ -86,10 +87,12 @@
         </label>
       </header>
 
-      <table class="tabla-doc" data-lineas>
+      <div class="tabla-scroll">
+      <table class="tabla-doc tabla-lineas" data-lineas>
         <thead>
           <tr>
             <th>Producto</th>
+            <th>Descripción</th>
             <th class="der">Cantidad</th>
             <th class="der">Precio</th>
             <th class="der">Base</th>
@@ -109,6 +112,7 @@
                 {% endfor %}
               </select>
             </td>
+            <td><input name="linea_descripcion" value="{{ fila.descripcion|default:'' }}" maxlength="200" placeholder="Descripción de la línea"></td>
             <td><input class="js-cantidad num der" name="linea_cantidad" value="{{ fila.cantidad|default:'' }}" inputmode="decimal"></td>
             <td><input class="js-precio num der" name="linea_precio" value="{{ fila.precio|default:'' }}" inputmode="decimal"></td>
             <td class="num der js-base">{{ fila.base|default:"0,00" }}</td>
@@ -119,6 +123,7 @@
           {% endfor %}
         </tbody>
       </table>
+      </div>
 
       <div class="doc-actions">
         <button type="button" class="btn btn-ghost" data-agregar-linea>+ Agregar línea</button>
@@ -143,7 +148,7 @@
         <p class="preview-note">El costo de venta se calcula al confirmar, con la capa más antigua.</p>
       </div>
 
-      <button class="btn btn-primary btn-block" type="submit">Guardar borrador</button>
+      <button class="btn btn-primary btn-block" type="submit">{% if venta %}Guardar cambios{% else %}Guardar borrador{% endif %}</button>
       <p class="preview-note">Después podrás revisarlo y confirmarlo.</p>
     </div>
   </aside>

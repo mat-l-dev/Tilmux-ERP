@@ -79,6 +79,16 @@
         <span>{{ periodos_abiertos }} periodos abiertos</span>
       </li>
       <li>
+        <svg class="icon {% if pendientes_count %}muted{% else %}ok{% endif %}"><use href="#i-reloj"></use></svg>
+        <span>
+          {% if pendientes_count %}
+          <a href="{% url 'core:pendientes' %}">{{ pendientes_count }} comprobante{{ pendientes_count|pluralize }} por completar</a>
+          {% else %}
+          Sin comprobantes pendientes
+          {% endif %}
+        </span>
+      </li>
+      <li>
         <svg class="icon muted"><use href="#i-reloj"></use></svg>
         <span>Respaldo diario programado</span>
       </li>

@@ -48,7 +48,7 @@
         <td><a href="{% url 'compras:detalle' c.pk %}">{{ c.serie }}-{{ c.numero }}</a></td>
         <td>{{ c.proveedor.nombre }}</td>
         <td class="num der">{{ c.total }}</td>
-        <td><span class="chip {% if c.estado == 'CONFIRMADA' %}chip-ok{% endif %}">{{ c.get_estado_display }}</span></td>
+        <td><span class="chip {% if c.estado == 'CONFIRMADA' %}chip-ok{% elif c.estado == 'PENDIENTE' %}chip-warn{% endif %}">{{ c.get_estado_display }}</span></td>
       </tr>
       {% endfor %}
     </tbody>

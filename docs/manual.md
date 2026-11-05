@@ -40,16 +40,40 @@ unidades, series y cuentas de tesorería. Las cuentas contables ya están cargad
 ## Compras
 
 **Compras → Nueva compra.** Escribes la factura del proveedor, agregas las líneas
-y, si hubo flete o aduana, los costos de internamiento. Se prorratean por valor y
-el costo unitario final los incluye.
+(con su descripción) y, si hubo flete o aduana, los costos de internamiento. Se
+prorratean por valor y el costo unitario final los incluye.
 
-Al confirmar: se crean las capas de stock y el asiento por pagar.
+Si no sabes si el precio incluye IGV, usa el interruptor **Los precios incluyen
+IGV**; el sistema separa base e impuesto.
+
+Si la factura todavía no llega, marca **La factura aún no llega; guardar como
+pendiente de factura**. La compra queda en estado **Pendiente**, no mueve stock
+ni contabilidad y aparece en **Pendientes** hasta que completes RUC, serie y
+número. Mientras esté pendiente no entra al PDT 621.
+
+**Editar.** Mientras la compra esté en borrador o pendiente, el detalle tiene
+**Editar**: puedes cambiar cabecera, descripciones, cantidades, precios y costos.
+
+Al confirmar: se crean las capas de stock y el asiento por pagar. Una compra con
+crédito fiscal no se confirma sin RUC, serie y número.
+
+**Corregir datos.** En una compra confirmada puedes completar serie, número,
+tipo, glosa y descripciones desde **Corregir datos**. Los importes, la fecha y el
+RUC no se editan en una compra confirmada: si están mal, usa una nota de crédito
+del proveedor o **Anular compra** (solo si no tiene pagos ni stock consumido).
 
 **Compras → Importar XML.** Subes el XML de SUNAT y el sistema extrae RUC, serie,
 número, base, IGV y total. Confirma como gasto o como mercadería.
 
 Regla: una **factura** separa base e IGV; una **boleta** no otorga crédito y su
 IGV forma parte del costo.
+
+## Pendientes
+
+En **Pendientes** (y en el panel) aparecen los comprobantes que necesitan algo:
+borradores sin confirmar, compras pendientes de factura y compras confirmadas a
+las que les falta RUC, serie o número. Cada fila tiene **Completar** y lleva al
+formulario que corresponde.
 
 ## Pagar una compra
 
@@ -104,11 +128,36 @@ Cada nota modifica un solo comprobante y usa los catálogos 09 y 10 de SUNAT.
 
 ## Impuestos
 
-**IGV y RER.** El reporte calcula el IGV del mes y la renta del 1,5 %. La
-tarjeta **IGV por pagar** muestra el saldo real de la cuenta 40111: incluye el
-crédito o saldo a favor del mes anterior. La tarjeta **Renta RER por pagar**
-muestra el saldo de la 40171, es decir, la renta de meses anteriores que aún no
-se paga.
+**IGV y RER.** El reporte calcula el IGV del mes y la renta del 1,5 %. En el
+panel, **IGV por pagar** muestra el saldo real de la cuenta 40111. En
+**Impuestos**, el KPI y la tabla **PDT 621** muestran lo que se declara: el 140
+es el IGV del mes, el 145 el saldo a favor anterior y el 184 lo que resulta
+(140 - 145). Si el libro y el 621 no coinciden, revisa si quedó una declaración
+anterior sin pagar.
+
+La tarjeta **Renta RER por pagar** muestra el saldo de la 40171, es decir, la
+renta de meses anteriores que aún no se paga.
+
+### PDT 621
+
+La tabla del reporte **IGV y RER** sigue las casillas del formulario:
+
+| Casilla | Qué es |
+|---|---|
+| 100 / 101 | Ventas netas gravadas y su IGV |
+| 102 / 103 | Descuentos y devoluciones de ventas de periodos anteriores |
+| 107 / 108 | Compras netas gravadas y su IGV |
+| 120 | Compras no gravadas |
+| 140 | IGV resultante |
+| 145 | Saldo a favor del periodo anterior |
+| 184 | IGV a pagar o saldo a favor |
+| 301 / 312 | Ingresos netos y renta RER (1,5 %) |
+| 303 / 304 | Saldo a favor anterior y renta a pagar |
+
+En el detalle de cada compra o venta hay una tarjeta **PDT 621** con las casillas
+que aporta ese comprobante. Una compra sin RUC, serie o número no suma en
+107/108. Una boleta de compra no otorga crédito. Una compra pendiente de factura
+no entra al 621 hasta completarse.
 
 Cuando hay renta y todavía no está asentada, el botón **Asentar renta de
 MM/AAAA** crea el asiento 881 contra 40171. Al cerrar el mes se hace solo. Para

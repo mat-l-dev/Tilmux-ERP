@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block titulo %}Corregir compra{% endblock %}
+{% block titulo_pagina %}Corregir datos de la compra{% endblock %}
+
+{% block contenido %}
+<form method="post">
+  {% csrf_token %}
+
+  <section class="card">
+    <header class="card-head">
+      <h2>Datos de la factura</h2>
+      <span class="chip chip-ok">Compra confirmada</span>
+    </header>
+
+    <div class="grid-fields">
+      <label class="field">
+        <span>Serie</span>
+        <input type="text" name="serie" value="{{ compra.serie }}" maxlength="4" {% if compra.serie %}readonly{% endif %}>
+      </label>
+      <label class="field">
+        <span>Número</span>
+        <input type="text" name="numero" value="{{ compra.numero }}" maxlength="20" {% if compra.numero %}readonly{% endif %}>
+      </label>
+      <label class="field">
+        <span>Tipo</span>
+        <select name="tipo_doc">
+          <option value="FACTURA" {% if compra.tipo_doc == "FACTURA" %}selected{% endif %}>Factura</option>
+          <option value="BOLETA" {% if compra.tipo_doc == "BOLETA" %}selected{% endif %}>Boleta</option>
+          <option value="OTRO" {% if compra.tipo_doc == "OTRO" %}selected{% endif %}>Otro documento</option>
+        </select>
+      </label>
+      <label class="field field-full">
+        <span>Glosa</span>
+        <input type="text" name="glosa" value="{{ compra.glosa }}" maxlength="255">
+      </label>
+    </div>
+
+    <table class="tabla-doc" style="margin-top:14px">
+      <thead>
+        <tr><th>Producto</th><th>Descripción de la línea</th></tr>
+      </thead>
+      <tbody>
+        {% for l in compra.lineas.all %}
+        <tr>
+          <td>{{ l.producto.sku }} · {{ l.producto.nombre }}</td>
+          <td><input type="text" name="desc_{{ l.pk }}" value="{{ l.descripcion }}" maxlength="200"></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <p class="preview-note">
+      Aquí solo se completan serie, número, glosa y descripciones. Los importes,
+      la fecha y el RUC no se cambian en una compra confirmada: si están mal,
+      usa una nota de crédito del proveedor o anula la compra si aún no tiene
+      pagos ni stock consumido.
+    </p>
+
+    <div class="acciones-head" style="justify-content:flex-end">
+      <a class="btn btn-ghost" href="{% url 'compras:detalle' compra.pk %}">Volver</a>
+      <button class="btn btn-primary" type="submit">Guardar datos</button>
+    </div>
+  </section>
+</form>
+{% endblock %}

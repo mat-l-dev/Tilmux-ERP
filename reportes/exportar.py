@@ -41,6 +41,8 @@ CAMPOS_VENTAS = [
     "moneda",
 ]
 
+TIPO_SUNAT_COMPRA = {"FACTURA": "01", "BOLETA": "03", "OTRO": "00"}
+
 CAMPOS_COMPRAS = [
     "periodo",
     "fecha",
@@ -55,6 +57,7 @@ CAMPOS_COMPRAS = [
     "total",
     "clase",
     "credito",
+    "pendiente",
 ]
 
 
@@ -168,32 +171,45 @@ def compras(request):
             estado=Compra.Estado.CONFIRMADA,
             fecha__range=(desde, hasta),
         ).select_related("proveedor").order_by("fecha", "serie", "numero"):
+            usa_credito = (
+                compra.con_credito
+                and bool(compra.serie.strip())
+                and bool(compra.numero.strip())
+                and len(compra.proveedor.numero_doc) == 11
+            )
             filas.append(
                 [
                     _periodo(compra.fecha),
                     compra.fecha.isoformat(),
-                    "01" if compra.tipo_doc == "FACTURA" else "03",
+                    TIPO_SUNAT_COMPRA.get(compra.tipo_doc, "00"),
                     compra.serie,
                     compra.numero,
                     compra.proveedor.numero_doc,
                     compra.proveedor.nombre,
-                    _importe(compra.subtotal if compra.con_credito else 0),
-                    _importe(compra.igv if compra.con_credito else 0),
+                    _importe(compra.subtotal if usa_credito else 0),
+                    _importe(compra.igv if usa_credito else 0),
                     _importe(
                         compra.subtotal
-                        if compra.con_credito and compra.igv == 0
+                        if usa_credito and compra.igv == 0
                         else 0
                     ),
                     _importe(compra.total),
                     "Mercadería",
-                    "Sí" if compra.con_credito else "No",
+                    "Sí" if usa_credito else "No",
+                    "Sí" if not usa_credito else "No",
                 ]
             )
 
         for gasto in Gasto.objects.filter(
             empresa=empresa, fecha__range=(desde, hasta)
         ).select_related("proveedor").order_by("fecha", "serie", "numero"):
-            usa_credito = gasto.con_credito and gasto.tipo_doc != "OTRO"
+            usa_credito = (
+                gasto.con_credito
+                and gasto.tipo_doc != "OTRO"
+                and bool(gasto.serie.strip())
+                and bool(gasto.numero.strip())
+                and len(gasto.proveedor.numero_doc) == 11
+            )
             filas.append(
                 [
                     _periodo(gasto.fecha),
@@ -209,6 +225,7 @@ def compras(request):
                     _importe(gasto.total),
                     "Gasto",
                     "Sí" if usa_credito else "No",
+                    "No",
                 ]
             )
 

@@ -127,3 +127,35 @@ class Perfil(models.Model):
 
     def __str__(self) -> str:
         return f"{self.usuario.username} · {self.get_rol_display()}"
+
+class HistorialDocumento(models.Model):
+    """Rastro de cambios y acciones sobre compras y ventas."""
+
+    class Tipo(models.TextChoices):
+        COMPRA = "COMPRA", "Compra"
+        VENTA = "VENTA", "Venta"
+
+    empresa = models.ForeignKey(
+        Empresa, on_delete=models.CASCADE, related_name="historial"
+    )
+    tipo = models.CharField(max_length=10, choices=Tipo.choices)
+    documento_id = models.PositiveIntegerField()
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="historial_documentos",
+    )
+    fecha = models.DateTimeField(auto_now_add=True)
+    accion = models.CharField(max_length=20, default="EDICION")
+    detalle = models.TextField(blank=True)
+
+    class Meta:
+        verbose_name = "historial de documento"
+        verbose_name_plural = "historial de documentos"
+        ordering = ["-fecha", "-id"]
+        indexes = [models.Index(fields=["empresa", "tipo", "documento_id"])]
+
+    def __str__(self) -> str:
+        return f"{self.tipo} {self.documento_id} · {self.accion}"

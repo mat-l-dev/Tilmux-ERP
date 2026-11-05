@@ -10,14 +10,26 @@
     const n = Number.parseFloat(String(v).replace(",", "."));
     return Number.isFinite(n) ? n : 0;
   };
+  const conIgv = () => {
+    const control = document.querySelector("#id_con_igv");
+    return control ? control.checked : false;
+  };
 
   function totales() {
     let base = 0, igv = 0;
     tabla.querySelectorAll("tbody tr").forEach((tr) => {
       const cantidad = num(tr.querySelector(".js-cantidad")?.value);
       const precio = num(tr.querySelector(".js-precio")?.value);
-      const b = Math.round(cantidad * precio * 100) / 100;
-      const i = Math.round(b * tasa * 100) / 100;
+      const bruto = Math.round(cantidad * precio * 100);
+      let b, i;
+      if (conIgv()) {
+        const baseCalc = Math.round(bruto / (1 + tasa));
+        b = baseCalc / 100;
+        i = (bruto - baseCalc) / 100;
+      } else {
+        b = bruto / 100;
+        i = Math.round(bruto * tasa) / 100;
+      }
       if (tr.querySelector(".js-base")) tr.querySelector(".js-base").textContent = fmt(b);
       if (tr.querySelector(".js-igv")) tr.querySelector(".js-igv").textContent = fmt(i);
       base += b;
@@ -40,6 +52,9 @@
       totales();
     }
   });
+
+  const igvControl = document.querySelector("#id_con_igv");
+  if (igvControl) igvControl.addEventListener("change", totales);
 
   totales();
 })();

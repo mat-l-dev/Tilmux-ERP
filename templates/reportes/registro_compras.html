@@ -36,7 +36,10 @@
       {% for f in filas %}
       <tr>
         <td>{{ f.fecha|date:"d/m/Y" }}</td>
-        <td>{{ f.tipo }}</td>
+        <td>
+          {{ f.tipo }}
+          {% if f.pendiente %}<span class="chip chip-warn">Pendiente</span>{% endif %}
+        </td>
         <td>{{ f.documento|default:"—" }}</td>
         <td class="num">{{ f.ruc|default:"—" }}</td>
         <td>{{ f.proveedor }}</td>
@@ -70,7 +73,8 @@
   <p class="preview-note">
     Solo las filas con crédito «Sí» alimentan las casillas 107 y 108. Las boletas
     no otorgan crédito fiscal ni sustentan gasto, así que no suman base ni IGV.
-    Las compras no gravadas van a la casilla 120.
+    Las compras no gravadas van a la casilla 120. Las filas con chip «Pendiente»
+    no entran al PDT 621 hasta completar RUC, serie y número.
   </p>
   {% else %}
   <p class="muted">No hay comprobantes en el rango.</p>
