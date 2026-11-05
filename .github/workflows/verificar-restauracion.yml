@@ -39,6 +39,11 @@ jobs:
 
       - name: Restaurar en una base vacía
         run: |
+          # El volcado incluye CREATE SCHEMA public; se elimina antes para que no choque.
+          docker run --rm --network host -e PGPASSWORD=postgres postgres:17 \
+            psql -h 127.0.0.1 -U postgres -d restaurado -v ON_ERROR_STOP=1 \
+              -c "DROP SCHEMA IF EXISTS public CASCADE;"
+
           docker run --rm --network host \
             -v "$PWD/out:/in" -e PGPASSWORD=postgres postgres:17 \
             pg_restore -h 127.0.0.1 -U postgres -d restaurado \
