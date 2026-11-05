@@ -54,6 +54,7 @@ CAMPOS_COMPRAS = [
     "no_gravado",
     "total",
     "clase",
+    "credito",
 ]
 
 
@@ -176,17 +177,23 @@ def compras(request):
                     compra.numero,
                     compra.proveedor.numero_doc,
                     compra.proveedor.nombre,
-                    _importe(compra.subtotal),
-                    _importe(compra.igv),
-                    "0.00",
+                    _importe(compra.subtotal if compra.con_credito else 0),
+                    _importe(compra.igv if compra.con_credito else 0),
+                    _importe(
+                        compra.subtotal
+                        if compra.con_credito and compra.igv == 0
+                        else 0
+                    ),
                     _importe(compra.total),
                     "Mercadería",
+                    "Sí" if compra.con_credito else "No",
                 ]
             )
 
         for gasto in Gasto.objects.filter(
             empresa=empresa, fecha__range=(desde, hasta)
         ).select_related("proveedor").order_by("fecha", "serie", "numero"):
+            usa_credito = gasto.con_credito and gasto.tipo_doc != "OTRO"
             filas.append(
                 [
                     _periodo(gasto.fecha),
@@ -196,11 +203,12 @@ def compras(request):
                     gasto.numero,
                     gasto.proveedor.numero_doc,
                     gasto.proveedor.nombre,
-                    _importe(gasto.base if gasto.igv > 0 else 0),
-                    _importe(gasto.igv),
-                    _importe(gasto.base if gasto.igv == 0 else 0),
+                    _importe(gasto.base if usa_credito and gasto.igv > 0 else 0),
+                    _importe(gasto.igv if usa_credito and gasto.igv > 0 else 0),
+                    _importe(gasto.base if usa_credito and gasto.igv == 0 else 0),
                     _importe(gasto.total),
                     "Gasto",
+                    "Sí" if usa_credito else "No",
                 ]
             )
 

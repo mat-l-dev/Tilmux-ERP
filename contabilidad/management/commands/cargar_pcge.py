@@ -17,7 +17,7 @@ def naturaleza_de(elemento: int) -> str:
 
 
 def categoria_de(codigo: str) -> str:
-    """Clasificación financiera (NIIF 18). Solo aplica a resultados."""
+    """Clasificación de las cuentas de resultado para los estados financieros."""
     if codigo.startswith(("67", "77")):
         return "FINANCIACION"
     if codigo.startswith("88") or codigo.startswith("891"):

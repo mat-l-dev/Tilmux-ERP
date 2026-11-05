@@ -38,20 +38,28 @@ def calcular(empresa, anio: int, mes: int) -> dict:
     igv_ventas += debitos["i"] or CERO
 
     compras = Compra.objects.filter(
-        empresa=empresa, estado=Compra.Estado.CONFIRMADA, fecha__range=(desde, hasta)
+        empresa=empresa,
+        estado=Compra.Estado.CONFIRMADA,
+        fecha__range=(desde, hasta),
+        con_credito=True,
     )
-    base_compras = compras.aggregate(s=Sum("subtotal"))["s"] or CERO
-    igv_compras = compras.aggregate(s=Sum("igv"))["s"] or CERO
+    compras_gravadas = compras.filter(igv__gt=0)
+    base_compras = compras_gravadas.aggregate(s=Sum("subtotal"))["s"] or CERO
+    igv_compras = compras_gravadas.aggregate(s=Sum("igv"))["s"] or CERO
 
-    gastos_gravados = Gasto.objects.filter(
-        empresa=empresa, fecha__range=(desde, hasta), igv__gt=0
+    # Compras con factura pero exoneradas o inafectas: van a la casilla 120.
+    no_gravado = (
+        compras.filter(igv=0).aggregate(s=Sum("subtotal"))["s"] or CERO
     )
+
+    gastos = Gasto.objects.filter(
+        empresa=empresa, fecha__range=(desde, hasta), con_credito=True
+    ).exclude(tipo_doc="OTRO")
+    gastos_gravados = gastos.filter(igv__gt=0)
     base_compras += gastos_gravados.aggregate(s=Sum("base"))["s"] or CERO
     igv_compras += gastos_gravados.aggregate(s=Sum("igv"))["s"] or CERO
 
-    no_gravado = Gasto.objects.filter(
-        empresa=empresa, fecha__range=(desde, hasta), igv=0
-    ).aggregate(s=Sum("base"))["s"] or CERO
+    no_gravado += gastos.filter(igv=0).aggregate(s=Sum("base"))["s"] or CERO
 
     return {
         "anio": anio,

@@ -25,6 +25,7 @@
         <th>Serie y número</th>
         <th>RUC</th>
         <th>Proveedor</th>
+        <th>Crédito</th>
         <th class="der">Base</th>
         <th class="der">No gravado</th>
         <th class="der">IGV</th>
@@ -39,6 +40,9 @@
         <td>{{ f.documento|default:"—" }}</td>
         <td class="num">{{ f.ruc|default:"—" }}</td>
         <td>{{ f.proveedor }}</td>
+        <td>
+          {% if f.credito %}Sí{% else %}<span class="chip chip-warn">No</span>{% endif %}
+        </td>
         <td class="num der">{{ f.base|default:0|floatformat:2 }}</td>
         <td class="num der">{{ f.no_gravado|default:0|floatformat:2 }}</td>
         <td class="num der">{{ f.igv|floatformat:2 }}</td>
@@ -48,7 +52,7 @@
     </tbody>
     <tfoot>
       <tr>
-        <td colspan="5"><strong>Totales</strong></td>
+        <td colspan="6"><strong>Totales</strong></td>
         <td class="num der"><strong>{{ base|floatformat:2 }}</strong></td>
         <td class="num der"><strong>{{ no_gravado|floatformat:2 }}</strong></td>
         <td class="num der"><strong>{{ igv|floatformat:2 }}</strong></td>
@@ -63,6 +67,11 @@
     {% if page_obj.has_next %}<a href="{% querystring page=page_obj.next_page_number %}">Siguiente</a>{% endif %}
   </nav>
   {% endif %}
+  <p class="preview-note">
+    Solo las filas con crédito «Sí» alimentan las casillas 107 y 108. Las boletas
+    no otorgan crédito fiscal ni sustentan gasto, así que no suman base ni IGV.
+    Las compras no gravadas van a la casilla 120.
+  </p>
   {% else %}
   <p class="muted">No hay comprobantes en el rango.</p>
   {% endif %}

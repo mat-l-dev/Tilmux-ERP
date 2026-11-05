@@ -6,6 +6,10 @@
 {% block contenido %}
 {% include "reportes/_tabs.html" %}
 
+<div class="acciones-head" style="justify-content:flex-end; margin-bottom:10px">
+  <a class="btn btn-ghost" href="{% url 'reportes:conciliacion_archivo' %}?anio={{ anio }}&mes={{ mes }}&registro=compras">Conciliar con la propuesta del SIRE</a>
+</div>
+
 <form method="get" class="filtro">
   <label class="field" style="min-width:110px">
     <span>Año</span>

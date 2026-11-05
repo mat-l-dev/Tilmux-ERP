@@ -25,6 +25,7 @@ from contabilidad.servicios import ContabilidadError
 from core.contexto import usuario_actual
 from core.models import Empresa, Periodo, TipoCambio
 from inventario.models import CapaFIFO, ConsumoCapa, MovimientoStock
+from reportes.casillas import calcular
 from ventas.models import Venta, VentaLinea
 from ventas.models_guia import GuiaRemision
 from ventas.servicios import VentaError, emitir_nota_credito, emitir_nota_debito
@@ -624,3 +625,49 @@ class InvarianteInmutabilidad(BaseContable):
             ).count(),
             1,
         )
+
+class InvarianteCreditoFiscal(BaseContable):
+    """Las boletas no dan crédito fiscal ni se declaran como compras no gravadas."""
+
+    def gasto(self, tipo: str, base: str, igv: str, total: str, *, credito: bool):
+        return registrar_gasto(
+            empresa=self.empresa,
+            proveedor=self.proveedor,
+            fecha=date(2026, 11, 15),
+            tipo_doc=tipo,
+            serie="F001" if tipo == "FACTURA" else "B001",
+            numero=f"{base}-{igv}",
+            base=Decimal(base),
+            igv=Decimal(igv),
+            total=Decimal(total),
+            cuenta=Cuenta.objects.get(version="2026", codigo="6391"),
+            medio=self.bbva,
+            con_credito=credito,
+            deducible=credito,
+        )
+
+    def test_la_boleta_no_suma_ni_base_ni_igv(self):
+        self.gasto("BOLETA", "167.83", "30.21", "198.04", credito=False)
+        self.gasto("FACTURA", "100.00", "18.00", "118.00", credito=True)
+
+        datos = calcular(self.empresa, 2026, 11)
+
+        self.assertEqual(datos["compras_base"], Decimal("100.00"))
+        self.assertEqual(datos["compras_igv"], Decimal("18.00"))
+        self.assertEqual(datos["no_gravado"], Decimal("0"))
+
+    def test_la_compra_con_boleta_marca_el_igv_al_costo(self):
+        self.comprar("1", "100", con_credito=False)
+
+        datos = calcular(self.empresa, 2026, 11)
+
+        self.assertEqual(datos["compras_base"], Decimal("0"))
+        self.assertEqual(datos["compras_igv"], Decimal("0"))
+
+    def test_la_factura_exonerada_va_a_compras_no_gravadas(self):
+        self.gasto("FACTURA", "50.00", "0.00", "50.00", credito=True)
+
+        datos = calcular(self.empresa, 2026, 11)
+
+        self.assertEqual(datos["no_gravado"], Decimal("50.00"))
+        self.assertEqual(datos["compras_base"], Decimal("0"))

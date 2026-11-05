@@ -2,8 +2,8 @@
 
 El estado de situación financiera es acumulado hasta la fecha de corte.
 El estado de resultados cubre el periodo elegido.
-Las categorías siguen la NIIF 18: operación, inversión, financiación,
-impuesto a las ganancias y operaciones discontinuadas.
+Se preparan conforme a la NPIF (Res. CNC 001-2024-EF/30), con las categorías
+de operación, financiación e impuesto a las ganancias.
 """
 
 from __future__ import annotations

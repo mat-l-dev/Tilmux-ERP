@@ -1134,3 +1134,19 @@ select {
     grid-template-columns: 1fr;
   }
 }
+
+.lista-pasos {
+  margin: 10px 0 4px;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+
+.lista-pasos li::marker {
+  color: var(--ink-3);
+  font-weight: 600;
+}

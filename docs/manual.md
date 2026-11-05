@@ -95,7 +95,7 @@ Cada nota modifica un solo comprobante y usa los catálogos 09 y 10 de SUNAT.
 | Registro de compras | Compras y gastos, con exportación CSV |
 | IGV y RER | IGV del mes y renta del 1,5 % |
 | Estados financieros | Situación, resultados, cambios y flujo |
-| Conciliación SUNAT | Compara las casillas del sistema con la vista preliminar |
+| Conciliación SUNAT | Casillas contra la vista preliminar o contra la propuesta del SIRE |
 
 ## Cierre del mes
 
@@ -131,3 +131,43 @@ python manage.py verificar_sunat --anio 2026 --mes 9
 
 Compara casilla por casilla: 107 base de compras, 108 IGV, 120 no gravado, 140
 saldo. Si algo no cuadra, se ve antes de declarar.
+
+### Conciliar con la propuesta del SIRE
+
+En **Reportes → Conciliación SUNAT → Conciliar con la propuesta del SIRE**
+puedes subir el archivo que descarga SUNAT en lugar de copiar las casillas a mano.
+
+1. En SUNAT, abre **SIRE** y elige **RVIE** (ventas) o **RCE** (compras).
+2. Descarga la propuesta en Excel o CSV.
+3. En el ERP elige año, mes y registro, adjunta el archivo y pulsa **Conciliar**.
+
+El lector busca las columnas por su nombre (base imponible, IGV, importe total),
+así que no depende del orden ni de que SUNAT cambie la plantilla. Las notas de
+crédito se restan solas porque vienen con signo negativo en la propuesta. La
+fila de totales se ignora para no contar dos veces.
+
+El resultado muestra base, IGV y total del sistema y de SUNAT, con la
+diferencia (sistema menos SUNAT). Una diferencia positiva significa que el ERP
+tiene más que la propuesta: revisa si esos comprobantes están en el RCE o si
+están duplicados. Una negativa, que SUNAT tiene un comprobante que el ERP no
+registró.
+
+El archivo no se guarda ni se envía a SUNAT: se lee en el equipo y se descarta.
+
+
+## Normativa aplicada
+
+Estas son las normas que usa el ERP y que conviene tener a mano:
+
+| Tema | Norma | Qué implica en el sistema |
+|---|---|---|
+| Plan de cuentas | Resolución CNC N° 002-2026-EF/30 | PCGE 2026 aplicado anticipadamente; su vigencia obligatoria es el 1/1/2028, pero la norma permite adelantarlo |
+| Estados financieros | Resolución CNC N° 001-2024-EF/30 (NPIF) | Vigente desde el 1/1/2025 para microempresas: situación financiera, resultados, cambios en el patrimonio, flujo de efectivo y notas |
+| Renta | Ley del Impuesto a la Renta, capítulo XV | RER: 1,5 % de los ingresos netos mensuales; sin declaración anual |
+| Límites del RER | SUNAT | Ingresos o compras hasta S/ 525 000 al año, activos fijos hasta S/ 126 000 y máximo 10 trabajadores por turno |
+| IGV | TUO de la Ley del IGV, artículos 18 y 19 | 18 % (16 % IGV + 2 % IPM); el crédito fiscal exige factura y destino a operaciones gravadas |
+| Boletas | Reglamento de Comprobantes de Pago | No otorgan crédito fiscal ni sustentan gasto o costo |
+| Registros electrónicos | Resolución de Superintendencia N° 000040-2022/SUNAT | RVIE y RCE se llevan en el SIRE; el ERP solo lee la propuesta descargada |
+
+El ERP **no envía nada a SUNAT**. Solo descarga el tipo de cambio y lee archivos
+que tú descargas de SUNAT.

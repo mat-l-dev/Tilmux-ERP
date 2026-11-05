@@ -74,22 +74,12 @@ def panel(request: HttpRequest) -> HttpResponse:
         ).aggregate(d=Sum("debe"), h=Sum("haber"))
         saldo = Decimal(saldos["d"] or 0) - Decimal(saldos["h"] or 0)
 
-        ventas_mes = Venta.objects.filter(
-            empresa=empresa,
-            estado=Venta.Estado.CONFIRMADA,
-            fecha__year=anio,
-            fecha__month=mes,
-        )
-        ventas_base = ventas_mes.aggregate(s=Sum("subtotal"))["s"] or 0
-        igv_ventas = ventas_mes.aggregate(s=Sum("igv"))["s"] or 0
+        from reportes.casillas import calcular
 
-        compras_mes = Compra.objects.filter(
-            empresa=empresa,
-            estado=Compra.Estado.CONFIRMADA,
-            fecha__year=anio,
-            fecha__month=mes,
-        )
-        igv_compras = compras_mes.aggregate(s=Sum("igv"))["s"] or 0
+        datos_mes = calcular(empresa, anio, mes)
+        ventas_base = datos_mes["ventas_base"]
+        igv_ventas = datos_mes["ventas_igv"]
+        igv_compras = datos_mes["compras_igv"]
 
     igv = Decimal(igv_ventas) - Decimal(igv_compras)
     renta = Decimal(ventas_base) * TASA_RENTA_RER

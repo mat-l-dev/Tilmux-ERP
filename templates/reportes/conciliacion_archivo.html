@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block titulo %}Conciliación por archivo{% endblock %}
+{% block titulo_pagina %}Conciliación con la propuesta SIRE{% endblock %}
+
+{% block contenido %}
+{% include "reportes/_tabs.html" %}
+
+<form method="post" enctype="multipart/form-data" class="filtro">
+  {% csrf_token %}
+  <label class="field" style="min-width:110px">
+    <span>Año</span>
+    <input type="number" name="anio" value="{{ anio }}" min="2020" max="2100">
+  </label>
+  <label class="field" style="min-width:110px">
+    <span>Mes</span>
+    <input type="number" name="mes" value="{{ mes }}" min="1" max="12">
+  </label>
+  <label class="field" style="min-width:200px">
+    <span>Registro</span>
+    <select name="registro">
+      <option value="compras" {% if registro == "compras" %}selected{% endif %}>RCE · compras</option>
+      <option value="ventas" {% if registro == "ventas" %}selected{% endif %}>RVIE · ventas</option>
+    </select>
+  </label>
+  <label class="field" style="min-width:280px">
+    <span>Propuesta del SIRE (.xlsx o .csv)</span>
+    <input type="file" name="archivo" accept=".xlsx,.xlsm,.csv,.txt" required>
+  </label>
+  <button class="btn btn-primary" type="submit">Conciliar</button>
+</form>
+
+{% if error %}
+<section class="card">
+  <div class="message error">{{ error }}</div>
+</section>
+{% endif %}
+
+{% if resultado %}
+<section class="card">
+  <header class="card-head">
+    <h2>{{ resultado.etiqueta }} · {{ mes }}/{{ anio }}</h2>
+    <span class="chip {% if resultado.cuadra %}chip-ok{% else %}chip-warn{% endif %}">
+      {% if resultado.cuadra %}Cuadra{% else %}Con diferencias{% endif %}
+    </span>
+  </header>
+
+  <p class="preview-note">
+    Archivo: <strong>{{ nombre_archivo }}</strong> ·
+    {{ resultado.filas }} comprobante{{ resultado.filas|pluralize }} leído{{ resultado.filas|pluralize }}.
+    Columnas detectadas: {{ resultado.columnas|join:", " }}.
+  </p>
+
+  <table class="tabla-doc">
+    <thead>
+      <tr>
+        <th>Concepto</th>
+        <th class="der">Sistema</th>
+        <th class="der">SUNAT</th>
+        <th class="der">Diferencia</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Base imponible</td>
+        <td class="num der">{{ resultado.sistema_base|floatformat:2 }}</td>
+        <td class="num der">{{ resultado.sunat_base|floatformat:2 }}</td>
+        <td class="num der">
+          <span class="{% if resultado.dif_base %}chip chip-warn{% else %}chip chip-ok{% endif %}">{{ resultado.dif_base|floatformat:2 }}</span>
+        </td>
+      </tr>
+      <tr>
+        <td>IGV</td>
+        <td class="num der">{{ resultado.sistema_igv|floatformat:2 }}</td>
+        <td class="num der">{{ resultado.sunat_igv|floatformat:2 }}</td>
+        <td class="num der">
+          <span class="{% if resultado.dif_igv %}chip chip-warn{% else %}chip chip-ok{% endif %}">{{ resultado.dif_igv|floatformat:2 }}</span>
+        </td>
+      </tr>
+      <tr>
+        <td>Total</td>
+        <td class="num der">{{ resultado.sistema_total|floatformat:2 }}</td>
+        <td class="num der">{{ resultado.sunat_total|floatformat:2 }}</td>
+        <td class="num der">
+          <span class="{% if resultado.dif_total %}chip chip-warn{% else %}chip chip-ok{% endif %}">{{ resultado.dif_total|floatformat:2 }}</span>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="preview-note">
+    «Sistema» es lo que sale de tus registros para el periodo. La diferencia es
+    Sistema menos SUNAT: si es positiva, declaraste de más; si es negativa, te
+    falta un comprobante. En compras, una diferencia en la base o en el IGV suele
+    ser una factura no registrada o un gasto sin comprobante.
+  </p>
+</section>
+{% endif %}
+
+<section class="card" style="margin-top:12px">
+  <header class="card-head">
+    <h2>Cómo obtener la propuesta</h2>
+  </header>
+  <ol class="lista-pasos">
+    <li>Entra a SUNAT con Clave SOL y abre <strong>SIRE</strong>.</li>
+    <li>Elige <strong>Registro de Ventas (RVIE)</strong> o <strong>Registro de Compras (RCE)</strong> del periodo.</li>
+    <li>Descarga la propuesta en Excel o CSV.</li>
+    <li>Súbela aquí. No se envía nada a SUNAT: el archivo se lee en tu equipo.</li>
+  </ol>
+  <p class="preview-note">
+    El lector busca las columnas por su nombre (base imponible, IGV, total), así
+    que funciona aunque SUNAT cambie el orden. No guardamos el archivo.
+  </p>
+</section>
+{% endblock %}

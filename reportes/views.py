@@ -19,10 +19,18 @@ from inventario.models import CapaFIFO, MovimientoStock
 from ventas.models import NotaCredito, NotaDebito, Venta
 
 from .casillas import calcular
+from .sire import ArchivoInvalido, leer_filas, sumar
 from .utils import rango
 
 TASA_RENTA_RER = Decimal("0.015")
 CERO = Decimal("0")
+
+
+def _entero(valor, defecto: int) -> int:
+    try:
+        return int(valor)
+    except (TypeError, ValueError):
+        return defecto
 
 
 
@@ -194,6 +202,7 @@ def registro_compras(request):
             estado=Compra.Estado.CONFIRMADA,
             fecha__range=(desde, hasta),
         ).select_related("proveedor"):
+            usa_credito = compra.con_credito
             filas.append(
                 {
                     "fecha": compra.fecha,
@@ -201,15 +210,18 @@ def registro_compras(request):
                     "documento": f"{compra.serie}-{compra.numero}".strip(" -"),
                     "ruc": compra.proveedor.numero_doc,
                     "proveedor": compra.proveedor.nombre,
-                    "base": compra.subtotal,
-                    "igv": compra.igv,
+                    "base": compra.subtotal if usa_credito and compra.igv > 0 else 0,
+                    "no_gravado": compra.subtotal if usa_credito and compra.igv == 0 else 0,
+                    "igv": compra.igv if usa_credito and compra.igv > 0 else 0,
                     "total": compra.total,
+                    "credito": usa_credito,
                     "clase": "Mercadería",
                 }
             )
         for gasto in Gasto.objects.filter(
             empresa=empresa, fecha__range=(desde, hasta)
         ).select_related("proveedor"):
+            usa_credito = gasto.con_credito and gasto.tipo_doc != "OTRO"
             filas.append(
                 {
                     "fecha": gasto.fecha,
@@ -217,10 +229,13 @@ def registro_compras(request):
                     "documento": f"{gasto.serie}-{gasto.numero}".strip(" -"),
                     "ruc": gasto.proveedor.numero_doc,
                     "proveedor": gasto.proveedor.nombre,
-                    "base": gasto.base if gasto.igv > 0 else 0,
-                    "no_gravado": gasto.base if gasto.igv == 0 else 0,
-                    "igv": gasto.igv,
+                    "base": gasto.base if usa_credito and gasto.igv > 0 else 0,
+                    "no_gravado": gasto.base
+                    if usa_credito and gasto.igv == 0
+                    else 0,
+                    "igv": gasto.igv if usa_credito and gasto.igv > 0 else 0,
                     "total": gasto.total,
+                    "credito": usa_credito,
                     "clase": "Gasto",
                 }
             )
@@ -273,15 +288,22 @@ def impuestos(request):
         ventas_igv += debitos["i"] or Decimal("0")
 
         compras = Compra.objects.filter(
-            empresa=empresa, estado=Compra.Estado.CONFIRMADA, fecha__range=(desde, hasta)
+            empresa=empresa,
+            estado=Compra.Estado.CONFIRMADA,
+            fecha__range=(desde, hasta),
+            con_credito=True,
         )
-        compras_base = compras.aggregate(s=Sum("subtotal"))["s"] or Decimal("0")
-        compras_igv = compras.aggregate(s=Sum("igv"))["s"] or Decimal("0")
+        compras_gravadas = compras.filter(igv__gt=0)
+        compras_base = compras_gravadas.aggregate(s=Sum("subtotal"))["s"] or Decimal("0")
+        compras_igv = compras_gravadas.aggregate(s=Sum("igv"))["s"] or Decimal("0")
 
         # Solo los gastos con comprobante que otorga crédito fiscal (facturas).
         gastos = Gasto.objects.filter(
-            empresa=empresa, fecha__range=(desde, hasta), con_credito=True
-        )
+            empresa=empresa,
+            fecha__range=(desde, hasta),
+            con_credito=True,
+            igv__gt=0,
+        ).exclude(tipo_doc="OTRO")
         compras_base += gastos.aggregate(s=Sum("base"))["s"] or Decimal("0")
         compras_igv += gastos.aggregate(s=Sum("igv"))["s"] or Decimal("0")
 
@@ -306,8 +328,8 @@ def conciliacion(request):
     """Compara las casillas del sistema con las que muestra SUNAT."""
     empresa = empresa_actual(request)
     hoy = date.today()
-    anio = int(request.GET.get("anio") or hoy.year)
-    mes = int(request.GET.get("mes") or hoy.month)
+    anio = min(max(_entero(request.GET.get("anio"), hoy.year), 2000), 2100)
+    mes = min(max(_entero(request.GET.get("mes"), hoy.month), 1), 12)
 
     datos = calcular(empresa, anio, mes) if empresa else None
     filas = []
@@ -416,4 +438,91 @@ def kardex(request, pk: int):
         request,
         "reportes/kardex.html",
         {"producto": producto, "filas": filas, "saldo": saldo, "capas": capas},
+    )
+
+
+@login_required
+def conciliacion_archivo(request):
+    """Lee la propuesta del SIRE (RVIE o RCE) y la compara con el registro."""
+    empresa = empresa_actual(request)
+    hoy = date.today()
+    anio = min(
+        max(_entero(request.POST.get("anio") or request.GET.get("anio"), hoy.year), 2000),
+        2100,
+    )
+    mes = min(
+        max(_entero(request.POST.get("mes") or request.GET.get("mes"), hoy.month), 1), 12
+    )
+    registro = request.POST.get("registro") or request.GET.get("registro") or "compras"
+    if registro not in {"ventas", "compras"}:
+        registro = "compras"
+
+    resultado = None
+    error = None
+    nombre_archivo = None
+
+    if request.method == "POST":
+        archivo = request.FILES.get("archivo")
+        if archivo is None:
+            error = "Adjunta el archivo de la propuesta."
+        elif empresa is None:
+            error = "Configura una empresa antes de conciliar."
+        else:
+            try:
+                totales = sumar(leer_filas(archivo))
+            except ArchivoInvalido as exc:
+                error = str(exc)
+            else:
+                nombre_archivo = archivo.name
+                datos = calcular(empresa, anio, mes)
+                if registro == "ventas":
+                    sistema_base = datos["ventas_base"]
+                    sistema_igv = datos["ventas_igv"]
+                    etiqueta = "RVIE · ventas"
+                else:
+                    sistema_base = datos["compras_base"]
+                    sistema_igv = datos["compras_igv"]
+                    etiqueta = "RCE · compras"
+
+                resultado = {
+                    "registro": registro,
+                    "etiqueta": etiqueta,
+                    "filas": totales["filas"],
+                    "columnas": totales["columnas"],
+                    "sunat_base": totales["base"],
+                    "sunat_igv": totales["igv"],
+                    "sunat_total": totales["total"],
+                    "sistema_base": sistema_base,
+                    "sistema_igv": sistema_igv,
+                    "sistema_total": sistema_base + sistema_igv,
+                }
+                resultado["dif_base"] = (
+                    resultado["sistema_base"] - resultado["sunat_base"]
+                ).quantize(Decimal("0.01"))
+                resultado["dif_igv"] = (
+                    resultado["sistema_igv"] - resultado["sunat_igv"]
+                ).quantize(Decimal("0.01"))
+                resultado["dif_total"] = (
+                    resultado["sistema_total"] - resultado["sunat_total"]
+                ).quantize(Decimal("0.01"))
+                resultado["cuadra"] = all(
+                    valor == 0
+                    for valor in (
+                        resultado["dif_base"],
+                        resultado["dif_igv"],
+                        resultado["dif_total"],
+                    )
+                )
+
+    return render(
+        request,
+        "reportes/conciliacion_archivo.html",
+        {
+            "anio": anio,
+            "mes": mes,
+            "registro": registro,
+            "resultado": resultado,
+            "error": error,
+            "nombre_archivo": nombre_archivo,
+        },
     )

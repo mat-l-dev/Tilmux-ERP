@@ -131,8 +131,9 @@ def generar(datos, empresa) -> bytes:
 
     notas = [
         "<b>1. Base de preparación.</b> Estados financieros preparados conforme a la "
-        "Norma de Información Financiera para microempresas, con el PCGE 2026 aplicado "
-        "anticipadamente. Se presentan en soles.",
+        "Norma Peruana de Información Financiera para las Microempresas (Resolución CNC "
+        "N° 001-2024-EF/30), con el PCGE 2026 aplicado anticipadamente conforme a la "
+        "Resolución CNC N° 002-2026-EF/30. Se presentan en soles.",
         f"<b>2. Efectivo.</b> El saldo de S/ {_importe(datos['efectivo'])} incluye caja, "
         "efectivo en tránsito y depósitos bancarios.",
         "<b>3. Inventarios.</b> Valorizados al costo de adquisición con costos de "
