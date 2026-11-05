@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
@@ -13,6 +14,8 @@ from core.contexto import usuario_actual
 from core.models import Empresa, Periodo
 
 from .models import Asiento, AsientoLinea, Cuenta, Regla, ReglaLinea
+
+logger = logging.getLogger(__name__)
 
 CENT = Decimal("0.01")
 ZERO = Decimal("0")
@@ -129,6 +132,11 @@ def postear(
         raise ContabilidadError("El asiento quedó sin líneas.")
 
     AsientoLinea.objects.bulk_create(lineas)
+    logger.info(
+        "asiento %s %s total=%s usuario=%s",
+        asiento.numero, asiento.tipo_operacion, sum((x.debe for x in lineas), ZERO),
+        getattr(asiento.creado_por, "username", None),
+    )
     return asiento
 
 

@@ -55,7 +55,7 @@ separa base e IGV y sí genera crédito.
 ## Uso diario
 
 Doble clic en el acceso directo **Tilmux ERP** del escritorio. Arranca el
-servidor y abre el navegador. Detalle en [uso local](docs/uso-local.md).
+servidor y abre el navegador. El detalle está en el [manual](docs/manual.md).
 
 ## Despliegue (opcional)
 

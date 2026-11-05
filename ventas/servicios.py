@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 
@@ -21,6 +22,8 @@ from .models import (
     Venta,
     VentaLinea,
 )
+
+logger = logging.getLogger(__name__)
 
 CENT = Decimal("0.01")
 LIMITE_IDENTIFICACION = Decimal("700.00")
@@ -118,6 +121,7 @@ def confirmar(venta: Venta) -> Venta:
             origen_id=venta.pk,
         )
 
+    logger.info("venta confirmada %s-%s total=%s", venta.serie, venta.numero, total)
     return venta
 
 

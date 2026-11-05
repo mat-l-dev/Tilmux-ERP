@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import calendar
+import logging
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 
@@ -19,6 +20,8 @@ from tesoreria.servicios import anotar
 
 from .models import Compra
 from .models_gasto import Gasto
+
+logger = logging.getLogger(__name__)
 
 CENT = Decimal("0.01")
 DIEZ = Decimal("0.0000000001")
@@ -122,6 +125,7 @@ def confirmar(compra: Compra) -> Compra:
         origen_tipo="COMPRA",
         origen_id=compra.pk,
     )
+    logger.info("compra confirmada %s-%s total=%s", compra.serie, compra.numero, total)
     return compra
 
 
