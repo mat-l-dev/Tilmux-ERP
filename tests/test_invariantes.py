@@ -175,7 +175,12 @@ class InvarianteAsiento(BaseContable):
         self.assertEqual(debe, haber)
 
     def test_la_base_rechaza_un_asiento_descuadrado(self):
-        periodo = Periodo.objects.get(empresa=self.empresa, anio=2026, mes=11)
+        periodo, _ = Periodo.objects.get_or_create(
+            empresa=self.empresa,
+            anio=2026,
+            mes=11,
+            defaults={"version_pcge": "2026"},
+        )
         cuenta = Cuenta.objects.get(version="2026", codigo="101")
         asiento = Asiento.objects.create(
             empresa=self.empresa,
@@ -583,7 +588,12 @@ class InvarianteRevaluacion(BaseContable):
 
 class InvariantePeriodos(BaseContable):
     def test_un_periodo_cerrado_no_acepta_asientos(self):
-        periodo = Periodo.objects.get(empresa=self.empresa, anio=2026, mes=11)
+        periodo, _ = Periodo.objects.get_or_create(
+            empresa=self.empresa,
+            anio=2026,
+            mes=11,
+            defaults={"version_pcge": "2026"},
+        )
         periodo.estado = Periodo.Estado.CERRADO
         periodo.save(update_fields=["estado"])
 

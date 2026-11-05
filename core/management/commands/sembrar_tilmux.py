@@ -1,4 +1,4 @@
-"""Crea la empresa TILMUX, sus periodos y activa las cuentas que usa."""
+"""Crea la empresa TILMUX y activa las cuentas que usa."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 
 from contabilidad.models import Cuenta
-from core.models import Empresa, Periodo
+from core.models import Empresa
 
 CUENTAS_EN_USO = [
     "101", "1031", "1041", "1061", "1212", "122", "1421", "1699", "20111",
@@ -18,7 +18,7 @@ CUENTAS_EN_USO = [
 
 
 class Command(BaseCommand):
-    help = "Siembra la empresa TILMUX con periodos 2026-09 en adelante."
+    help = "Siembra la empresa TILMUX y activa las cuentas que usa."
 
     @transaction.atomic
     def handle(self, *args, **options):
@@ -33,20 +33,6 @@ class Command(BaseCommand):
             },
         )
         self.stdout.write(f"Empresa {'creada' if creada else 'existente'}: {empresa}")
-
-        nuevos = 0
-        for anio in (2026, 2027):
-            for mes in range(1, 13):
-                if anio == 2026 and mes < 9:
-                    continue
-                _, creado = Periodo.objects.get_or_create(
-                    empresa=empresa,
-                    anio=anio,
-                    mes=mes,
-                    defaults={"version_pcge": "2026"},
-                )
-                nuevos += int(creado)
-        self.stdout.write(f"Periodos creados: {nuevos}")
 
         existentes = set(
             Cuenta.objects.filter(version="2026").values_list("codigo", flat=True)
