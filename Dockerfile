@@ -16,7 +16,9 @@ COPY . .
 RUN DATABASE_URL="postgresql://build:build@localhost:5432/build" \
     uv run --no-dev python manage.py collectstatic --noinput
 
+RUN chmod +x /app/docker-entrypoint.sh
+
 EXPOSE 8080
 
-CMD ["uv", "run", "--no-dev", "gunicorn", "config.wsgi:application", \
-     "--bind", "0.0.0.0:8080", "--workers", "2", "--timeout", "60"]
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
+CMD ["sh", "-c", "uv run --no-dev gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8080} --workers 2 --timeout 60"]

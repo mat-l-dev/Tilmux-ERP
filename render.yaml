@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: tilmux-erp
+    runtime: docker
+    plan: free
+    region: virginia
+    healthCheckPath: /salud/
+    autoDeploy: true
+    envVars:
+      - key: DJANGO_DEBUG
+        value: "false"
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false

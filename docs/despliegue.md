@@ -1,32 +1,32 @@
-# Despliegue
+# Despliegue en Render
 
-El despliegue corre en GitHub Actions, no en tu computadora. Así el antivirus no
-interfiere y cada push a `main` publica la versión nueva.
+Render free tier no pide tarjeta. El servicio duerme tras 15 minutos sin uso y
+despierta con la primera visita en unos 50 segundos.
 
-## Secretos del repositorio
+## Primera vez
 
-En GitHub: **Settings → Secrets and variables → Actions → New repository secret**
+1. Entra a https://dashboard.render.com y regístrate con GitHub.
+2. **New → Blueprint**.
+3. Conecta el repositorio `mat-l-dev/Tilmux-ERP`.
+4. Render lee `render.yaml` y pide el valor de `DATABASE_URL`.
+   Pega la cadena de Supabase (Session pooler, puerto 5432).
+5. **Apply**.
 
-| Secreto | Para qué |
-|---|---|
-| `FLY_API_TOKEN` | Desplegar en Fly.io |
-| `DATABASE_URL` | Respaldo diario de la base |
+El primer build tarda unos 5 minutos.
 
-### Cómo obtener el token de Fly
+## Después
 
-1. Entra a https://fly.io/user/personal_access_tokens
-2. **Create token**, nombre `github-deploy`, sin fecha de expiración.
-3. Copia el valor (empieza con `FlyV1 ...`) y guárdalo como `FLY_API_TOKEN`.
+Cada push a `main` despliega solo (`autoDeploy: true`).
 
-El token permite desplegar; no es la contraseña de tu cuenta.
-
-## Desplegar
-
-Con el secreto cargado, cualquier push a `main` despliega. También puedes lanzarlo
-a mano desde **Actions → Desplegar → Run workflow**.
-
-La migración corre sola: `fly.toml` la declara como `release_command`.
+Las migraciones corren al arrancar el contenedor (`docker-entrypoint.sh`), así
+que no hay paso manual.
 
 ## Verificar
 
-https://tilmux-erp.fly.dev/salud/ debe devolver `{"estado": "ok"}`.
+`https://tilmux-erp.onrender.com/salud/` debe devolver `{"estado": "ok"}`.
+
+## Respaldo
+
+`.github/workflows/backup.yml` sigue funcionando: se conecta directo a Supabase,
+no depende del hosting. Requiere el secreto `DATABASE_URL` en el repositorio
+(ya cargado).

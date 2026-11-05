@@ -44,6 +44,11 @@ CSRF_TRUSTED_ORIGINS = [
 if _aplicacion_fly:
     CSRF_TRUSTED_ORIGINS.append(f"https://{_aplicacion_fly}.fly.dev")
 
+_host_render = os.environ.get("RENDER_EXTERNAL_HOSTNAME")
+if _host_render:
+    ALLOWED_HOSTS.append(_host_render)
+    CSRF_TRUSTED_ORIGINS.append(f"https://{_host_render}")
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
