@@ -249,6 +249,15 @@ def importar(request):
                     "base": str(documento.base),
                     "igv": str(documento.igv),
                     "total": str(documento.total),
+                    "lineas": [
+                        {
+                            "descripcion": linea.descripcion,
+                            "cantidad": str(linea.cantidad),
+                            "valor_unitario": str(linea.valor_unitario),
+                            "base": str(linea.base),
+                        }
+                        for linea in documento.lineas
+                    ],
                 }
                 return redirect("compras:importar_preview")
     return render(request, "compras/importar.html", {"empresa": empresa})
@@ -318,6 +327,96 @@ def importar_preview(request):
         request,
         "compras/importar_preview.html",
         {"datos": datos, "cuentas": cuentas, "medios": medios, "sugerida": sugerida},
+    )
+
+
+@login_required
+def importar_compra(request):
+    empresa = empresa_actual(request)
+    datos = request.session.get("xml_pendiente")
+    if not datos:
+        messages.info(request, "Primero sube un comprobante.")
+        return redirect("compras:importar")
+
+    lineas = datos.get("lineas") or []
+    productos = list(Producto.objects.filter(activo=True))
+    con_credito = datos["tipo"] == "FACTURA"
+
+    if request.method == "POST":
+        elegidos = request.POST.getlist("producto")
+        if not lineas:
+            messages.error(request, "El comprobante no trae líneas para mapear.")
+        elif len(elegidos) != len(lineas) or not all(elegidos):
+            messages.error(request, "Elige un producto en cada línea.")
+        else:
+            proveedor, _ = Tercero.objects.get_or_create(
+                tipo_doc="RUC",
+                numero_doc=datos["emisor_ruc"],
+                defaults={
+                    "nombre": datos["emisor_nombre"] or "Proveedor",
+                    "rol": "PROVEEDOR",
+                },
+            )
+            compra = Compra.objects.create(
+                empresa=empresa,
+                proveedor=proveedor,
+                fecha=date.fromisoformat(datos["fecha"]),
+                tipo_doc=datos["tipo"],
+                serie=datos["serie"],
+                numero=datos["numero"],
+                glosa=f"{datos['tipo']} {datos['serie']}-{datos['numero']}",
+                con_credito=con_credito,
+            )
+
+            base_total = sum((Decimal(l["base"]) for l in lineas), Decimal("0.00"))
+            igv_total = Decimal(datos["igv"])
+            acumulado = Decimal("0.00")
+            for indice, (linea, producto_id) in enumerate(zip(lineas, elegidos)):
+                producto = Producto.objects.get(pk=producto_id)
+                base = Decimal(linea["base"])
+                if indice == len(lineas) - 1:
+                    igv = igv_total - acumulado
+                else:
+                    igv = (
+                        (igv_total * base / base_total).quantize(Decimal("0.01"))
+                        if base_total
+                        else Decimal("0.00")
+                    )
+                    acumulado += igv
+                CompraLinea.objects.create(
+                    compra=compra,
+                    orden=indice + 1,
+                    producto=producto,
+                    descripcion=linea["descripcion"][:200],
+                    cantidad=Decimal(linea["cantidad"]),
+                    precio_unitario=Decimal(linea["valor_unitario"]),
+                    base=base,
+                    igv=igv,
+                    total=base + igv,
+                )
+
+            try:
+                confirmar(compra)
+            except CompraError as exc:
+                messages.error(request, f"No se pudo confirmar: {exc}")
+            else:
+                request.session.pop("xml_pendiente", None)
+                messages.success(
+                    request,
+                    f"Compra registrada: {datos['serie']}-{datos['numero']} "
+                    f"por S/ {datos['total']}.",
+                )
+                return redirect("compras:detalle", compra.pk)
+
+    return render(
+        request,
+        "compras/importar_compra.html",
+        {
+            "datos": datos,
+            "lineas": lineas,
+            "productos": productos,
+            "con_credito": con_credito,
+        },
     )
 
 

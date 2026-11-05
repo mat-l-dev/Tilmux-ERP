@@ -67,6 +67,7 @@ class BaseContable(TestCase):
         *,
         fecha: date = date(2026, 11, 10),
         flete: str = "0",
+        con_credito: bool = True,
     ) -> Compra:
         cantidad_d = Decimal(cantidad)
         costo_d = Decimal(costo_unitario)
@@ -80,6 +81,7 @@ class BaseContable(TestCase):
             tipo_doc="FACTURA",
             serie="F001",
             numero=f"{Compra.objects.count() + 1:04d}",
+            con_credito=con_credito,
         )
         CompraLinea.objects.create(
             compra=compra,
@@ -322,6 +324,19 @@ class InvarianteComprobantes(BaseContable):
         self.assertTrue(gasto.con_credito)
         self.assertEqual(importes["40111"], Decimal("30.21"))
         self.assertEqual(importes["6391"], Decimal("167.83"))
+
+
+    def test_la_compra_con_boleta_mete_el_igv_al_costo(self):
+        compra = self.comprar("1", "100", con_credito=False)
+
+        capa = self.capas().get()
+        self.assertEqual(capa.costo_unitario, Decimal("118.0000000000"))
+
+        asiento = Asiento.objects.get(origen_tipo="COMPRA", origen_id=compra.pk)
+        importes = {linea.cuenta.codigo: linea.debe for linea in asiento.lineas.all()}
+
+        self.assertNotIn("40111", importes)
+        self.assertEqual(importes["20111"], Decimal("118.00"))
 
 
 class InvarianteInmutabilidad(BaseContable):

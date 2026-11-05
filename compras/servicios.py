@@ -63,7 +63,9 @@ def confirmar(compra: Compra) -> Compra:
     for linea in lineas:
         if linea.cantidad <= 0:
             raise CompraError("Hay una línea con cantidad cero.")
-        costo_total_linea = Decimal(linea.base) + asignado[linea.pk]
+        # Si el comprobante no da crédito fiscal, su IGV forma parte del costo.
+        impuesto_al_costo = Decimal("0") if compra.con_credito else Decimal(linea.igv)
+        costo_total_linea = Decimal(linea.base) + impuesto_al_costo + asignado[linea.pk]
         costo_unitario = (costo_total_linea / linea.cantidad).quantize(
             DIEZ, rounding=ROUND_HALF_UP
         )
@@ -98,7 +100,11 @@ def confirmar(compra: Compra) -> Compra:
         fecha=compra.fecha,
         tipo="COMPRA",
         glosa=f"Compra {compra.serie}-{compra.numero}".strip(" -"),
-        montos=Montos(base=base, igv=igv, total=total),
+        montos=Montos(
+            base=base if compra.con_credito else total,
+            igv=igv if compra.con_credito else Decimal("0.00"),
+            total=total,
+        ),
         origen_tipo="COMPRA",
         origen_id=compra.pk,
     )

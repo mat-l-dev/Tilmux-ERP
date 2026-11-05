@@ -37,6 +37,10 @@ class Compra(models.Model):
     estado = models.CharField(
         max_length=10, choices=Estado.choices, default=Estado.BORRADOR
     )
+    con_credito = models.BooleanField(
+        default=True,
+        help_text="Una boleta no otorga crédito: su IGV forma parte del costo.",
+    )
     subtotal = models.DecimalField(max_digits=18, decimal_places=2, default=0)
     igv = models.DecimalField(max_digits=18, decimal_places=2, default=0)
     total = models.DecimalField(max_digits=18, decimal_places=2, default=0)

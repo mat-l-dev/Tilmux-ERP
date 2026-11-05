@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block titulo %}Comprar por XML{% endblock %}
+{% block titulo_pagina %}Comprar por XML{% endblock %}
+
+{% block contenido %}
+<div class="doc">
+  <div class="doc-main">
+    <section class="card">
+      <header class="card-head">
+        <h2>{{ datos.tipo|capfirst }} {{ datos.serie }}-{{ datos.numero }}</h2>
+        <span class="chip">{{ datos.fecha }}</span>
+      </header>
+
+      {% if not con_credito %}
+      <div class="message info">
+        Boleta de venta: no otorga crédito fiscal. El IGV forma parte del costo
+        del inventario, así que la capa entrará por el total.
+      </div>
+      {% endif %}
+
+      <form method="post" class="form">
+        {% csrf_token %}
+        <table class="tabla-doc">
+          <thead>
+            <tr>
+              <th>Descripción del XML</th>
+              <th class="der">Cantidad</th>
+              <th class="der">Base</th>
+              <th>Producto</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for linea in lineas %}
+            <tr>
+              <td class="muted">{{ linea.descripcion|default:"—" }}</td>
+              <td class="num der">{{ linea.cantidad }}</td>
+              <td class="num der">{{ linea.base }}</td>
+              <td>
+                <select name="producto" required>
+                  <option value="">—</option>
+                  {% for p in productos %}
+                  <option value="{{ p.pk }}">{{ p.sku }} · {{ p.nombre }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <button class="btn btn-primary" type="submit">Registrar compra</button>
+      </form>
+    </section>
+  </div>
+
+  <aside class="doc-side">
+    <div class="card sticky">
+      <header class="card-head"><h2>Totales</h2></header>
+      <dl class="totales">
+        <div><dt>Base</dt><dd class="num">{{ datos.base }}</dd></div>
+        <div><dt>IGV</dt><dd class="num">{{ datos.igv }}</dd></div>
+        <div class="total"><dt>Total</dt><dd class="num">{{ datos.total }}</dd></div>
+      </dl>
+      <p class="preview-note">
+        Al confirmar se crean las capas de stock con su costo unitario y el asiento
+        por pagar al proveedor.
+      </p>
+      <a class="btn btn-ghost btn-block" href="{% url 'compras:importar_preview' %}">Volver</a>
+    </div>
+  </aside>
+</div>
+{% endblock %}

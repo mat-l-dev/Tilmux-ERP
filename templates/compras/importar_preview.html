@@ -53,6 +53,11 @@
         </div>
         <button class="btn btn-primary" type="submit">Registrar gasto</button>
       </form>
+      {% if datos.lineas %}
+      <a class="btn btn-ghost btn-block" href="{% url 'compras:importar_compra' %}">
+        Es mercadería: registrar como compra
+      </a>
+      {% endif %}
     </section>
   </div>
 
