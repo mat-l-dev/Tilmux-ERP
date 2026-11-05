@@ -127,3 +127,61 @@ def postear(
 
     AsientoLinea.objects.bulk_create(lineas)
     return asiento
+
+
+@transaction.atomic
+def postear_lineas(
+    *,
+    empresa: Empresa,
+    fecha: date,
+    tipo: str,
+    glosa: str,
+    lineas: list[tuple[Cuenta, Decimal, Decimal, str]],
+    origen_tipo: str = "",
+    origen_id: int | None = None,
+) -> Asiento:
+    """Asiento con líneas explícitas: (cuenta, debe, haber, glosa)."""
+    periodo = periodo_de(empresa, fecha)
+    Empresa.objects.select_for_update().get(pk=empresa.pk)
+    ultimo = Asiento.objects.filter(empresa=empresa).aggregate(m=Max("numero"))["m"]
+
+    asiento = Asiento.objects.create(
+        empresa=empresa,
+        periodo=periodo,
+        numero=(ultimo or 0) + 1,
+        fecha=fecha,
+        tipo_operacion=tipo,
+        glosa=glosa[:255],
+        origen_tipo=origen_tipo,
+        origen_id=origen_id,
+    )
+
+    filas = []
+    for orden, (cuenta, debe, haber, detalle) in enumerate(lineas, start=1):
+        debe, haber = q(debe), q(haber)
+        if debe == ZERO and haber == ZERO:
+            continue
+        filas.append(
+            AsientoLinea(
+                asiento=asiento,
+                orden=orden,
+                cuenta=cuenta,
+                debe=debe,
+                haber=haber,
+                monto_contable=debe or haber,
+                monto_tributario=debe or haber,
+                glosa=(detalle or glosa)[:255],
+            )
+        )
+
+    total_debe = sum((l.debe for l in filas), ZERO)
+    total_haber = sum((l.haber for l in filas), ZERO)
+    if total_debe != total_haber:
+        raise ContabilidadError(
+            f"El asiento no cuadra: debe {total_debe} contra haber {total_haber}."
+        )
+    if not filas:
+        raise ContabilidadError("El asiento quedó sin líneas.")
+
+    AsientoLinea.objects.bulk_create(filas)
+    return asiento

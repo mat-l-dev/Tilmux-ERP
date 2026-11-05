@@ -20,7 +20,8 @@ from ventas.models import Venta
 from ventas.models_guia import GuiaRemision
 
 from .models import Compra, CompraLinea, CostoAdicional
-from .servicios import CompraError, confirmar, registrar_gasto
+from .servicios import CompraError, confirmar, pagar, registrar_gasto
+from contabilidad.moneda import SinTipoCambio
 from documentos.xml_cpe import Guia, XMLInvalido, leer
 
 
@@ -504,6 +505,47 @@ def importar_compra(request):
             "productos": productos,
             "con_credito": con_credito,
         },
+    )
+
+
+@login_required
+def pagar_compra(request, pk: int):
+    compra = get_object_or_404(Compra, pk=pk)
+    cuentas = list(
+        CuentaTesoreria.objects.filter(empresa=compra.empresa, activa=True)
+    )
+    hoy = date.today()
+
+    if request.method == "POST":
+        cuenta = CuentaTesoreria.objects.filter(
+            pk=request.POST.get("cuenta"), empresa=compra.empresa
+        ).first()
+        if cuenta is None:
+            messages.error(request, "Elige la cuenta de donde sale el dinero.")
+        else:
+            try:
+                pagado, diferencia = pagar(
+                    compra,
+                    cuenta=cuenta,
+                    fecha=date.fromisoformat(
+                        request.POST.get("fecha") or hoy.isoformat()
+                    ),
+                    canal=request.POST.get("canal", "TRANSFERENCIA"),
+                    tipo_cambio_pago=request.POST.get("tipo_cambio") or None,
+                )
+            except (CompraError, SinTipoCambio) as exc:
+                messages.error(request, str(exc))
+            else:
+                mensaje = f"Pago registrado por S/ {pagado}."
+                if diferencia:
+                    mensaje += f" Diferencia de cambio: S/ {diferencia}."
+                messages.success(request, mensaje)
+                return redirect("compras:detalle", compra.pk)
+
+    return render(
+        request,
+        "compras/pagar.html",
+        {"compra": compra, "cuentas": cuentas, "hoy": hoy},
     )
 
 

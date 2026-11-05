@@ -9,13 +9,12 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum
 from django.http import HttpRequest, HttpResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from compras.models import Compra
 from contabilidad.models import AsientoLinea, Cuenta
 from ventas.models import Venta
-
 from .context import empresa_actual
 from .models import Empresa, Periodo
 
@@ -129,6 +128,60 @@ def cambiar_empresa(request: HttpRequest) -> HttpResponse:
     if Empresa.objects.filter(pk=empresa_id, activa=True).exists():
         request.session["empresa_id"] = int(empresa_id)
     return redirect(request.POST.get("siguiente") or "core:panel")
+
+
+@login_required
+def periodos(request: HttpRequest) -> HttpResponse:
+    empresa = empresa_actual(request)
+    lista = (
+        Periodo.objects.filter(empresa=empresa).order_by("-anio", "-mes")
+        if empresa
+        else Periodo.objects.none()
+    )
+    return render(request, "core/periodos.html", {"periodos": lista})
+
+
+@login_required
+@require_POST
+def cerrar_periodo(request: HttpRequest, pk: int) -> HttpResponse:
+    periodo = get_object_or_404(Periodo, pk=pk)
+    borradores = Compra.objects.filter(
+        empresa=periodo.empresa,
+        estado=Compra.Estado.BORRADOR,
+        fecha__year=periodo.anio,
+        fecha__month=periodo.mes,
+    ).count()
+    borradores += Venta.objects.filter(
+        empresa=periodo.empresa,
+        estado=Venta.Estado.BORRADOR,
+        fecha__year=periodo.anio,
+        fecha__month=periodo.mes,
+    ).count()
+
+    if borradores:
+        messages.error(
+            request,
+            f"No se puede cerrar: hay {borradores} borrador(es) sin confirmar en ese mes.",
+        )
+    else:
+        periodo.estado = Periodo.Estado.CERRADO
+        periodo.save(update_fields=["estado"])
+        messages.success(request, f"Periodo {periodo.etiqueta} cerrado.")
+    return redirect("core:periodos")
+
+
+@login_required
+@require_POST
+def reabrir_periodo(request: HttpRequest, pk: int) -> HttpResponse:
+    if not request.user.is_superuser:
+        messages.error(request, "Solo el administrador puede reabrir un periodo.")
+        return redirect("core:periodos")
+
+    periodo = get_object_or_404(Periodo, pk=pk)
+    periodo.estado = Periodo.Estado.ABIERTO
+    periodo.save(update_fields=["estado"])
+    messages.success(request, f"Periodo {periodo.etiqueta} reabierto.")
+    return redirect("core:periodos")
 
 
 @login_required

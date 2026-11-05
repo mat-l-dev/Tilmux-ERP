@@ -86,8 +86,11 @@
         <button class="btn btn-primary btn-block" type="submit">Confirmar compra</button>
       </form>
       <p class="preview-note">Al confirmar se crean las capas de stock con su costo landed y el asiento.</p>
+      {% elif not compra.pagada %}
+      <a class="btn btn-primary btn-block" href="{% url 'compras:pagar' compra.pk %}">Pagar compra</a>
+      <p class="preview-note">Registra la salida de dinero y la diferencia de cambio si la hay.</p>
       {% else %}
-      <p class="muted">Compra confirmada. El stock y la obligación ya están registrados.</p>
+      <p class="muted">Compra pagada el {{ compra.fecha_pago|date:"d/m/Y" }}.</p>
       {% endif %}
       <a class="btn btn-ghost btn-block" href="{% url 'compras:lista' %}">Volver a la lista</a>
     </div>

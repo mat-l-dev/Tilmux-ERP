@@ -7,7 +7,9 @@ from decimal import ROUND_HALF_UP, Decimal
 from django.db import transaction
 from django.utils import timezone
 
-from contabilidad.servicios import Montos, postear
+from contabilidad.models import Cuenta
+from contabilidad.moneda import tipo_cambio_de
+from contabilidad.servicios import Montos, postear, postear_lineas
 from inventario.servicios import entrar
 from tesoreria.servicios import anotar
 
@@ -89,10 +91,18 @@ def confirmar(compra: Compra) -> Compra:
     compra.subtotal = base
     compra.igv = igv
     compra.total = total
+    compra.total_moneda_origen = total
     compra.estado = Compra.Estado.CONFIRMADA
     compra.confirmado_en = timezone.now()
     compra.save(
-        update_fields=["subtotal", "igv", "total", "estado", "confirmado_en"]
+        update_fields=[
+            "subtotal",
+            "igv",
+            "total",
+            "total_moneda_origen",
+            "estado",
+            "confirmado_en",
+        ]
     )
 
     postear(
@@ -184,3 +194,94 @@ def registrar_gasto(
         origen_id=origen_id or gasto.pk,
     )
     return gasto
+
+CUENTA_DIFERENCIA_PERDIDA = "6761"
+CUENTA_DIFERENCIA_GANANCIA = "7761"
+
+
+@transaction.atomic
+def pagar(
+    compra: Compra,
+    *,
+    cuenta,
+    fecha,
+    canal: str = "TRANSFERENCIA",
+    tipo_cambio_pago=None,
+):
+    """Paga una compra y reconoce la diferencia de cambio si la hay."""
+    compra = Compra.objects.select_for_update().get(pk=compra.pk)
+    if compra.estado != Compra.Estado.CONFIRMADA:
+        raise CompraError("Solo se paga una compra confirmada.")
+    if compra.pagada:
+        raise CompraError("La compra ya está pagada.")
+    if cuenta.cuenta_contable is None:
+        raise CompraError("La cuenta de tesorería no tiene cuenta contable.")
+
+    if compra.moneda == "PEN":
+        pagado = _cent(compra.total)
+        diferencia = Decimal("0.00")
+    else:
+        tasa = (
+            Decimal(tipo_cambio_pago)
+            if tipo_cambio_pago
+            else tipo_cambio_de(fecha).venta
+        )
+        pagado = _cent(Decimal(compra.total_moneda_origen) * tasa)
+        diferencia = _cent(pagado - compra.total)
+
+    cuentas = {
+        c.codigo: c
+        for c in Cuenta.objects.filter(
+            version="2026",
+            codigo__in=["4212", CUENTA_DIFERENCIA_PERDIDA, CUENTA_DIFERENCIA_GANANCIA],
+        )
+    }
+    documento = f"{compra.serie}-{compra.numero}".strip(" -")
+    lineas = [
+        (cuentas["4212"], compra.total, Decimal("0.00"), f"Pago compra {documento}")
+    ]
+    if diferencia > 0:
+        lineas.append(
+            (
+                cuentas[CUENTA_DIFERENCIA_PERDIDA],
+                diferencia,
+                Decimal("0.00"),
+                "Diferencia de cambio",
+            )
+        )
+    elif diferencia < 0:
+        lineas.append(
+            (
+                cuentas[CUENTA_DIFERENCIA_GANANCIA],
+                Decimal("0.00"),
+                -diferencia,
+                "Diferencia de cambio",
+            )
+        )
+    lineas.append((cuenta.cuenta_contable, Decimal("0.00"), pagado, "Salida de dinero"))
+
+    postear_lineas(
+        empresa=compra.empresa,
+        fecha=fecha,
+        tipo="PAGO_PROVEEDOR",
+        glosa=f"Pago compra {documento}",
+        lineas=lineas,
+        origen_tipo="COMPRA_PAGO",
+        origen_id=compra.pk,
+    )
+    anotar(
+        empresa=compra.empresa,
+        cuenta=cuenta,
+        fecha=fecha,
+        tipo="EGRESO",
+        importe=pagado,
+        concepto=f"Pago compra {documento}",
+        canal=canal,
+        origen_tipo="COMPRA_PAGO",
+        origen_id=compra.pk,
+    )
+
+    compra.pagada = True
+    compra.fecha_pago = fecha
+    compra.save(update_fields=["pagada", "fecha_pago"])
+    return pagado, diferencia

@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block titulo %}Periodos{% endblock %}
+{% block titulo_pagina %}Periodos{% endblock %}
+
+{% block contenido %}
+<section class="card">
+  <header class="card-head">
+    <h2>Cierre mensual</h2>
+    <span class="chip">Un periodo cerrado no acepta asientos nuevos</span>
+  </header>
+
+  {% if periodos %}
+  <table class="tabla-doc">
+    <thead>
+      <tr>
+        <th>Periodo</th>
+        <th>Estado</th>
+        <th>PCGE</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in periodos %}
+      <tr>
+        <td>{{ p.etiqueta }}</td>
+        <td>
+          <span class="chip {% if p.estado == 'CERRADO' %}chip-warn{% else %}chip-ok{% endif %}">
+            {{ p.get_estado_display }}
+          </span>
+        </td>
+        <td class="num">{{ p.version_pcge }}</td>
+        <td class="accion">
+          {% if p.estado == "ABIERTO" %}
+          <form method="post" action="{% url 'core:cerrar_periodo' p.pk %}">
+            {% csrf_token %}
+            <button class="btn btn-ghost" type="submit">Cerrar</button>
+          </form>
+          {% else %}
+          <form method="post" action="{% url 'core:reabrir_periodo' p.pk %}">
+            {% csrf_token %}
+            <button class="btn btn-ghost" type="submit">Reabrir</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">No hay periodos creados.</p>
+  {% endif %}
+
+  <p class="preview-note">
+    Para cerrar un mes no deben quedar compras ni ventas en borrador. Reabrir un
+    periodo requiere ser administrador y deja rastro en el asiento.
+  </p>
+</section>
+{% endblock %}

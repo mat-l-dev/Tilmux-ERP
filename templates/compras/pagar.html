@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block titulo %}Pagar compra{% endblock %}
+{% block titulo_pagina %}Pagar compra{% endblock %}
+
+{% block contenido %}
+<div class="doc">
+  <div class="doc-main">
+    <section class="card">
+      <header class="card-head">
+        <h2>{{ compra.serie }}-{{ compra.numero }}</h2>
+        <span class="chip">{{ compra.proveedor.nombre }}</span>
+      </header>
+
+      <dl class="datos">
+        <div><dt>Moneda</dt><dd>{{ compra.moneda }}</dd></div>
+        <div><dt>Registrado</dt><dd class="num">{{ compra.total }}</dd></div>
+        <div><dt>Tipo de cambio</dt><dd class="num">{{ compra.tipo_cambio }}</dd></div>
+        <div><dt>Monto en origen</dt><dd class="num">{{ compra.total_moneda_origen }}</dd></div>
+      </dl>
+
+      <form method="post" class="form">
+        {% csrf_token %}
+        <div class="grid-fields">
+          <label class="field">
+            <span>Fecha del pago</span>
+            <input type="date" name="fecha" value="{{ hoy|date:'Y-m-d' }}" required>
+          </label>
+          <label class="field">
+            <span>Cuenta</span>
+            <select name="cuenta" required>
+              {% for c in cuentas %}
+              <option value="{{ c.pk }}">{{ c.nombre }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label class="field">
+            <span>Canal</span>
+            <select name="canal">
+              <option value="TRANSFERENCIA">Transferencia</option>
+              <option value="YAPE">Yape</option>
+              <option value="PLIN">Plin</option>
+              <option value="EFECTIVO">Efectivo</option>
+            </select>
+          </label>
+          {% if compra.moneda != "PEN" %}
+          <label class="field">
+            <span>Tipo de cambio del pago</span>
+            <input type="text" name="tipo_cambio" inputmode="decimal" placeholder="3.500">
+          </label>
+          {% endif %}
+        </div>
+        <button class="btn btn-primary" type="submit">Registrar pago</button>
+      </form>
+    </section>
+  </div>
+
+  <aside class="doc-side">
+    <div class="card sticky">
+      <header class="card-head"><h2>Qué se registra</h2></header>
+      <div class="preview-row"><span>4212 · Por pagar</span><b class="num">{{ compra.total }}</b></div>
+      <div class="preview-row"><span>10xx · Salida de dinero</span><b class="num">{{ compra.total }}</b></div>
+      {% if compra.moneda != "PEN" %}
+      <p class="preview-note">
+        Si pagas con otro tipo de cambio, la diferencia se reconoce en la 6761
+        (pérdida) o 7761 (ganancia).
+      </p>
+      {% endif %}
+      <a class="btn btn-ghost btn-block" href="{% url 'compras:detalle' compra.pk %}">Volver</a>
+    </div>
+  </aside>
+</div>
+{% endblock %}

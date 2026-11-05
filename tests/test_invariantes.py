@@ -18,10 +18,11 @@ from catalogo.models import CuentaTesoreria, Producto, Tercero
 from compras.models import Compra, CompraLinea, CostoAdicional
 from compras.models_gasto import Gasto
 from compras.servicios import confirmar as confirmar_compra
-from compras.servicios import registrar_gasto
+from compras.servicios import pagar, registrar_gasto
 from contabilidad.calculos import calcular_linea
 from contabilidad.models import Asiento, AsientoLinea, Cuenta
 from contabilidad.moneda import a_soles
+from contabilidad.servicios import ContabilidadError
 from core.models import Empresa, Periodo, TipoCambio
 from inventario.models import CapaFIFO, ConsumoCapa, MovimientoStock
 from ventas.models import Venta, VentaLinea
@@ -376,6 +377,73 @@ class InvarianteMoneda(BaseContable):
 
         self.assertEqual(venta.guias.count(), 1)
         self.assertEqual(venta.guias.first(), guia)
+
+
+class InvariantePagos(BaseContable):
+    def test_pagar_una_compra_en_soles(self):
+        compra = self.comprar("10", "100")
+
+        pagado, diferencia = pagar(
+            compra, cuenta=self.bbva, fecha=date(2026, 11, 15)
+        )
+        compra.refresh_from_db()
+
+        self.assertEqual(pagado, Decimal("1180.00"))
+        self.assertEqual(diferencia, Decimal("0.00"))
+        self.assertTrue(compra.pagada)
+
+        asiento = Asiento.objects.get(
+            origen_tipo="COMPRA_PAGO", origen_id=compra.pk
+        )
+        importes = {l.cuenta.codigo: (l.debe, l.haber) for l in asiento.lineas.all()}
+        self.assertEqual(importes["4212"], (Decimal("1180.00"), Decimal("0.00")))
+        self.assertEqual(importes["1061"], (Decimal("0.00"), Decimal("1180.00")))
+
+    def test_la_diferencia_de_cambio_se_reconoce(self):
+        compra = Compra.objects.create(
+            empresa=self.empresa,
+            proveedor=self.proveedor,
+            fecha=date(2026, 11, 10),
+            tipo_doc="FACTURA",
+            serie="F009",
+            numero="0001",
+            moneda="USD",
+            tipo_cambio=Decimal("3.452"),
+            estado=Compra.Estado.CONFIRMADA,
+            subtotal=Decimal("292.54"),
+            igv=Decimal("52.66"),
+            total=Decimal("345.20"),
+            total_moneda_origen=Decimal("100.00"),
+        )
+
+        pagado, diferencia = pagar(
+            compra,
+            cuenta=self.bbva,
+            fecha=date(2026, 11, 20),
+            tipo_cambio_pago=Decimal("3.500"),
+        )
+
+        self.assertEqual(pagado, Decimal("350.00"))
+        self.assertEqual(diferencia, Decimal("4.80"))
+
+        asiento = Asiento.objects.get(
+            origen_tipo="COMPRA_PAGO", origen_id=compra.pk
+        )
+        importes = {l.cuenta.codigo: l.debe for l in asiento.lineas.all()}
+        self.assertEqual(importes["4212"], Decimal("345.20"))
+        self.assertEqual(importes["6761"], Decimal("4.80"))
+
+
+class InvariantePeriodos(BaseContable):
+    def test_un_periodo_cerrado_no_acepta_asientos(self):
+        periodo = Periodo.objects.get(empresa=self.empresa, anio=2026, mes=11)
+        periodo.estado = Periodo.Estado.CERRADO
+        periodo.save(update_fields=["estado"])
+
+        with self.assertRaises(ContabilidadError):
+            self.comprar("1", "100")
+
+        self.assertEqual(Compra.objects.filter(estado=Compra.Estado.CONFIRMADA).count(), 0)
 
 
 class InvarianteInmutabilidad(BaseContable):
