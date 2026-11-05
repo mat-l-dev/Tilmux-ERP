@@ -41,18 +41,15 @@ Abrir http://127.0.0.1:8000
 | `sembrar_productos` | Los dos SKUs iniciales |
 | `importar_excel` | Importa las 23 operaciones del Excel de TILMUX |
 
-## Despliegue
+## Uso diario
 
-```powershell
-flyctl auth login
-flyctl apps create tilmux-erp
-flyctl secrets set DJANGO_DEBUG=false DJANGO_SECRET_KEY=... DATABASE_URL=...
-flyctl deploy --remote-only
-```
+Doble clic en el acceso directo **Tilmux ERP** del escritorio. Arranca el
+servidor y abre el navegador. Detalle en [uso local](docs/uso-local.md).
 
-`fly.toml` ya incluye migración automática en cada despliegue y la sonda de
-salud en `/salud/`. La máquina se suspende sin tráfico y despierta en menos de
-un segundo con la primera visita.
+## Despliegue (opcional)
+
+`render.yaml` deja preparado un despliegue gratuito en Render, sin tarjeta,
+para cuando quieras abrirlo desde otro dispositivo. Ver [despliegue](docs/despliegue.md).
 
 ## Respaldo
 
