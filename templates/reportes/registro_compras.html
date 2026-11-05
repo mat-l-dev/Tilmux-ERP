@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block titulo %}Registro de compras{% endblock %}
+{% block titulo_pagina %}Registro de compras{% endblock %}
+
+{% block contenido %}
+{% include "reportes/_tabs.html" %}
+{% include "reportes/_filtro.html" %}
+
+<section class="card">
+  <header class="card-head">
+    <h2>Comprobantes recibidos</h2>
+    <span class="chip">{{ desde|date:"d/m/Y" }} — {{ hasta|date:"d/m/Y" }}</span>
+  </header>
+
+  {% if filas %}
+  <table class="tabla-doc">
+    <thead>
+      <tr>
+        <th>Fecha</th>
+        <th>Tipo</th>
+        <th>Serie y número</th>
+        <th>RUC</th>
+        <th>Proveedor</th>
+        <th class="der">Base</th>
+        <th class="der">No gravado</th>
+        <th class="der">IGV</th>
+        <th class="der">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for f in filas %}
+      <tr>
+        <td>{{ f.fecha|date:"d/m/Y" }}</td>
+        <td>{{ f.tipo }}</td>
+        <td>{{ f.documento|default:"—" }}</td>
+        <td class="num">{{ f.ruc|default:"—" }}</td>
+        <td>{{ f.proveedor }}</td>
+        <td class="num der">{{ f.base|default:0|floatformat:2 }}</td>
+        <td class="num der">{{ f.no_gravado|default:0|floatformat:2 }}</td>
+        <td class="num der">{{ f.igv|floatformat:2 }}</td>
+        <td class="num der">{{ f.total|floatformat:2 }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="5"><strong>Totales</strong></td>
+        <td class="num der"><strong>{{ base|floatformat:2 }}</strong></td>
+        <td class="num der"><strong>{{ no_gravado|floatformat:2 }}</strong></td>
+        <td class="num der"><strong>{{ igv|floatformat:2 }}</strong></td>
+        <td class="num der"><strong>{{ total|floatformat:2 }}</strong></td>
+      </tr>
+    </tfoot>
+  </table>
+  {% else %}
+  <p class="muted">No hay comprobantes en el rango.</p>
+  {% endif %}
+</section>
+{% endblock %}

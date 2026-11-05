@@ -96,6 +96,7 @@ class ReglaLinea(models.Model):
         NO_GRAVADO = "NO_GRAVADO", "No gravado"
         MEDIO = "MEDIO", "Cuenta del medio de pago"
         MEDIO_DESTINO = "MEDIO_DESTINO", "Cuenta del medio de destino"
+        GASTO = "GASTO", "Cuenta del gasto"
 
     regla = models.ForeignKey(Regla, on_delete=models.CASCADE, related_name="lineas")
     orden = models.PositiveSmallIntegerField()

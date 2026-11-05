@@ -25,6 +25,13 @@ from ventas.servicios import confirmar as confirmar_venta
 MEDIOS = {"BBVA": "BBVA", "BCP": "BCP", "Caja": "Caja", "Pasarela": "Mercado Pago"}
 COMPRAS = {"FACTURA": "Factura", "BOLETA": "Boleta"}
 
+# Comprobantes que figuran en el Registro de Compras Electrónico de SUNAT
+# (setiembre 2026) y que el Excel no tenía anotados.
+DOCUMENTOS_SUNAT = {
+    3: ("FB29", "29158446"),
+    9: ("FB29", "29458395"),
+}
+
 
 def dec(valor) -> Decimal:
     return Decimal(str(valor or 0)).quantize(Decimal("0.01"))
@@ -139,31 +146,22 @@ class Command(BaseCommand):
                     origen_tipo="IMPORTACION",
                     origen_id=numero_fila,
                 )
-            elif tipo == "Comisión o gasto bancario":
-                registrar(
-                    empresa=empresa,
-                    cuenta=self._cuenta(medio),
-                    fecha=fecha,
-                    tipo="EGRESO",
-                    importe=importe,
-                    concepto=detalle or "Comisión bancaria",
-                    tipo_regla="GASTO_SIN_IGV",
-                    origen_tipo="IMPORTACION",
-                    origen_id=numero_fila,
-                )
-            elif tipo == "Comisión de pasarela de pagos":
-                registrar(
-                    empresa=empresa,
-                    cuenta=self._cuenta(medio),
-                    fecha=fecha,
-                    tipo="EGRESO",
-                    importe=importe,
-                    concepto=detalle,
-                    tipo_regla="COMISION_PASARELA",
-                    base=base,
-                    igv=igv,
-                    origen_tipo="IMPORTACION",
-                    origen_id=numero_fila,
+            elif tipo in (
+                "Comisión o gasto bancario",
+                "Comisión de pasarela de pagos",
+            ):
+                self._gasto(
+                    numero_fila,
+                    fecha,
+                    base,
+                    igv,
+                    importe,
+                    comprobante,
+                    detalle,
+                    medio,
+                    tipo,
+                    campo(fila, "RUC o DNI"),
+                    campo(fila, "Nombre del tercero"),
                 )
             elif tipo == "Transferencia entre cuentas propias":
                 transferir(
@@ -239,6 +237,61 @@ class Command(BaseCommand):
     def _producto(self, detalle: str) -> Producto:
         sku = "TIL-000002" if "Standard" in detalle else "TIL-000001"
         return Producto.objects.get(sku=sku)
+
+    def _gasto(self, numero_fila, fecha, base, igv, total, comprobante, detalle, medio, tipo, ruc, nombre):
+        from compras.servicios import registrar_gasto
+        from contabilidad.models import Cuenta
+
+        serie, numero = "", ""
+        tipo_doc = "OTRO"
+
+        if numero_fila in DOCUMENTOS_SUNAT:
+            serie, numero = DOCUMENTOS_SUNAT[numero_fila]
+            tipo_doc = "FACTURA"
+        elif comprobante and "-" in comprobante and not comprobante.lower().startswith("voucher"):
+            serie, numero = comprobante.split("-", 1)
+            tipo_doc = "BOLETA" if serie.upper().startswith("B") else "FACTURA"
+
+        es_pasarela = tipo == "Comisión de pasarela de pagos"
+        codigo_cuenta = "6311" if es_pasarela else "6391"
+        cuenta = Cuenta.objects.get(version="2026", codigo=codigo_cuenta)
+
+        if ruc:
+            proveedor, _ = Tercero.objects.get_or_create(
+                tipo_doc="RUC",
+                numero_doc=str(ruc),
+                defaults={"nombre": nombre or "Proveedor", "rol": "PROVEEDOR"},
+            )
+        elif "BBVA" in (nombre or "").upper():
+            proveedor, _ = Tercero.objects.get_or_create(
+                tipo_doc="RUC",
+                numero_doc="20100130204",
+                defaults={"nombre": "BANCO BBVA PERÚ", "rol": "PROVEEDOR"},
+            )
+        else:
+            proveedor, _ = Tercero.objects.get_or_create(
+                tipo_doc="SIN",
+                numero_doc="",
+                nombre=nombre or "Proveedor sin documento",
+                defaults={"rol": "PROVEEDOR"},
+            )
+
+        registrar_gasto(
+            empresa=self.empresa,
+            proveedor=proveedor,
+            fecha=fecha,
+            tipo_doc=tipo_doc,
+            serie=serie,
+            numero=numero,
+            base=base,
+            igv=igv,
+            total=total,
+            cuenta=cuenta,
+            medio=self._cuenta(medio),
+            glosa=detalle,
+            origen_tipo="IMPORTACION",
+            origen_id=numero_fila,
+        )
 
     def _compra(self, *, fecha, base, igv, total, comprobante, detalle, medio):
         serie, numero = ("", "")

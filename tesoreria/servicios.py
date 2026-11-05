@@ -61,6 +61,33 @@ def registrar(
 
 
 @transaction.atomic
+def anotar(
+    *,
+    empresa: Empresa,
+    cuenta: CuentaTesoreria,
+    fecha: date,
+    tipo: str,
+    importe: Decimal,
+    concepto: str,
+    canal: str = "TRANSFERENCIA",
+    origen_tipo: str = "",
+    origen_id: int | None = None,
+) -> MovimientoTesoreria:
+    """Registra el movimiento de dinero sin generar asiento (ya lo hizo el dueño)."""
+    return MovimientoTesoreria.objects.create(
+        empresa=empresa,
+        cuenta=cuenta,
+        fecha=fecha,
+        tipo=tipo,
+        importe=importe,
+        canal=canal,
+        concepto=concepto[:200],
+        origen_tipo=origen_tipo,
+        origen_id=origen_id,
+    )
+
+
+@transaction.atomic
 def transferir(
     *,
     empresa: Empresa,

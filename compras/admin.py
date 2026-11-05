@@ -1,6 +1,7 @@
 from django.contrib import admin
 
 from .models import Compra, CompraLinea, CostoAdicional
+from .models_gasto import Gasto
 
 
 class CompraLineaInline(admin.TabularInline):
@@ -14,6 +15,15 @@ class CostoAdicionalInline(admin.TabularInline):
     model = CostoAdicional
     extra = 1
     fields = ("concepto", "base", "igv", "criterio")
+
+
+@admin.register(Gasto)
+class GastoAdmin(admin.ModelAdmin):
+    list_display = ("fecha", "proveedor", "tipo_doc", "serie", "numero", "total", "medio")
+    list_filter = ("empresa", "tipo_doc", "cuenta")
+    search_fields = ("proveedor__nombre", "serie", "numero", "glosa")
+    date_hierarchy = "fecha"
+    autocomplete_fields = ("proveedor", "cuenta")
 
 
 @admin.register(Compra)

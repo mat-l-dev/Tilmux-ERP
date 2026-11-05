@@ -58,6 +58,7 @@ def postear(
     origen_id: int | None = None,
     cuenta_medio: Cuenta | None = None,
     cuenta_destino: Cuenta | None = None,
+    cuenta_gasto: Cuenta | None = None,
 ) -> Asiento:
     """Crea el asiento a partir de la regla del tipo de operación."""
     periodo = periodo_de(empresa, fecha)
@@ -88,6 +89,9 @@ def postear(
         elif linea.importe_ref == ReglaLinea.ImporteRef.MEDIO_DESTINO:
             cuenta = cuenta_destino
             valor = montos.total
+        elif linea.importe_ref == ReglaLinea.ImporteRef.GASTO:
+            cuenta = cuenta_gasto
+            valor = montos.base if montos.base else montos.total
         else:
             cuenta = linea.cuenta
             valor = getattr(montos, linea.importe_ref.lower())

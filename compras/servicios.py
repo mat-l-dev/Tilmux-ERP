@@ -9,8 +9,10 @@ from django.utils import timezone
 
 from contabilidad.servicios import Montos, postear
 from inventario.servicios import entrar
+from tesoreria.servicios import anotar
 
 from .models import Compra
+from .models_gasto import Gasto
 
 CENT = Decimal("0.01")
 DIEZ = Decimal("0.0000000001")
@@ -101,3 +103,69 @@ def confirmar(compra: Compra) -> Compra:
         origen_id=compra.pk,
     )
     return compra
+
+
+@transaction.atomic
+def registrar_gasto(
+    *,
+    empresa,
+    proveedor,
+    fecha,
+    tipo_doc: str,
+    serie: str,
+    numero: str,
+    base,
+    igv,
+    total,
+    cuenta,
+    medio=None,
+    glosa: str = "",
+    origen_tipo: str = "",
+    origen_id: int | None = None,
+) -> Gasto:
+    base, igv, total = _cent(base), _cent(igv), _cent(total)
+    if base + igv != total:
+        raise CompraError("El gasto no cuadra: base más IGV no da el total.")
+    if medio is None:
+        raise CompraError("El gasto necesita una cuenta de tesorería.")
+    if cuenta is None:
+        raise CompraError("El gasto necesita una cuenta contable.")
+
+    gasto = Gasto.objects.create(
+        empresa=empresa,
+        proveedor=proveedor,
+        fecha=fecha,
+        tipo_doc=tipo_doc,
+        serie=serie[:4],
+        numero=numero[:20],
+        base=base,
+        igv=igv,
+        total=total,
+        cuenta=cuenta,
+        medio=medio,
+        glosa=glosa[:255],
+    )
+
+    documento = f"{serie}-{numero}".strip(" -") or "sin comprobante"
+    postear(
+        empresa=empresa,
+        fecha=fecha,
+        tipo="GASTO_CON_IGV" if igv > 0 else "GASTO_SIN_IGV",
+        glosa=f"{documento} · {proveedor.nombre}"[:255],
+        montos=Montos(base=base, igv=igv, total=total),
+        origen_tipo=origen_tipo or "GASTO",
+        origen_id=origen_id or gasto.pk,
+        cuenta_medio=medio.cuenta_contable,
+        cuenta_gasto=cuenta,
+    )
+    anotar(
+        empresa=empresa,
+        cuenta=medio,
+        fecha=fecha,
+        tipo="EGRESO",
+        importe=total,
+        concepto=glosa or f"Gasto {documento}",
+        origen_tipo=origen_tipo or "GASTO",
+        origen_id=origen_id or gasto.pk,
+    )
+    return gasto

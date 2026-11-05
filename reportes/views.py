@@ -10,6 +10,7 @@ from django.db.models import Sum
 from django.shortcuts import render
 
 from compras.models import Compra
+from compras.models_gasto import Gasto
 from contabilidad.models import Cuenta
 from core.context import empresa_actual
 from ventas.models import Venta
@@ -120,6 +121,63 @@ def registro_ventas(request):
         "total": (base or 0) + (igv or 0),
     }
     return render(request, "reportes/registro_ventas.html", contexto)
+
+
+@login_required
+def registro_compras(request):
+    empresa = empresa_actual(request)
+    desde, hasta = _rango(request)
+    filas = []
+
+    if empresa:
+        for compra in Compra.objects.filter(
+            empresa=empresa,
+            estado=Compra.Estado.CONFIRMADA,
+            fecha__range=(desde, hasta),
+        ).select_related("proveedor"):
+            filas.append(
+                {
+                    "fecha": compra.fecha,
+                    "tipo": compra.get_tipo_doc_display(),
+                    "documento": f"{compra.serie}-{compra.numero}".strip(" -"),
+                    "ruc": compra.proveedor.numero_doc,
+                    "proveedor": compra.proveedor.nombre,
+                    "base": compra.subtotal,
+                    "igv": compra.igv,
+                    "total": compra.total,
+                    "clase": "Mercadería",
+                }
+            )
+        for gasto in Gasto.objects.filter(
+            empresa=empresa, fecha__range=(desde, hasta)
+        ).select_related("proveedor"):
+            filas.append(
+                {
+                    "fecha": gasto.fecha,
+                    "tipo": gasto.get_tipo_doc_display(),
+                    "documento": f"{gasto.serie}-{gasto.numero}".strip(" -"),
+                    "ruc": gasto.proveedor.numero_doc,
+                    "proveedor": gasto.proveedor.nombre,
+                    "base": gasto.base if gasto.igv > 0 else 0,
+                    "no_gravado": gasto.base if gasto.igv == 0 else 0,
+                    "igv": gasto.igv,
+                    "total": gasto.total,
+                    "clase": "Gasto",
+                }
+            )
+
+    filas.sort(key=lambda f: (f["fecha"], f["documento"]))
+
+    contexto = {
+        "filas": filas,
+        "desde": desde,
+        "hasta": hasta,
+        "base": sum((f.get("base") or 0) for f in filas),
+        "no_gravado": sum((f.get("no_gravado") or 0) for f in filas),
+        "igv": sum((f["igv"] or 0) for f in filas),
+        "total": sum((f["total"] or 0) for f in filas),
+    }
+    return render(request, "reportes/registro_compras.html", contexto)
 
 
 @login_required

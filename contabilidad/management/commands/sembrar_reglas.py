@@ -15,6 +15,7 @@ TOTAL = ReglaLinea.ImporteRef.TOTAL
 COSTO = ReglaLinea.ImporteRef.COSTO
 MEDIO = ReglaLinea.ImporteRef.MEDIO
 MEDIO_DESTINO = ReglaLinea.ImporteRef.MEDIO_DESTINO
+GASTO = ReglaLinea.ImporteRef.GASTO
 
 REGLAS = {
     "COMPRA": (
@@ -35,11 +36,11 @@ REGLAS = {
     ),
     "GASTO_CON_IGV": (
         "Gasto con IGV",
-        [("6593", D, BASE, "Gasto"), ("40111", D, IGV, "IGV"), (None, H, MEDIO, "Salida de dinero")],
+        [(None, D, GASTO, "Gasto"), ("40111", D, IGV, "IGV"), (None, H, MEDIO, "Salida de dinero")],
     ),
     "GASTO_SIN_IGV": (
         "Gasto sin IGV",
-        [("6391", D, TOTAL, "Gasto"), (None, H, MEDIO, "Salida de dinero")],
+        [(None, D, GASTO, "Gasto"), (None, H, MEDIO, "Salida de dinero")],
     ),
     "NOTA_CREDITO": (
         "Nota de crédito de venta",
