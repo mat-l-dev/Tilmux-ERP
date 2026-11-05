@@ -13,6 +13,7 @@ urlpatterns = [
     path("compras/exportar/", exportar.compras, name="exportar_compras"),
     path("eeff/", eeff.estados, name="eeff"),
     path("eeff/exportar/", exportar.eeff_excel, name="exportar_eeff"),
+    path("eeff/pdf/", exportar.eeff_pdf, name="exportar_eeff_pdf"),
     path("conciliacion/", views.conciliacion, name="conciliacion"),
     path("inventario/", views.inventario, name="inventario"),
     path("kardex/<int:pk>/", views.kardex, name="kardex"),

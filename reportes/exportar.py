@@ -22,6 +22,7 @@ from core.context import empresa_actual
 from ventas.models import NotaCredito, NotaDebito, Venta
 
 from .eeff import construir
+from .pdf_eeff import generar as generar_pdf
 from .utils import rango
 
 CAMPOS_VENTAS = [
@@ -280,4 +281,14 @@ def eeff_excel(request):
     )
     respuesta["Content-Disposition"] = f'attachment; filename="eeff-{hasta:%Y%m%d}.xlsx"'
     libro.save(respuesta)
+    return respuesta
+
+
+@login_required
+def eeff_pdf(request):
+    empresa = empresa_actual(request)
+    desde, hasta = rango(request)
+    datos = construir(empresa, desde, hasta)
+    respuesta = HttpResponse(generar_pdf(datos, empresa), content_type="application/pdf")
+    respuesta["Content-Disposition"] = f'attachment; filename="eeff-{hasta:%Y%m%d}.pdf"'
     return respuesta

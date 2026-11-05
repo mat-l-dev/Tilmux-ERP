@@ -185,6 +185,31 @@ def construir(empresa, desde: date, hasta: date) -> dict:
     flujo_financiacion = aportes
     flujo_neto = flujo_operacion + flujo_financiacion
 
+    efectivo_cuentas = [
+        item
+        for item in activo_corriente
+        if item["codigo"].startswith(("101", "1031", "1061"))
+    ]
+    tributos = [item for item in pasivo if item["codigo"].startswith("40")]
+    relacionadas = [item for item in pasivo if item["codigo"].startswith("44")]
+
+    inventario_detalle = []
+    if empresa:
+        from inventario.models import CapaFIFO
+
+        resumen = {}
+        for capa in CapaFIFO.objects.filter(
+            empresa=empresa, cantidad_restante__gt=0
+        ).select_related("producto"):
+            fila = resumen.setdefault(
+                capa.producto_id, {"producto": capa.producto, "cantidad": CERO, "valor": CERO}
+            )
+            fila["cantidad"] += capa.cantidad_restante
+            fila["valor"] += capa.cantidad_restante * capa.costo_unitario
+        inventario_detalle = sorted(
+            resumen.values(), key=lambda f: f["valor"], reverse=True
+        )[:5]
+
     contexto = {
         "desde": desde,
         "hasta": hasta,
@@ -197,6 +222,7 @@ def construir(empresa, desde: date, hasta: date) -> dict:
         "total_activo": total_activo,
         "total_pasivo": total_pasivo,
         "total_patrimonio": total_patrimonio,
+        "total_patrimonio_resultado": total_patrimonio_resultado,
         "total_pasivo_patrimonio": total_pasivo + total_patrimonio_resultado,
         "resultado_acumulado": resultado_acumulado,
         "ingresos_ventas": ingresos_ventas,
@@ -231,6 +257,10 @@ def construir(empresa, desde: date, hasta: date) -> dict:
             {"concepto": "Efectivo al cierre", "importe": efectivo_final, "total": True},
         ],
         "flujo_cuadra": efectivo_inicial + flujo_neto - efectivo_final,
+        "efectivo_cuentas": efectivo_cuentas,
+        "tributos": tributos,
+        "relacionadas": relacionadas,
+        "inventario_detalle": inventario_detalle,
     }
     return contexto
 
@@ -248,4 +278,38 @@ def estados(request):
         desde = date.fromisoformat(request.GET["desde"])
 
     contexto = construir(empresa, desde, hasta)
+
+    def menos_un_anio(fecha: date) -> date:
+        try:
+            return fecha.replace(year=fecha.year - 1)
+        except ValueError:
+            return fecha.replace(year=fecha.year - 1, day=28)
+
+    anterior = construir(empresa, menos_un_anio(desde), menos_un_anio(hasta))
+    contexto["anterior"] = anterior
+    contexto["anio_anterior"] = hasta.year - 1
+
+    def variacion(actual, previo):
+        if not previo:
+            return None
+        return ((Decimal(actual) - Decimal(previo)) / Decimal(previo) * 100).quantize(
+            Decimal("0.1")
+        )
+
+    pares = [
+        ("Ingresos por ventas", "ingresos_ventas"),
+        ("Resultado del periodo", "resultado_neto"),
+        ("Total activo", "total_activo"),
+        ("Total pasivo", "total_pasivo"),
+        ("Total patrimonio", "total_patrimonio_resultado"),
+    ]
+    contexto["comparativo"] = [
+        {
+            "concepto": etiqueta,
+            "actual": contexto[clave],
+            "anterior": anterior[clave],
+            "variacion": variacion(contexto[clave], anterior[clave]),
+        }
+        for etiqueta, clave in pares
+    ]
     return render(request, "reportes/eeff.html", contexto)

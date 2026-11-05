@@ -9,6 +9,7 @@
 
 <div class="acciones-head" style="justify-content:flex-end; margin-bottom:10px">
   <a class="btn btn-ghost" href="{% url 'reportes:exportar_eeff' %}?desde={{ desde|date:'Y-m-d' }}&hasta={{ hasta|date:'Y-m-d' }}">Exportar a Excel</a>
+  <a class="btn btn-ghost" href="{% url 'reportes:exportar_eeff_pdf' %}?desde={{ desde|date:'Y-m-d' }}&hasta={{ hasta|date:'Y-m-d' }}">Exportar a PDF</a>
 </div>
 
 {% if descuadre %}
@@ -135,6 +136,35 @@
 </section>
 
 <section class="card" style="margin-top:12px">
+  <header class="card-head">
+    <h2>Comparativo con {{ anio_anterior }}</h2>
+    <span class="chip">Mismo periodo del año anterior</span>
+  </header>
+  <table class="tabla-doc eeff-tabla">
+    <thead>
+      <tr>
+        <th>Concepto</th>
+        <th class="der">{{ hasta|date:"Y" }}</th>
+        <th class="der">{{ anio_anterior }}</th>
+        <th class="der">Variación</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in comparativo %}
+      <tr>
+        <td>{{ c.concepto }}</td>
+        <td class="num der">{{ c.actual|floatformat:2 }}</td>
+        <td class="num der">{{ c.anterior|floatformat:2 }}</td>
+        <td class="num der">
+          {% if c.variacion is None %}—{% else %}{{ c.variacion|floatformat:1 }} %{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="card" style="margin-top:12px">
   <header class="card-head"><h2>Notas a los estados financieros</h2></header>
 
   <details class="nota">
@@ -170,6 +200,67 @@
     <p>Las operaciones en dólares se convierten al tipo de cambio publicado por SUNAT.
     Al cierre se revalúan los saldos pendientes y la diferencia se reconoce en
     resultados.</p>
+  </details>
+
+  <details class="nota">
+    <summary>6. Composición del efectivo</summary>
+    {% if efectivo_cuentas %}
+    <table class="tabla-doc">
+      <tbody>
+        {% for c in efectivo_cuentas %}
+        <tr><td>{{ c.codigo }} · {{ c.nombre }}</td><td class="num der">{{ c.importe|floatformat:2 }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p>Sin saldo en efectivo al cierre.</p>
+    {% endif %}
+  </details>
+
+  <details class="nota">
+    <summary>7. Tributos por pagar</summary>
+    {% if tributos %}
+    <table class="tabla-doc">
+      <tbody>
+        {% for c in tributos %}
+        <tr><td>{{ c.codigo }} · {{ c.nombre }}</td><td class="num der">{{ c.importe|floatformat:2 }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p>Sin tributos pendientes al cierre.</p>
+    {% endif %}
+  </details>
+
+  <details class="nota">
+    <summary>8. Partes relacionadas</summary>
+    {% if relacionadas %}
+    <p>Saldos con socios y accionistas:</p>
+    <table class="tabla-doc">
+      <tbody>
+        {% for c in relacionadas %}
+        <tr><td>{{ c.codigo }} · {{ c.nombre }}</td><td class="num der">{{ c.importe|floatformat:2 }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p>Sin saldos pendientes con socios al cierre.</p>
+    {% endif %}
+  </details>
+
+  <details class="nota">
+    <summary>9. Composición del inventario</summary>
+    {% if inventario_detalle %}
+    <table class="tabla-doc">
+      <tbody>
+        {% for i in inventario_detalle %}
+        <tr><td>{{ i.producto.sku }} · {{ i.producto.nombre }}</td><td class="num der">{{ i.cantidad }}</td><td class="num der">{{ i.valor|floatformat:2 }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p>Sin inventario al cierre.</p>
+    {% endif %}
   </details>
 </section>
 {% endblock %}
