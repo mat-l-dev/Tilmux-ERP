@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
@@ -110,7 +111,7 @@ def _base_de_datos() -> dict:
         "PASSWORD": unquote(url.password or ""),
         "HOST": url.hostname,
         "PORT": url.port or 5432,
-        "CONN_MAX_AGE": 60,
+        "CONN_MAX_AGE": 0 if "test" in sys.argv else 60,
         "DISABLE_SERVER_SIDE_CURSORS": True,
         "OPTIONS": {"sslmode": os.environ.get("DJANGO_DB_SSLMODE", "require")},
     }
