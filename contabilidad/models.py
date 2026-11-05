@@ -67,6 +67,9 @@ class Regla(models.Model):
         TRANSFERENCIA = "TRANSFERENCIA", "Transferencia entre cuentas"
         IGV_MENSUAL = "IGV_MENSUAL", "Pago de IGV mensual"
         RENTA_MENSUAL = "RENTA_MENSUAL", "Renta RER del mes"
+        CAPITAL_SUSCRITO = "CAPITAL_SUSCRITO", "Capital suscrito"
+        REEMBOLSO_SOCIO = "REEMBOLSO_SOCIO", "Dinero de socio por reembolsar"
+        COMISION_PASARELA = "COMISION_PASARELA", "Comisión de pasarela"
 
     tipo = models.CharField(max_length=20, choices=Tipo.choices, unique=True)
     nombre = models.CharField(max_length=120)
@@ -92,6 +95,7 @@ class ReglaLinea(models.Model):
         COSTO = "COSTO", "Costo de venta"
         NO_GRAVADO = "NO_GRAVADO", "No gravado"
         MEDIO = "MEDIO", "Cuenta del medio de pago"
+        MEDIO_DESTINO = "MEDIO_DESTINO", "Cuenta del medio de destino"
 
     regla = models.ForeignKey(Regla, on_delete=models.CASCADE, related_name="lineas")
     orden = models.PositiveSmallIntegerField()
@@ -104,7 +108,7 @@ class ReglaLinea(models.Model):
         help_text="Vacío cuando la cuenta la decide el medio de pago.",
     )
     lado = models.CharField(max_length=1, choices=Lado.choices)
-    importe_ref = models.CharField(max_length=12, choices=ImporteRef.choices)
+    importe_ref = models.CharField(max_length=14, choices=ImporteRef.choices)
     glosa = models.CharField(max_length=120, blank=True)
 
     class Meta:

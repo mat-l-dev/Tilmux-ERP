@@ -13,8 +13,7 @@ from django.shortcuts import redirect, render
 from django.views.decorators.http import require_POST
 
 from compras.models import Compra
-from contabilidad.models import Cuenta
-from tesoreria.models import MovimientoTesoreria
+from contabilidad.models import AsientoLinea, Cuenta
 from ventas.models import Venta
 
 from .context import empresa_actual
@@ -45,14 +44,12 @@ def panel(request: HttpRequest) -> HttpResponse:
     igv_compras = Decimal("0")
 
     if empresa:
-        movimientos = MovimientoTesoreria.objects.filter(empresa=empresa)
-        entradas = movimientos.filter(tipo=MovimientoTesoreria.Tipo.INGRESO).aggregate(
-            s=Sum("importe")
-        )["s"] or 0
-        salidas = movimientos.filter(tipo=MovimientoTesoreria.Tipo.EGRESO).aggregate(
-            s=Sum("importe")
-        )["s"] or 0
-        saldo = Decimal(entradas) - Decimal(salidas)
+        saldos = AsientoLinea.objects.filter(
+            asiento__empresa=empresa,
+            asiento__estado="CONFIRMADO",
+            cuenta__codigo__in=["101", "1031", "1061"],
+        ).aggregate(d=Sum("debe"), h=Sum("haber"))
+        saldo = Decimal(saldos["d"] or 0) - Decimal(saldos["h"] or 0)
 
         ventas_mes = Venta.objects.filter(
             empresa=empresa,
@@ -112,6 +109,7 @@ def panel(request: HttpRequest) -> HttpResponse:
         "saldo_tesoreria": soles(saldo),
         "ventas_mes": soles(ventas_base),
         "igv_por_pagar": soles(igv),
+        "igv_nota": "Saldo a favor" if igv < 0 else "Después del crédito de compras",
         "renta_mes": soles(renta),
         "periodo_actual": (
             Periodo.objects.filter(empresa=empresa, anio=hoy.year, mes=hoy.month).first()

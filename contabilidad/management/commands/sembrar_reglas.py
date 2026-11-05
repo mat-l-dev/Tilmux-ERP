@@ -14,6 +14,7 @@ IGV = ReglaLinea.ImporteRef.IGV
 TOTAL = ReglaLinea.ImporteRef.TOTAL
 COSTO = ReglaLinea.ImporteRef.COSTO
 MEDIO = ReglaLinea.ImporteRef.MEDIO
+MEDIO_DESTINO = ReglaLinea.ImporteRef.MEDIO_DESTINO
 
 REGLAS = {
     "COMPRA": (
@@ -46,7 +47,7 @@ REGLAS = {
     ),
     "APORTE_CAPITAL": (
         "Aporte de capital",
-        [(None, D, MEDIO, "Ingreso de dinero"), ("5011", H, TOTAL, "Capital")],
+        [(None, D, MEDIO, "Ingreso de dinero"), ("1421", H, TOTAL, "Capital suscrito por cobrar")],
     ),
     "PRESTAMO_SOCIO": (
         "Préstamo de socio",
@@ -59,6 +60,22 @@ REGLAS = {
     "RENTA_MENSUAL": (
         "Renta RER del mes",
         [("881", D, TOTAL, "Impuesto corriente"), ("40171", H, TOTAL, "Por pagar")],
+    ),
+    "CAPITAL_SUSCRITO": (
+        "Capital suscrito en la constitución",
+        [("1421", D, TOTAL, "Por cobrar a socios"), ("5011", H, TOTAL, "Capital")],
+    ),
+    "REEMBOLSO_SOCIO": (
+        "Dinero de socio por reembolsar",
+        [(None, D, MEDIO, "Ingreso de dinero"), ("4419", H, TOTAL, "Por reembolsar")],
+    ),
+    "TRANSFERENCIA": (
+        "Transferencia entre cuentas propias",
+        [(None, H, MEDIO, "Sale de"), (None, D, MEDIO_DESTINO, "Entra a")],
+    ),
+    "COMISION_PASARELA": (
+        "Comisión de pasarela de pagos",
+        [("6311", D, BASE, "Comisión"), ("40111", D, IGV, "IGV"), (None, H, MEDIO, "Salida de dinero")],
     ),
 }
 

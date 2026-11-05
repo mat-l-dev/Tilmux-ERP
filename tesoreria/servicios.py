@@ -22,6 +22,9 @@ def registrar(
     canal: str = "TRANSFERENCIA",
     origen_tipo: str = "",
     origen_id: int | None = None,
+    tipo_regla: str | None = None,
+    base: Decimal | None = None,
+    igv: Decimal = Decimal("0"),
 ) -> MovimientoTesoreria:
     movimiento = MovimientoTesoreria.objects.create(
         empresa=empresa,
@@ -35,7 +38,7 @@ def registrar(
         origen_id=origen_id,
     )
 
-    tipo_regla = (
+    regla = tipo_regla or (
         "COBRO_CLIENTE"
         if tipo == MovimientoTesoreria.Tipo.INGRESO
         else "PAGO_PROVEEDOR"
@@ -43,11 +46,55 @@ def registrar(
     postear(
         empresa=empresa,
         fecha=fecha,
-        tipo=tipo_regla,
+        tipo=regla,
         glosa=concepto,
-        montos=Montos(total=importe),
+        montos=Montos(
+            total=importe,
+            base=importe if base is None else base,
+            igv=igv,
+        ),
         origen_tipo=origen_tipo,
         origen_id=origen_id,
         cuenta_medio=cuenta.cuenta_contable,
     )
     return movimiento
+
+
+@transaction.atomic
+def transferir(
+    *,
+    empresa: Empresa,
+    origen: CuentaTesoreria,
+    destino: CuentaTesoreria,
+    fecha: date,
+    importe: Decimal,
+    concepto: str,
+) -> None:
+    MovimientoTesoreria.objects.create(
+        empresa=empresa,
+        cuenta=origen,
+        fecha=fecha,
+        tipo=MovimientoTesoreria.Tipo.EGRESO,
+        importe=importe,
+        concepto=f"Transferencia a {destino.nombre}: {concepto}"[:200],
+        origen_tipo="TRANSFERENCIA",
+    )
+    MovimientoTesoreria.objects.create(
+        empresa=empresa,
+        cuenta=destino,
+        fecha=fecha,
+        tipo=MovimientoTesoreria.Tipo.INGRESO,
+        importe=importe,
+        concepto=f"Transferencia desde {origen.nombre}: {concepto}"[:200],
+        origen_tipo="TRANSFERENCIA",
+    )
+    postear(
+        empresa=empresa,
+        fecha=fecha,
+        tipo="TRANSFERENCIA",
+        glosa=concepto,
+        montos=Montos(total=importe),
+        origen_tipo="TRANSFERENCIA",
+        cuenta_medio=origen.cuenta_contable,
+        cuenta_destino=destino.cuenta_contable,
+    )

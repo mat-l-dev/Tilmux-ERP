@@ -19,7 +19,7 @@ TASA_RENTA_RER = Decimal("0.015")
 
 def _rango(request) -> tuple[date, date]:
     hoy = date.today()
-    desde = request.GET.get("desde") or hoy.replace(day=1).isoformat()
+    desde = request.GET.get("desde") or date(hoy.year, 1, 1).isoformat()
     hasta = request.GET.get("hasta") or hoy.isoformat()
     return date.fromisoformat(desde), date.fromisoformat(hasta)
 
