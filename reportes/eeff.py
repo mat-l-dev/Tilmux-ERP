@@ -108,6 +108,15 @@ def estados(request):
     resultado_neto = resultado_antes_impuesto - gasto_impuesto
     total_patrimonio_resultado = total_patrimonio + resultado_neto
 
+    efectivo = sum(
+        (
+            item["importe"]
+            for item in activo_corriente
+            if item["codigo"].startswith(("101", "1031", "1061"))
+        ),
+        CERO,
+    )
+
     contexto = {
         "desde": desde,
         "hasta": hasta,
@@ -130,5 +139,12 @@ def estados(request):
         "resultado_neto": resultado_neto,
         "total_patrimonio_resultado": total_patrimonio_resultado,
         "descuadre": total_activo - (total_pasivo + total_patrimonio_resultado),
+        "efectivo": efectivo,
+        "cambios": [
+            {"concepto": "Saldo al inicio del ejercicio", "importe": total_patrimonio},
+            {"concepto": "Aportes de capital del periodo", "importe": CERO},
+            {"concepto": "Resultado del periodo", "importe": resultado_neto},
+            {"concepto": "Saldo al cierre", "importe": total_patrimonio_resultado},
+        ],
     }
     return render(request, "reportes/eeff.html", contexto)

@@ -82,4 +82,60 @@
     </p>
   </section>
 </div>
+
+<section class="card" style="margin-top:12px">
+  <header class="card-head">
+    <h2>Estado de cambios en el patrimonio</h2>
+    <span class="chip">Al {{ hasta|date:"d/m/Y" }}</span>
+  </header>
+  <table class="tabla-doc eeff-tabla">
+    <tbody>
+      {% for c in cambios %}
+      <tr class="{% if forloop.last %}total{% endif %}">
+        <td>{{ c.concepto }}</td>
+        <td class="num der">{{ c.importe|floatformat:2 }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="card" style="margin-top:12px">
+  <header class="card-head"><h2>Notas a los estados financieros</h2></header>
+
+  <details class="nota">
+    <summary>1. Base de preparación</summary>
+    <p>Los estados financieros se preparan conforme a la Norma de Información Financiera
+    para microempresas, con el Plan Contable General Empresarial 2026 aplicado
+    anticipadamente. Se presentan en soles y por el periodo indicado.</p>
+  </details>
+
+  <details class="nota">
+    <summary>2. Efectivo y equivalentes</summary>
+    <p>El saldo de S/ {{ efectivo|floatformat:2 }} corresponde a las cuentas de caja,
+    efectivo en tránsito y depósitos. Incluye el dinero retenido por la pasarela de
+    pagos pendiente de transferencia al banco.</p>
+  </details>
+
+  <details class="nota">
+    <summary>3. Inventarios</summary>
+    <p>Se valorizan al costo de adquisición, que incluye fletes, derechos de aduana y
+    otros costos de internamiento. El método es PEPS. Al cierre se compara el costo
+    con el valor neto realizable y, si corresponde, se registra el deterioro.</p>
+  </details>
+
+  <details class="nota">
+    <summary>4. Impuestos</summary>
+    <p>El IGV se determina mensualmente como impuesto de ventas menos el crédito de
+    compras con factura. Las boletas de venta no otorgan crédito fiscal. La renta del
+    régimen especial equivale al 1,5 % de los ingresos netos mensuales.</p>
+  </details>
+
+  <details class="nota">
+    <summary>5. Moneda extranjera</summary>
+    <p>Las operaciones en dólares se convierten al tipo de cambio publicado por SUNAT.
+    Al cierre se revalúan los saldos pendientes y la diferencia se reconoce en
+    resultados.</p>
+  </details>
+</section>
 {% endblock %}

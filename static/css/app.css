@@ -1001,6 +1001,25 @@ select {
   justify-content: flex-end;
 }
 
+.nota {
+  border-top: 1px solid var(--line);
+  padding: 10px 0;
+}
+
+.nota summary {
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.nota p {
+  margin-top: 8px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+
 /* ---------- Gráfica de barras ---------- */
 
 .chart {
