@@ -19,6 +19,7 @@ from compras.models import Compra, CompraLinea, CostoAdicional
 from compras.models_gasto import Gasto
 from compras.servicios import confirmar as confirmar_compra
 from compras.servicios import pagar, registrar_gasto
+from compras.servicios import revaluar
 from contabilidad.calculos import calcular_linea
 from contabilidad.models import Asiento, AsientoLinea, Cuenta
 from contabilidad.moneda import a_soles
@@ -432,6 +433,51 @@ class InvariantePagos(BaseContable):
         importes = {l.cuenta.codigo: l.debe for l in asiento.lineas.all()}
         self.assertEqual(importes["4212"], Decimal("345.20"))
         self.assertEqual(importes["6761"], Decimal("4.80"))
+
+
+class InvarianteRevaluacion(BaseContable):
+    def test_la_revaluacion_ajusta_el_saldo_y_el_pago_ya_no_difiere(self):
+        TipoCambio.objects.create(
+            fecha=date(2026, 11, 30),
+            compra=Decimal("3.447"),
+            venta=Decimal("3.500"),
+        )
+        compra = Compra.objects.create(
+            empresa=self.empresa,
+            proveedor=self.proveedor,
+            fecha=date(2026, 11, 10),
+            tipo_doc="FACTURA",
+            serie="F009",
+            numero="0002",
+            moneda="USD",
+            tipo_cambio=Decimal("3.452"),
+            estado=Compra.Estado.CONFIRMADA,
+            subtotal=Decimal("292.54"),
+            igv=Decimal("52.66"),
+            total=Decimal("345.20"),
+            total_moneda_origen=Decimal("100.00"),
+        )
+
+        ajustadas, total = revaluar(self.empresa, 2026, 11)
+
+        self.assertEqual(ajustadas, 1)
+        self.assertEqual(total, Decimal("4.80"))
+        compra.refresh_from_db()
+        self.assertEqual(compra.revaluacion, Decimal("4.80"))
+
+        asiento = Asiento.objects.get(origen_tipo="REVALUACION", origen_id=compra.pk)
+        importes = {l.cuenta.codigo: (l.debe, l.haber) for l in asiento.lineas.all()}
+        self.assertEqual(importes["6761"][0], Decimal("4.80"))
+        self.assertEqual(importes["4212"][1], Decimal("4.80"))
+
+        pagado, diferencia = pagar(
+            compra,
+            cuenta=self.bbva,
+            fecha=date(2026, 12, 2),
+            tipo_cambio_pago=Decimal("3.500"),
+        )
+        self.assertEqual(pagado, Decimal("350.00"))
+        self.assertEqual(diferencia, Decimal("0.00"))
 
 
 class InvariantePeriodos(BaseContable):

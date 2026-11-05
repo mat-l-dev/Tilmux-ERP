@@ -995,6 +995,12 @@ select {
   border-bottom: none;
 }
 
+.acciones-fila {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
 /* ---------- Gráfica de barras ---------- */
 
 .chart {

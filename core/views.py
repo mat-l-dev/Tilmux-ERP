@@ -172,6 +172,24 @@ def cerrar_periodo(request: HttpRequest, pk: int) -> HttpResponse:
 
 @login_required
 @require_POST
+def revaluar_periodo(request: HttpRequest, pk: int) -> HttpResponse:
+    from compras.servicios import revaluar
+
+    periodo = get_object_or_404(Periodo, pk=pk)
+    try:
+        ajustadas, total = revaluar(periodo.empresa, periodo.anio, periodo.mes)
+    except ValueError as exc:
+        messages.error(request, str(exc))
+    else:
+        messages.success(
+            request,
+            f"{ajustadas} compra(s) revaluada(s). Ajuste total: S/ {total}.",
+        )
+    return redirect("core:periodos")
+
+
+@login_required
+@require_POST
 def reabrir_periodo(request: HttpRequest, pk: int) -> HttpResponse:
     if not request.user.is_superuser:
         messages.error(request, "Solo el administrador puede reabrir un periodo.")

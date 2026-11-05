@@ -67,6 +67,7 @@ class Regla(models.Model):
         TRANSFERENCIA = "TRANSFERENCIA", "Transferencia entre cuentas"
         IGV_MENSUAL = "IGV_MENSUAL", "Pago de IGV mensual"
         RENTA_MENSUAL = "RENTA_MENSUAL", "Renta RER del mes"
+        REVALUACION = "REVALUACION", "Revaluación de moneda extranjera"
         CAPITAL_SUSCRITO = "CAPITAL_SUSCRITO", "Capital suscrito"
         REEMBOLSO_SOCIO = "REEMBOLSO_SOCIO", "Dinero de socio por reembolsar"
         COMISION_PASARELA = "COMISION_PASARELA", "Comisión de pasarela"

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import calendar
+from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 
 from django.db import transaction
@@ -10,6 +12,7 @@ from django.utils import timezone
 from contabilidad.models import Cuenta
 from contabilidad.moneda import tipo_cambio_de
 from contabilidad.servicios import Montos, postear, postear_lineas
+from core.models import TipoCambio
 from inventario.servicios import entrar
 from tesoreria.servicios import anotar
 
@@ -218,16 +221,18 @@ def pagar(
         raise CompraError("La cuenta de tesorería no tiene cuenta contable.")
 
     if compra.moneda == "PEN":
+        llevado = _cent(compra.total)
         pagado = _cent(compra.total)
         diferencia = Decimal("0.00")
     else:
+        llevado = _cent(Decimal(compra.total) + Decimal(compra.revaluacion))
         tasa = (
             Decimal(tipo_cambio_pago)
             if tipo_cambio_pago
             else tipo_cambio_de(fecha).venta
         )
         pagado = _cent(Decimal(compra.total_moneda_origen) * tasa)
-        diferencia = _cent(pagado - compra.total)
+        diferencia = _cent(pagado - llevado)
 
     cuentas = {
         c.codigo: c
@@ -238,7 +243,7 @@ def pagar(
     }
     documento = f"{compra.serie}-{compra.numero}".strip(" -")
     lineas = [
-        (cuentas["4212"], compra.total, Decimal("0.00"), f"Pago compra {documento}")
+        (cuentas["4212"], llevado, Decimal("0.00"), f"Pago compra {documento}")
     ]
     if diferencia > 0:
         lineas.append(
@@ -285,3 +290,78 @@ def pagar(
     compra.fecha_pago = fecha
     compra.save(update_fields=["pagada", "fecha_pago"])
     return pagado, diferencia
+
+
+@transaction.atomic
+def revaluar(empresa, anio: int, mes: int):
+    """Ajusta los saldos por pagar en moneda extranjera al cierre del mes."""
+    ultimo_dia = date(anio, mes, calendar.monthrange(anio, mes)[1])
+    tasa = TipoCambio.del_dia(ultimo_dia).venta
+
+    compras = (
+        Compra.objects.select_for_update()
+        .filter(
+            empresa=empresa,
+            estado=Compra.Estado.CONFIRMADA,
+            pagada=False,
+            fecha__lte=ultimo_dia,
+        )
+        .exclude(moneda="PEN")
+    )
+
+    cuentas = {
+        c.codigo: c
+        for c in Cuenta.objects.filter(
+            version="2026",
+            codigo__in=["4212", CUENTA_DIFERENCIA_PERDIDA, CUENTA_DIFERENCIA_GANANCIA],
+        )
+    }
+
+    ajustadas = 0
+    total = Decimal("0.00")
+
+    for compra in compras:
+        objetivo = _cent(Decimal(compra.total_moneda_origen) * tasa)
+        llevado = _cent(Decimal(compra.total) + Decimal(compra.revaluacion))
+        delta = _cent(objetivo - llevado)
+        if delta == 0:
+            continue
+
+        documento = f"{compra.serie}-{compra.numero}".strip(" -")
+        if delta > 0:
+            lineas = [
+                (
+                    cuentas[CUENTA_DIFERENCIA_PERDIDA],
+                    delta,
+                    Decimal("0.00"),
+                    "Pérdida por diferencia de cambio",
+                ),
+                (cuentas["4212"], Decimal("0.00"), delta, f"Revaluación {documento}"),
+            ]
+        else:
+            lineas = [
+                (cuentas["4212"], -delta, Decimal("0.00"), f"Revaluación {documento}"),
+                (
+                    cuentas[CUENTA_DIFERENCIA_GANANCIA],
+                    Decimal("0.00"),
+                    -delta,
+                    "Ganancia por diferencia de cambio",
+                ),
+            ]
+
+        postear_lineas(
+            empresa=empresa,
+            fecha=ultimo_dia,
+            tipo="REVALUACION",
+            glosa=f"Revaluación {documento}",
+            lineas=lineas,
+            origen_tipo="REVALUACION",
+            origen_id=compra.pk,
+        )
+
+        compra.revaluacion = Decimal(compra.revaluacion) + delta
+        compra.save(update_fields=["revaluacion"])
+        total += delta
+        ajustadas += 1
+
+    return ajustadas, total

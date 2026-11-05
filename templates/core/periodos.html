@@ -32,10 +32,16 @@
         <td class="num">{{ p.version_pcge }}</td>
         <td class="accion">
           {% if p.estado == "ABIERTO" %}
-          <form method="post" action="{% url 'core:cerrar_periodo' p.pk %}">
-            {% csrf_token %}
-            <button class="btn btn-ghost" type="submit">Cerrar</button>
-          </form>
+          <div class="acciones-fila">
+            <form method="post" action="{% url 'core:revaluar_periodo' p.pk %}">
+              {% csrf_token %}
+              <button class="btn btn-ghost" type="submit">Revaluar</button>
+            </form>
+            <form method="post" action="{% url 'core:cerrar_periodo' p.pk %}">
+              {% csrf_token %}
+              <button class="btn btn-ghost" type="submit">Cerrar</button>
+            </form>
+          </div>
           {% else %}
           <form method="post" action="{% url 'core:reabrir_periodo' p.pk %}">
             {% csrf_token %}

@@ -47,6 +47,7 @@ class Compra(models.Model):
     total_moneda_origen = models.DecimalField(
         max_digits=18, decimal_places=2, default=0
     )
+    revaluacion = models.DecimalField(max_digits=18, decimal_places=2, default=0)
     pagada = models.BooleanField(default=False)
     fecha_pago = models.DateField(null=True, blank=True)
     creado = models.DateTimeField(auto_now_add=True)
