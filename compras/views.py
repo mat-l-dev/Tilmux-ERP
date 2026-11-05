@@ -14,7 +14,10 @@ from django.views.decorators.http import require_POST
 from catalogo.models import CuentaTesoreria, Producto, Tercero
 from contabilidad.calculos import calcular_linea
 from contabilidad.models import Asiento, Cuenta
+from contabilidad.moneda import SinTipoCambio, a_soles
 from core.context import empresa_actual
+from ventas.models import Venta
+from ventas.models_guia import GuiaRemision
 
 from .models import Compra, CompraLinea, CostoAdicional
 from .servicios import CompraError, confirmar, registrar_gasto
@@ -235,20 +238,60 @@ def importar(request):
                 messages.error(request, str(exc))
             else:
                 if isinstance(documento, Guia):
+                    venta = None
+                    referencia = documento.documento_referencia
+                    if "-" in referencia:
+                        serie_ref, numero_ref = referencia.split("-", 1)
+                        venta = Venta.objects.filter(
+                            empresa=empresa, serie=serie_ref, numero=numero_ref
+                        ).first()
+                    request.session["guia_pendiente"] = {
+                        "tipo": documento.tipo,
+                        "serie": documento.serie,
+                        "numero": documento.numero,
+                        "fecha": documento.fecha.isoformat(),
+                        "remitente_ruc": documento.remitente_ruc,
+                        "remitente_nombre": documento.remitente_nombre,
+                        "destinatario_ruc": documento.destinatario_ruc,
+                        "destinatario_nombre": documento.destinatario_nombre,
+                        "peso_bruto": str(documento.peso_bruto or ""),
+                        "bultos": documento.bultos,
+                        "documento_referencia": documento.documento_referencia,
+                        "venta_id": venta.pk if venta else None,
+                    }
                     return render(
-                        request, "compras/importar_guia.html", {"guia": documento}
+                        request,
+                        "compras/importar_guia.html",
+                        {"guia": documento, "venta": venta},
                     )
+
+                try:
+                    total_soles, tipo_cambio = a_soles(
+                        documento.total, documento.moneda, documento.fecha, lado="venta"
+                    )
+                    igv_soles, _ = a_soles(
+                        documento.igv, documento.moneda, documento.fecha, lado="venta"
+                    )
+                except SinTipoCambio as exc:
+                    messages.error(request, str(exc))
+                    return render(request, "compras/importar.html", {"empresa": empresa})
+
+                base_soles = total_soles - igv_soles
+
                 request.session["xml_pendiente"] = {
                     "tipo": documento.tipo,
                     "serie": documento.serie,
                     "numero": documento.numero,
                     "fecha": documento.fecha.isoformat(),
                     "moneda": documento.moneda,
+                    "moneda_original": documento.moneda,
+                    "tipo_cambio": str(tipo_cambio),
+                    "total_original": str(documento.total),
                     "emisor_ruc": documento.emisor_ruc,
                     "emisor_nombre": documento.emisor_nombre,
-                    "base": str(documento.base),
-                    "igv": str(documento.igv),
-                    "total": str(documento.total),
+                    "base": str(base_soles),
+                    "igv": str(igv_soles),
+                    "total": str(total_soles),
                     "lineas": [
                         {
                             "descripcion": linea.descripcion,
@@ -328,6 +371,50 @@ def importar_preview(request):
         "compras/importar_preview.html",
         {"datos": datos, "cuentas": cuentas, "medios": medios, "sugerida": sugerida},
     )
+
+
+@login_required
+@require_POST
+def vincular_guia(request):
+    empresa = empresa_actual(request)
+    datos = request.session.get("guia_pendiente")
+    if not datos:
+        messages.info(request, "Primero sube una guía.")
+        return redirect("compras:importar")
+
+    venta = None
+    if datos.get("venta_id"):
+        venta = Venta.objects.filter(pk=datos["venta_id"]).first()
+
+    guia, creada = GuiaRemision.objects.update_or_create(
+        empresa=empresa,
+        serie=datos["serie"],
+        numero=datos["numero"],
+        defaults={
+            "tipo": datos["tipo"],
+            "fecha": date.fromisoformat(datos["fecha"]),
+            "remitente_ruc": datos["remitente_ruc"],
+            "remitente_nombre": datos["remitente_nombre"],
+            "destinatario_ruc": datos["destinatario_ruc"],
+            "destinatario_nombre": datos["destinatario_nombre"],
+            "peso_bruto": Decimal(datos["peso_bruto"]) if datos["peso_bruto"] else None,
+            "bultos": datos["bultos"],
+            "documento_referencia": datos["documento_referencia"],
+            "venta": venta,
+        },
+    )
+    request.session.pop("guia_pendiente", None)
+    if venta:
+        messages.success(
+            request, f"Guía {guia} vinculada a la venta {venta.serie}-{venta.numero}."
+        )
+    else:
+        messages.warning(
+            request,
+            f"Guía {guia} guardada, pero no encontré la venta "
+            f"{datos['documento_referencia']}.",
+        )
+    return redirect("compras:lista")
 
 
 @login_required

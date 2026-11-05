@@ -71,6 +71,23 @@
       </table>
     </section>
     {% endif %}
+
+    {% if venta.guias.all %}
+    <section class="card">
+      <header class="card-head"><h2>Guías de remisión</h2></header>
+      <table class="tabla-doc">
+        <tbody>
+          {% for g in venta.guias.all %}
+          <tr>
+            <td>{{ g.serie }}-{{ g.numero }}</td>
+            <td>{{ g.fecha|date:"d/m/Y" }}</td>
+            <td class="num der">{{ g.peso_bruto|default:"—" }} kg</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+    {% endif %}
   </div>
 
   <aside class="doc-side">

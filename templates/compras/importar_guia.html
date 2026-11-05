@@ -32,9 +32,24 @@
 
   <aside class="doc-side">
     <div class="card sticky">
-      <header class="card-head"><h2>Acciones</h2></header>
+      <header class="card-head"><h2>Venta vinculada</h2></header>
+      {% if venta %}
+      <p class="preview-note">La guía referencia el comprobante <strong>{{ venta.serie }}-{{ venta.numero }}</strong>.</p>
+      <div class="preview-row"><span>Venta</span><b>{{ venta.serie }}-{{ venta.numero }}</b></div>
+      <div class="preview-row"><span>Cliente</span><b>{{ venta.cliente_nombre }}</b></div>
+      <div class="preview-row"><span>Total</span><b class="num">{{ venta.total }}</b></div>
+      {% else %}
+      <div class="message info">
+        No encontré la venta {{ guia.documento_referencia }}. Se guardará la guía
+        sin vínculo y podrás relacionarla después.
+      </div>
+      {% endif %}
+
+      <form method="post" action="{% url 'compras:vincular_guia' %}">
+        {% csrf_token %}
+        <button class="btn btn-primary btn-block" type="submit">Guardar guía</button>
+      </form>
       <a class="btn btn-ghost btn-block" href="{% url 'compras:importar' %}">Subir otro XML</a>
-      <a class="btn btn-ghost btn-block" href="{% url 'compras:lista' %}">Volver a compras</a>
     </div>
   </aside>
 </div>

@@ -21,9 +21,11 @@ from compras.servicios import confirmar as confirmar_compra
 from compras.servicios import registrar_gasto
 from contabilidad.calculos import calcular_linea
 from contabilidad.models import Asiento, AsientoLinea, Cuenta
-from core.models import Empresa, Periodo
+from contabilidad.moneda import a_soles
+from core.models import Empresa, Periodo, TipoCambio
 from inventario.models import CapaFIFO, ConsumoCapa, MovimientoStock
 from ventas.models import Venta, VentaLinea
+from ventas.models_guia import GuiaRemision
 from ventas.servicios import VentaError, confirmar as confirmar_venta
 from ventas.servicios import emitir_nota_credito
 
@@ -337,6 +339,43 @@ class InvarianteComprobantes(BaseContable):
 
         self.assertNotIn("40111", importes)
         self.assertEqual(importes["20111"], Decimal("118.00"))
+
+
+class InvarianteMoneda(BaseContable):
+    def test_convierte_dolares_con_el_tipo_de_cambio_de_sunat(self):
+        TipoCambio.objects.create(
+            fecha=date(2026, 11, 5),
+            compra=Decimal("3.447"),
+            venta=Decimal("3.452"),
+        )
+
+        soles, tasa = a_soles(Decimal("100"), "USD", date(2026, 11, 5))
+
+        self.assertEqual(soles, Decimal("345.20"))
+        self.assertEqual(tasa, Decimal("3.452"))
+
+    def test_un_importe_en_soles_no_se_convierte(self):
+        soles, tasa = a_soles(Decimal("198.04"), "PEN", date(2026, 11, 5))
+
+        self.assertEqual(soles, Decimal("198.04"))
+        self.assertEqual(tasa, Decimal("1"))
+
+    def test_la_guia_se_vincula_a_su_venta(self):
+        self.comprar("10", "100")
+        venta = self.vender("1", "250")
+
+        guia = GuiaRemision.objects.create(
+            empresa=self.empresa,
+            venta=venta,
+            tipo="GRE_REMITENTE",
+            serie="EG07",
+            numero="1",
+            fecha=date(2026, 11, 20),
+            documento_referencia=f"{venta.serie}-{venta.numero}",
+        )
+
+        self.assertEqual(venta.guias.count(), 1)
+        self.assertEqual(venta.guias.first(), guia)
 
 
 class InvarianteInmutabilidad(BaseContable):

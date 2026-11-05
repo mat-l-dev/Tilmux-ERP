@@ -194,3 +194,6 @@ class NotaCredito(models.Model):
 
     def __str__(self) -> str:
         return f"{self.serie}-{self.numero} · {self.venta_id}"
+
+
+from .models_guia import GuiaRemision  # noqa: E402,F401
