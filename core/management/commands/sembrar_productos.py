@@ -6,7 +6,7 @@ from django.db import transaction
 from catalogo.models import Producto, UnidadMedida
 
 PRODUCTOS = [
-    ("TIL-000001", "Starlink Mini Kit (histórico)", False),
+    ("TIL-000001", "Starlink Mini Kit", True),
     ("TIL-000002", 'Monitor Gamer Samsung 25" 240Hz', False),
     ("TIL-000003", "Starlink Mini X", True),
 ]
