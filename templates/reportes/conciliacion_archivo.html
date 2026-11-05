@@ -77,6 +77,14 @@
           <span class="{% if resultado.dif_igv %}chip chip-warn{% else %}chip chip-ok{% endif %}">{{ resultado.dif_igv|floatformat:2 }}</span>
         </td>
       </tr>
+      {% if resultado.registro == "compras" %}
+      <tr>
+        <td>Compras no gravadas</td>
+        <td class="num der">{{ resultado.sistema_no_gravado|floatformat:2 }}</td>
+        <td class="num der">—</td>
+        <td class="num der">—</td>
+      </tr>
+      {% endif %}
       <tr>
         <td>Total</td>
         <td class="num der">{{ resultado.sistema_total|floatformat:2 }}</td>

@@ -478,10 +478,12 @@ def conciliacion_archivo(request):
                 if registro == "ventas":
                     sistema_base = datos["ventas_base"]
                     sistema_igv = datos["ventas_igv"]
+                    sistema_no_gravado = Decimal("0")
                     etiqueta = "RVIE · ventas"
                 else:
                     sistema_base = datos["compras_base"]
                     sistema_igv = datos["compras_igv"]
+                    sistema_no_gravado = datos["no_gravado"]
                     etiqueta = "RCE · compras"
 
                 resultado = {
@@ -494,7 +496,10 @@ def conciliacion_archivo(request):
                     "sunat_total": totales["total"],
                     "sistema_base": sistema_base,
                     "sistema_igv": sistema_igv,
-                    "sistema_total": sistema_base + sistema_igv,
+                    "sistema_no_gravado": sistema_no_gravado,
+                    "sistema_total": sistema_base
+                    + sistema_igv
+                    + sistema_no_gravado,
                 }
                 resultado["dif_base"] = (
                     resultado["sistema_base"] - resultado["sunat_base"]

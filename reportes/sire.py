@@ -82,10 +82,20 @@ def _numero(valor) -> Decimal | None:
         return None
 
 
-def _columnas(textos: list[str]) -> tuple[list[int], list[int], list[int]]:
-    base, igv, total = [], [], []
+def _columnas(
+    textos: list[str],
+) -> tuple[list[int], list[int], list[int], list[int], list[int]]:
+    base, igv, total, dscto_base, dscto_igv = [], [], [], [], []
     for indice, texto in enumerate(textos):
-        if not texto or any(palabra in texto for palabra in EXCLUIR):
+        if not texto:
+            continue
+        if "dscto" in texto or "descuento" in texto:
+            if "igv" in texto:
+                dscto_igv.append(indice)
+            elif "bi" in texto or "base" in texto:
+                dscto_base.append(indice)
+            continue
+        if any(palabra in texto for palabra in EXCLUIR):
             continue
         if "base" in texto or texto.startswith("bi "):
             base.append(indice)
@@ -93,15 +103,17 @@ def _columnas(textos: list[str]) -> tuple[list[int], list[int], list[int]]:
             igv.append(indice)
         if "total" in texto and "base" not in texto and "igv" not in texto:
             total.append(indice)
-    return base, igv, total
+    return base, igv, total, dscto_base, dscto_igv
 
 
-def _cabecera(filas: list[list]) -> tuple[int, list[int], list[int], list[int]]:
+def _cabecera(
+    filas: list[list],
+) -> tuple[int, list[int], list[int], list[int], list[int], list[int]]:
     for indice, fila in enumerate(filas[:60]):
         textos = [_normalizar(celda) for celda in fila]
-        base, igv, total = _columnas(textos)
-        if base and igv:
-            return indice, base, igv, total
+        columnas = _columnas(textos)
+        if columnas[0] and columnas[1]:
+            return indice, *columnas
     raise ArchivoInvalido(
         "No encontré las columnas de base imponible e IGV. "
         "Descarga la propuesta del SIRE en Excel o CSV y vuelve a intentarlo."
@@ -115,9 +127,19 @@ def _suma(fila: list, columnas: list[int]) -> Decimal:
 
 def sumar(filas: list[list]) -> dict:
     """Suma las columnas de base, IGV y total de la propuesta."""
-    cabecera, cols_base, cols_igv, cols_total = _cabecera(filas)
+    cabecera, cols_base, cols_igv, cols_total, cols_dscto_base, cols_dscto_igv = _cabecera(
+        filas
+    )
     titulos = [_limpio(celda) for celda in filas[cabecera]]
-    usadas = sorted(set(cols_base + cols_igv + cols_total))
+    usadas = sorted(
+        set(
+            cols_base
+            + cols_igv
+            + cols_total
+            + cols_dscto_base
+            + cols_dscto_igv
+        )
+    )
     nombres = [titulos[i] for i in usadas if i < len(titulos)]
 
     totales = {"base": Decimal("0"), "igv": Decimal("0"), "total": Decimal("0")}
@@ -130,8 +152,8 @@ def sumar(filas: list[list]) -> dict:
         if "total" in primera:
             continue
 
-        base = _suma(fila, cols_base)
-        igv = _suma(fila, cols_igv)
+        base = _suma(fila, cols_base) + _suma(fila, cols_dscto_base)
+        igv = _suma(fila, cols_igv) + _suma(fila, cols_dscto_igv)
         total = _suma(fila, cols_total)
         if not cols_total:
             total = base + igv

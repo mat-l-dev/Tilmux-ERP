@@ -143,8 +143,9 @@ puedes subir el archivo que descarga SUNAT en lugar de copiar las casillas a man
 
 El lector busca las columnas por su nombre (base imponible, IGV, importe total),
 así que no depende del orden ni de que SUNAT cambie la plantilla. Las notas de
-crédito se restan solas porque vienen con signo negativo en la propuesta. La
-fila de totales se ignora para no contar dos veces.
+crédito se restan solas porque la estructura del RVIE las exige con signo
+negativo; si afectan a un periodo anterior, vienen en las columnas de descuento
+y también se restan. La fila de totales se ignora para no contar dos veces.
 
 El resultado muestra base, IGV y total del sistema y de SUNAT, con la
 diferencia (sistema menos SUNAT). Una diferencia positiva significa que el ERP

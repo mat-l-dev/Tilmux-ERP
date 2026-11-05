@@ -95,3 +95,15 @@ class SireExcelTest(SimpleTestCase):
         totales = sumar(leer_filas(Archivo("rce.xlsx", buffer.getvalue())))
         self.assertEqual(totales["base"], Decimal("100"))
         self.assertEqual(totales["igv"], Decimal("18"))
+
+    def test_suma_el_descuento_de_notas_de_credito_de_otro_periodo(self):
+        contenido = (
+            "Nro;Tipo CP;BI Gravada;IGV;Importe Total;Dscto BI;Dscto IGV\n"
+            "1;01;100,00;18,00;118,00;0,00;0,00\n"
+            "2;07;0,00;0,00;-59,00;-50,00;-9,00\n"
+        )
+        totales = sumar(leer_filas(Archivo("rvie.csv", contenido.encode("utf-8"))))
+
+        self.assertEqual(totales["base"], Decimal("50.00"))
+        self.assertEqual(totales["igv"], Decimal("9.00"))
+        self.assertEqual(totales["total"], Decimal("59.00"))
