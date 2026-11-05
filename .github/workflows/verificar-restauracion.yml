@@ -1,0 +1,98 @@
+name: Verificar restauración
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 9 * * 1"
+
+jobs:
+  restaurar:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: restaurado
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Volcar la base real
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          mkdir -p out
+          docker run --rm -v "$PWD/out:/out" postgres:17 \
+            pg_dump "$DATABASE_URL" -Fc -f /out/tilmux.dump
+          ls -lh out/tilmux.dump
+
+      - name: Restaurar en una base vacía
+        run: |
+          docker run --rm --network host \
+            -v "$PWD/out:/in" -e PGPASSWORD=postgres postgres:17 \
+            pg_restore -h 127.0.0.1 -U postgres -d restaurado \
+              -O -x --exit-on-error /in/tilmux.dump
+
+      - name: Comprobar que los saldos coinciden
+        run: |
+          docker run --rm -i --network host -e PGPASSWORD=postgres postgres:17 \
+            psql -h 127.0.0.1 -U postgres -d restaurado -v ON_ERROR_STOP=1 <<'SQL'
+          \echo '--- Saldos por cuenta ---'
+          SELECT c.codigo,
+                 SUM(l.debe)  AS debe,
+                 SUM(l.haber) AS haber,
+                 SUM(l.debe - l.haber) AS saldo
+            FROM contabilidad_asientolinea l
+            JOIN contabilidad_cuenta c ON c.id = l.cuenta_id
+           GROUP BY c.codigo
+           ORDER BY c.codigo;
+
+          \echo '--- Verificación ---'
+          DO $$
+          DECLARE
+              efectivo   numeric;
+              inventario numeric;
+              asientos   integer;
+              ventas     integer;
+          BEGIN
+              SELECT COALESCE(SUM(l.debe - l.haber), 0) INTO efectivo
+                FROM contabilidad_asientolinea l
+                JOIN contabilidad_cuenta c ON c.id = l.cuenta_id
+               WHERE c.codigo IN ('101', '1031', '1061');
+
+              SELECT COALESCE(SUM(l.debe - l.haber), 0) INTO inventario
+                FROM contabilidad_asientolinea l
+                JOIN contabilidad_cuenta c ON c.id = l.cuenta_id
+               WHERE c.codigo = '20111';
+
+              SELECT COUNT(*) INTO asientos FROM contabilidad_asiento;
+              SELECT COUNT(*) INTO ventas   FROM ventas_venta;
+
+              RAISE NOTICE 'Efectivo=% Inventario=% Asientos=% Ventas=%',
+                  efectivo, inventario, asientos, ventas;
+
+              IF efectivo <> 2115.56 THEN
+                  RAISE EXCEPTION 'Efectivo % no coincide con 2115.56', efectivo;
+              END IF;
+              IF inventario <> 461.35 THEN
+                  RAISE EXCEPTION 'Inventario % no coincide con 461.35', inventario;
+              END IF;
+              IF asientos <> 29 THEN
+                  RAISE EXCEPTION 'Asientos % no coinciden con 29', asientos;
+              END IF;
+              IF ventas <> 2 THEN
+                  RAISE EXCEPTION 'Ventas % no coinciden con 2', ventas;
+              END IF;
+          END $$;
+
+          \echo '--- Restauración verificada ---'
+          SQL
