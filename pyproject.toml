@@ -1,0 +1,14 @@
+[project]
+name = "tilmux-erp"
+version = "0.1.0"
+description = "ERP contable de TILMUX S.A.C."
+requires-python = ">=3.14"
+dependencies = [
+    "django>=6.1,<6.2",
+    "psycopg[binary]>=3.2",
+    "whitenoise>=6.8",
+    "gunicorn>=23",
+]
+
+[tool.uv]
+package = false

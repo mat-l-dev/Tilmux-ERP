@@ -1,0 +1,41 @@
+{% load static %}<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Entrar · Tilmux</title>
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+</head>
+<body class="auth-body">
+  <main class="auth">
+    <div class="auth-card glass rise">
+      <div class="brand brand-lg">
+        <span class="brand-mark">T</span>
+        <span class="brand-text"><strong>TILMUX</strong><small>ERP contable</small></span>
+      </div>
+
+      <h1 class="auth-title">Entrar</h1>
+      <p class="auth-sub">Contabilidad, stock y tesorería en un solo libro.</p>
+
+      {% if form.errors %}
+      <div class="message error">Usuario o contraseña incorrectos.</div>
+      {% endif %}
+
+      <form method="post" class="form">
+        {% csrf_token %}
+        <label class="field">
+          <span>Usuario</span>
+          <input type="text" name="username" autocomplete="username" autofocus required>
+        </label>
+        <label class="field">
+          <span>Contraseña</span>
+          <input type="password" name="password" autocomplete="current-password" required>
+        </label>
+        <button class="btn btn-primary" type="submit">Entrar</button>
+      </form>
+    </div>
+    <p class="auth-foot">TILMUX S.A.C. · RUC 20615841961</p>
+  </main>
+</body>
+</html>

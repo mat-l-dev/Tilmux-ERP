@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block titulo %}Panel{% endblock %}
+{% block titulo_pagina %}Panel{% endblock %}
+
+{% block contenido %}
+<section class="kpis rise" style="--i:0">
+  <article class="kpi">
+    <span class="kpi-label">Dinero disponible</span>
+    <span class="kpi-value num">S/ {{ saldo_tesoreria }}</span>
+    <span class="kpi-note">Bancos, billeteras y caja</span>
+  </article>
+  <article class="kpi">
+    <span class="kpi-label">Ventas del mes</span>
+    <span class="kpi-value num">S/ {{ ventas_mes }}</span>
+    <span class="kpi-note">Base imponible, sin IGV</span>
+  </article>
+  <article class="kpi">
+    <span class="kpi-label">IGV por pagar</span>
+    <span class="kpi-value num">S/ {{ igv_por_pagar }}</span>
+    <span class="kpi-note">Después del saldo a favor</span>
+  </article>
+  <article class="kpi">
+    <span class="kpi-label">Renta RER</span>
+    <span class="kpi-value num">S/ {{ renta_mes }}</span>
+    <span class="kpi-note">1,5 % de ingresos netos</span>
+  </article>
+</section>
+
+<section class="grid-2">
+  <article class="card rise" style="--i:1">
+    <header class="card-head">
+      <h2>Estado del sistema</h2>
+      <span class="chip chip-ok">Operativo</span>
+    </header>
+    <ul class="checklist">
+      <li>
+        <svg class="icon ok"><use href="#i-check"></use></svg>
+        <span>Base de datos conectada</span>
+      </li>
+      <li>
+        <svg class="icon ok"><use href="#i-check"></use></svg>
+        <span>{{ cuentas_activas }} cuentas activas del PCGE 2026</span>
+      </li>
+      <li>
+        <svg class="icon ok"><use href="#i-check"></use></svg>
+        <span>{{ periodos_abiertos }} periodos abiertos</span>
+      </li>
+      <li>
+        <svg class="icon muted"><use href="#i-reloj"></use></svg>
+        <span>Respaldo diario programado</span>
+      </li>
+    </ul>
+  </article>
+
+  <article class="card rise" style="--i:2">
+    <header class="card-head">
+      <h2>Primer periodo</h2>
+      {% if periodo_actual %}<span class="chip">{{ periodo_actual.etiqueta }}</span>{% endif %}
+    </header>
+    <p class="muted">
+      Todavía no hay hechos registrados. El siguiente paso es cargar proveedores,
+      productos y la primera compra, para que el stock y el libro empiecen a moverse solos.
+    </p>
+    <div class="steps">
+      <div class="step"><span class="step-n">1</span> Catálogos</div>
+      <div class="step"><span class="step-n">2</span> Compras y stock</div>
+      <div class="step"><span class="step-n">3</span> Ventas</div>
+      <div class="step"><span class="step-n">4</span> Libro y cierre</div>
+    </div>
+  </article>
+</section>
+{% endblock %}
