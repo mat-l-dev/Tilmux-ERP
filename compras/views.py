@@ -40,6 +40,10 @@ def lista(request):
         if empresa
         else Compra.objects.none()
     )
+    periodo = request.GET.get("periodo", "")
+    if periodo and "-" in periodo:
+        anio, mes = (int(p) for p in periodo.split("-", 1))
+        consulta = consulta.filter(fecha__year=anio, fecha__month=mes)
     pagina = Paginator(consulta, 25).get_page(request.GET.get("page"))
     return render(
         request, "compras/lista.html", {"compras": pagina, "page_obj": pagina}

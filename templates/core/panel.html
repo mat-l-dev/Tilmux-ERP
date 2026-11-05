@@ -4,6 +4,17 @@
 {% block titulo_pagina %}Panel{% endblock %}
 
 {% block contenido %}
+<form method="get" class="filtro">
+  <label class="field" style="min-width:190px">
+    <span>Mes de trabajo</span>
+    <select name="periodo" data-autosubmit>
+      {% for p in periodos_disponibles %}
+      <option value="{{ p.valor }}" {% if p.valor == periodo_valor %}selected{% endif %}>{{ p.etiqueta }}</option>
+      {% endfor %}
+    </select>
+  </label>
+</form>
+
 <section class="kpis rise" style="--i:0">
   <article class="kpi">
     <span class="kpi-label">Dinero disponible</span>
@@ -30,7 +41,7 @@
 <section class="card rise" style="--i:1">
   <header class="card-head">
     <h2>Ventas por mes</h2>
-    <span class="chip">Últimos 6 meses · máximo S/ {{ maximo_mes }}</span>
+    <span class="chip">12 meses hasta {{ periodo_etiqueta }} · máximo S/ {{ maximo_mes }}</span>
   </header>
   <div class="chart">
     {% for p in serie_meses %}
@@ -74,7 +85,7 @@
   <article class="card rise" style="--i:3">
     <header class="card-head">
       <h2>Primer periodo</h2>
-      {% if periodo_actual %}<span class="chip">{{ periodo_actual.etiqueta }}</span>{% endif %}
+      <span class="chip">{{ periodo_etiqueta }}</span>
     </header>
     <p class="muted">
       Registra una compra para que el stock y el costo empiecen a moverse.

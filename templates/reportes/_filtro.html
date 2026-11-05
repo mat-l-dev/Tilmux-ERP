@@ -1,4 +1,13 @@
 <form method="get" class="filtro">
+  <label class="field" style="min-width:190px">
+    <span>Mes</span>
+    <select name="periodo" data-autosubmit>
+      <option value="">Todo el año</option>
+      {% for p in periodos_disponibles %}
+      <option value="{{ p.valor }}" {% if p.valor == periodo_seleccionado %}selected{% endif %}>{{ p.etiqueta }}</option>
+      {% endfor %}
+    </select>
+  </label>
   <label class="field">
     <span>Desde</span>
     <input type="date" name="desde" value="{{ desde|date:'Y-m-d' }}">

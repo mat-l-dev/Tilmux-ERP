@@ -16,20 +16,24 @@
       <tr>
         <th>Periodo</th>
         <th>Estado</th>
-        <th>PCGE</th>
+        <th class="der">Asientos</th>
+        <th class="der">Ventas</th>
+        <th class="der">Compras</th>
         <th></th>
       </tr>
     </thead>
     <tbody>
       {% for p in periodos %}
       <tr>
-        <td>{{ p.etiqueta }}</td>
+        <td><a href="{% url 'core:panel' %}?periodo={{ p.anio }}-{{ p.mes|stringformat:'02d' }}">{{ p.etiqueta }}</a></td>
         <td>
           <span class="chip {% if p.estado == 'CERRADO' %}chip-warn{% else %}chip-ok{% endif %}">
             {{ p.get_estado_display }}
           </span>
         </td>
-        <td class="num">{{ p.version_pcge }}</td>
+        <td class="num der">{{ p.n_asientos }}</td>
+        <td class="num der">{{ p.ventas|floatformat:2 }}</td>
+        <td class="num der">{{ p.compras|floatformat:2 }}</td>
         <td class="accion">
           {% if p.estado == "ABIERTO" %}
           <div class="acciones-fila">

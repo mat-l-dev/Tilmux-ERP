@@ -4,6 +4,18 @@
 {% block titulo_pagina %}Ventas{% endblock %}
 
 {% block contenido %}
+<form method="get" class="filtro">
+  <label class="field" style="min-width:190px">
+    <span>Mes</span>
+    <select name="periodo" data-autosubmit>
+      <option value="">Todos</option>
+      {% for p in periodos_disponibles %}
+      <option value="{{ p.valor }}" {% if p.valor == periodo_seleccionado %}selected{% endif %}>{{ p.etiqueta }}</option>
+      {% endfor %}
+    </select>
+  </label>
+</form>
+
 <section class="card">
   <header class="card-head">
     <h2>Comprobantes emitidos</h2>

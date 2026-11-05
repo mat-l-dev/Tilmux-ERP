@@ -13,7 +13,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from compras.models import Compra
-from contabilidad.models import AsientoLinea, Cuenta
+from contabilidad.models import Asiento, AsientoLinea, Cuenta
 from ventas.models import Venta
 
 from .context import empresa_actual
@@ -39,6 +39,28 @@ def panel(request: HttpRequest) -> HttpResponse:
     empresa = empresa_actual(request)
     hoy = date.today()
 
+    anio, mes = hoy.year, hoy.month
+    periodo_pedido = request.GET.get("periodo", "")
+    if periodo_pedido:
+        partes = periodo_pedido.split("-")
+        if len(partes) == 2 and partes[0].isdigit() and partes[1].isdigit():
+            anio, mes = int(partes[0]), int(partes[1])
+
+    # Si el mes actual no tiene movimiento, abrir el último mes con actividad.
+    if empresa and not periodo_pedido:
+        hay_movimiento = Asiento.objects.filter(
+            empresa=empresa, fecha__year=anio, fecha__month=mes
+        ).exists()
+        if not hay_movimiento:
+            ultimo = (
+                Asiento.objects.filter(empresa=empresa)
+                .order_by("-fecha")
+                .values_list("fecha", flat=True)
+                .first()
+            )
+            if ultimo:
+                anio, mes = ultimo.year, ultimo.month
+
     saldo = Decimal("0")
     ventas_base = Decimal("0")
     igv_ventas = Decimal("0")
@@ -55,8 +77,8 @@ def panel(request: HttpRequest) -> HttpResponse:
         ventas_mes = Venta.objects.filter(
             empresa=empresa,
             estado=Venta.Estado.CONFIRMADA,
-            fecha__year=hoy.year,
-            fecha__month=hoy.month,
+            fecha__year=anio,
+            fecha__month=mes,
         )
         ventas_base = ventas_mes.aggregate(s=Sum("subtotal"))["s"] or 0
         igv_ventas = ventas_mes.aggregate(s=Sum("igv"))["s"] or 0
@@ -64,8 +86,8 @@ def panel(request: HttpRequest) -> HttpResponse:
         compras_mes = Compra.objects.filter(
             empresa=empresa,
             estado=Compra.Estado.CONFIRMADA,
-            fecha__year=hoy.year,
-            fecha__month=hoy.month,
+            fecha__year=anio,
+            fecha__month=mes,
         )
         igv_compras = compras_mes.aggregate(s=Sum("igv"))["s"] or 0
 
@@ -75,32 +97,39 @@ def panel(request: HttpRequest) -> HttpResponse:
     serie_meses = []
     maximo = Decimal("0")
     if empresa:
-        inicio_anio, inicio_mes = _meses_atras(hoy.year, hoy.month, 5)
+        inicio_anio, inicio_mes = _meses_atras(anio, mes, 11)
         acumulado = {
             (fila["fecha__year"], fila["fecha__month"]): fila["total"]
             for fila in Venta.objects.filter(
                 empresa=empresa,
                 estado=Venta.Estado.CONFIRMADA,
                 fecha__gte=date(inicio_anio, inicio_mes, 1),
+                fecha__lte=date(anio, mes, 28),
             )
             .values("fecha__year", "fecha__month")
             .annotate(total=Sum("total"))
         }
-        for paso in range(5, -1, -1):
-            anio, mes = _meses_atras(hoy.year, hoy.month, paso)
-            valor = Decimal(acumulado.get((anio, mes), 0))
+        for paso in range(11, -1, -1):
+            anio_punto, mes_punto = _meses_atras(anio, mes, paso)
+            valor = Decimal(acumulado.get((anio_punto, mes_punto), 0))
             maximo = max(maximo, valor)
             serie_meses.append(
-                {"etiqueta": MESES_CORTOS[mes - 1], "valor": valor, "actual": paso == 0}
+                {
+                    "etiqueta": MESES_CORTOS[mes_punto - 1],
+                    "valor": valor,
+                    "actual": paso == 0,
+                }
             )
     for punto in serie_meses:
-        punto["altura"] = (
-            int(punto["valor"] * 100 / maximo) if maximo > 0 else 0
-        )
+        punto["altura"] = int(punto["valor"] * 100 / maximo) if maximo > 0 else 0
         punto["texto"] = soles(punto["valor"])
 
     contexto = {
         "hoy": hoy,
+        "anio": anio,
+        "mes": mes,
+        "periodo_valor": f"{anio}-{mes:02d}",
+        "periodo_etiqueta": f"{MESES_CORTOS[mes - 1]} {anio}",
         "cuentas_activas": Cuenta.objects.filter(activa=True).count(),
         "periodos_abiertos": (
             Periodo.objects.filter(empresa=empresa, estado=Periodo.Estado.ABIERTO).count()
@@ -113,7 +142,7 @@ def panel(request: HttpRequest) -> HttpResponse:
         "igv_nota": "Saldo a favor" if igv < 0 else "Después del crédito de compras",
         "renta_mes": soles(renta),
         "periodo_actual": (
-            Periodo.objects.filter(empresa=empresa, anio=hoy.year, mes=hoy.month).first()
+            Periodo.objects.filter(empresa=empresa, anio=anio, mes=mes).first()
             if empresa
             else None
         ),
@@ -135,11 +164,33 @@ def cambiar_empresa(request: HttpRequest) -> HttpResponse:
 @login_required
 def periodos(request: HttpRequest) -> HttpResponse:
     empresa = empresa_actual(request)
-    lista = (
+    lista = list(
         Periodo.objects.filter(empresa=empresa).order_by("-anio", "-mes")
         if empresa
         else Periodo.objects.none()
     )
+    for periodo in lista:
+        periodo.n_asientos = Asiento.objects.filter(
+            empresa=empresa, fecha__year=periodo.anio, fecha__month=periodo.mes
+        ).count()
+        periodo.ventas = (
+            Venta.objects.filter(
+                empresa=empresa,
+                estado=Venta.Estado.CONFIRMADA,
+                fecha__year=periodo.anio,
+                fecha__month=periodo.mes,
+            ).aggregate(s=Sum("total"))["s"]
+            or 0
+        )
+        periodo.compras = (
+            Compra.objects.filter(
+                empresa=empresa,
+                estado=Compra.Estado.CONFIRMADA,
+                fecha__year=periodo.anio,
+                fecha__month=periodo.mes,
+            ).aggregate(s=Sum("total"))["s"]
+            or 0
+        )
     return render(request, "core/periodos.html", {"periodos": lista})
 
 

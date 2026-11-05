@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 from django.http import HttpRequest
 
 from .models import Empresa
@@ -26,4 +28,26 @@ def empresas_context(request: HttpRequest) -> dict:
     return {
         "empresas": list(Empresa.objects.filter(activa=True)) if activa else [],
         "empresa_activa": activa,
+    }
+
+
+MESES = (
+    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+    "Julio", "Agosto", "Setiembre", "Octubre", "Noviembre", "Diciembre",
+)
+
+
+def periodos_context(request: HttpRequest) -> dict:
+    """Opciones de mes para los selectores de la interfaz."""
+    hoy = date.today()
+    opciones = []
+    for pasos in range(24):
+        total = hoy.year * 12 + (hoy.month - 1) - pasos
+        anio, mes = total // 12, total % 12 + 1
+        opciones.append(
+            {"valor": f"{anio}-{mes:02d}", "etiqueta": f"{MESES[mes - 1]} {anio}"}
+        )
+    return {
+        "periodos_disponibles": opciones,
+        "periodo_seleccionado": request.GET.get("periodo", ""),
     }
