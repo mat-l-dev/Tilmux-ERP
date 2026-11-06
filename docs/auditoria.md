@@ -675,8 +675,10 @@ for cod in ["1061", "1031", "40111", "40171", "4212"]:
   Se rechazan notas anteriores a su venta y se serializan notas de crédito de
   una misma venta. El formulario solo ofrece anulación y devolución; los demás
   motivos requieren lógica propia. No había notas en la base real al auditar.
-  Las series y números de notas entre ventas distintas requieren una restricción
-  global por empresa y siguen pendientes de revisión.
+  Los servicios rechazan series y números repetidos dentro de una empresa,
+  incluso entre ventas distintas y con ceros iniciales; separan notas de crédito
+  y débito. Ventas y notas de crédito son de solo consulta en administración;
+  la restricción de base sigue siendo por venta y no cubre escrituras directas.
 - Conciliación SIRE: el lector sumaba importes DGNG y DNG como si fueran
   compras destinadas exclusivamente a operaciones gravadas. Ahora advierte y
   detiene la comparación al encontrar valores en esas columnas; no calcula la

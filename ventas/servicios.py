@@ -8,6 +8,7 @@ from decimal import ROUND_HALF_UP, Decimal
 
 from django.db import transaction
 from django.db.models import Sum
+from django.db.models.functions import Trim, Upper
 from django.utils import timezone
 
 from catalogo.models import Serie
@@ -38,6 +39,23 @@ class VentaError(Exception):
 
 def _cent(valor) -> Decimal:
     return Decimal(valor).quantize(CENT, rounding=ROUND_HALF_UP)
+
+
+def _validar_numeracion_nota(venta: Venta, modelo, serie: str, numero: str) -> tuple[str, str]:
+    serie, numero = serie.strip().upper(), numero.strip()
+    if not serie or not numero:
+        raise VentaError("Indica la serie y el número de la nota.")
+    normalizado = (numero.lstrip("0") or "0") if numero.isdecimal() else numero.upper()
+    Empresa.objects.select_for_update().get(pk=venta.empresa_id)
+    existentes = modelo.objects.filter(venta__empresa_id=venta.empresa_id).annotate(
+        serie_normalizada=Upper(Trim("serie"))
+    ).filter(serie_normalizada=serie).values_list("numero", flat=True)
+    for existente in existentes:
+        existente = existente.strip().upper()
+        clave = (existente.lstrip("0") or "0") if existente.isdecimal() else existente
+        if clave == normalizado:
+            raise VentaError(f"La nota {serie}-{numero} ya está registrada para esta empresa.")
+    return serie, numero
 
 
 def _avanzar_serie(venta: Venta) -> None:
@@ -173,6 +191,7 @@ def emitir_nota_credito(
         raise VentaError("La fecha de la nota no puede ser anterior a la venta.")
     if motivo_codigo not in MOTIVOS_CREDITO_IMPLEMENTADOS:
         raise VentaError("Este motivo de nota de crédito todavía no está implementado.")
+    serie, numero = _validar_numeracion_nota(venta, NotaCredito, serie, numero)
 
     lineas = list(venta.lineas.select_related("producto"))
     if not lineas:
@@ -286,11 +305,12 @@ def emitir_nota_debito(
     descripcion: str = "",
 ) -> NotaDebito:
     """Nota de débito: aumenta el importe del comprobante original."""
-    venta = Venta.objects.get(pk=venta.pk)
+    venta = Venta.objects.select_for_update().get(pk=venta.pk)
     if venta.estado != Venta.Estado.CONFIRMADA:
         raise VentaError("Solo se debita una venta confirmada.")
     if fecha < venta.fecha:
         raise VentaError("La fecha de la nota no puede ser anterior a la venta.")
+    serie, numero = _validar_numeracion_nota(venta, NotaDebito, serie, numero)
 
     base, igv = _cent(base), _cent(igv)
     total = base + igv

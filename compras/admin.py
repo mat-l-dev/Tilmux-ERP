@@ -1,20 +1,9 @@
 from django.contrib import admin
 
+from core.admin_seguro import SoloConsultaContable
+
 from .models import Compra, CompraLinea, CostoAdicional
 from .models_gasto import Gasto
-
-
-class SoloConsultaContable:
-    """Evita guardar documentos sin pasar por sus servicios contables."""
-
-    def has_add_permission(self, request):
-        return False
-
-    def has_change_permission(self, request, obj=None):
-        return False
-
-    def has_delete_permission(self, request, obj=None):
-        return False
 
 
 class CompraLineaInline(admin.TabularInline):
