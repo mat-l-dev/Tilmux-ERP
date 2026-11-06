@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block titulo %}Tesorería{% endblock %}
+{% block titulo_pagina %}Tesorería{% endblock %}
+
+{% block contenido %}
+<section class="card">
+  <header class="card-head"><h2>Movimientos por cuenta</h2></header>
+  <p class="preview-note">Los totales son la suma de movimientos registrados en el ERP. No incluyen necesariamente el saldo inicial y no representan un saldo bancario conciliado. Verifica la moneda de los movimientos antiguos.</p>
+  {% if filas %}
+  <table class="tabla-doc">
+    <thead><tr><th>Cuenta</th><th>Moneda configurada</th><th class="der">Ingresos</th><th class="der">Egresos</th><th class="der">Neto registrado</th></tr></thead>
+    <tbody>
+      {% for fila in filas %}
+      <tr>
+        <td><a href="?cuenta={{ fila.cuenta.pk }}">{{ fila.cuenta.nombre }}</a>{% if not fila.cuenta.activa %} <span class="muted">(inactiva)</span>{% endif %}</td>
+        <td>{{ fila.cuenta.moneda }}</td>
+        <td class="num der">{{ fila.ingresos|floatformat:2 }}</td>
+        <td class="num der">{{ fila.egresos|floatformat:2 }}</td>
+        <td class="num der">{{ fila.neto|floatformat:2 }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">No hay cuentas registradas para esta empresa.</p>{% endif %}
+</section>
+
+<section class="card" style="margin-top:12px">
+  <header class="card-head"><h2>Historial de movimientos</h2></header>
+  <form method="get" class="filtro">
+    <label class="field"><span>Cuenta</span>
+      <select name="cuenta">
+        <option value="">Todas</option>
+        {% for fila in filas %}<option value="{{ fila.cuenta.pk }}" {% if cuenta_id == fila.cuenta.pk|stringformat:'s' %}selected{% endif %}>{{ fila.cuenta.nombre }}{% if not fila.cuenta.activa %} (inactiva){% endif %}</option>{% endfor %}
+      </select>
+    </label>
+    <button class="btn btn-ghost" type="submit">Filtrar</button>
+  </form>
+  {% if pagina.object_list %}
+  <table class="tabla-doc">
+    <thead><tr><th>Fecha</th><th>Cuenta</th><th>Tipo</th><th>Concepto</th><th>Canal</th><th class="der">Importe registrado</th></tr></thead>
+    <tbody>
+      {% for movimiento in pagina %}
+      <tr>
+        <td>{{ movimiento.fecha|date:"d/m/Y" }}</td>
+        <td>{{ movimiento.cuenta.nombre }}</td>
+        <td>{{ movimiento.get_tipo_display }}</td>
+        <td>{{ movimiento.concepto }}</td>
+        <td>{{ movimiento.get_canal_display }}</td>
+        <td class="num der">{{ movimiento.importe|floatformat:2 }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if pagina.has_other_pages %}
+  <nav class="filtro" aria-label="Páginas de movimientos">
+    {% if pagina.has_previous %}<a class="btn btn-ghost" href="?cuenta={{ cuenta_id|urlencode }}&amp;pagina={{ pagina.previous_page_number }}">Anterior</a>{% endif %}
+    <span>Página {{ pagina.number }} de {{ pagina.paginator.num_pages }}</span>
+    {% if pagina.has_next %}<a class="btn btn-ghost" href="?cuenta={{ cuenta_id|urlencode }}&amp;pagina={{ pagina.next_page_number }}">Siguiente</a>{% endif %}
+  </nav>
+  {% endif %}
+  {% else %}<p class="muted">No hay movimientos para esta selección.</p>{% endif %}
+</section>
+{% endblock %}

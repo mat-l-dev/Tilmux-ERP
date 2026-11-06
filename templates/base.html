@@ -49,10 +49,10 @@
       <a class="nav-item {% if 'compras' in request.path %}is-active{% endif %}" href="{% url 'compras:lista' %}">
         <svg class="icon"><use href="#i-compras"></use></svg><span>Compras</span>
       </a>
-      <a class="nav-item" href="{% url 'core:proximamente' %}">
+      <a class="nav-item {% if url == 'inventario' or url == 'kardex' %}is-active{% endif %}" href="{% url 'reportes:inventario' %}">
         <svg class="icon"><use href="#i-inventario"></use></svg><span>Inventario</span>
       </a>
-      <a class="nav-item" href="{% url 'core:proximamente' %}">
+      <a class="nav-item {% if request.resolver_match.namespace == 'tesoreria' %}is-active{% endif %}" href="{% url 'tesoreria:movimientos' %}">
         <svg class="icon"><use href="#i-tesoreria"></use></svg><span>Tesorería</span>
       </a>
 

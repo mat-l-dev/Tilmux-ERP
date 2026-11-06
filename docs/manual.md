@@ -171,7 +171,12 @@ Un usuario sin perfil se trata como administrador.
 En **Configuración**, compras, gastos, ventas, notas de crédito, asientos y
 movimientos de inventario y tesorería son de solo consulta. Sus registros se
 gestionan desde los módulos correspondientes para mantener la contabilidad.
-La conciliación bancaria de movimientos todavía no tiene un flujo propio.
+Desde **Tesorería** puedes consultar los movimientos y sus sumas por cuenta,
+filtrar el historial y abrir sus páginas. El neto es la suma de movimientos
+registrados, no el saldo del banco: puede faltar el saldo inicial o haber
+movimientos pendientes de registrar. No mezcla cuentas ni monedas y conviene
+verificar la moneda de los registros anteriores. La conciliación bancaria de
+movimientos todavía no tiene un flujo propio.
 
 ## Ventas
 

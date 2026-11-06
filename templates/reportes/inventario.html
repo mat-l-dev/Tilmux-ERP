@@ -17,7 +17,7 @@
 <section class="card">
   <header class="card-head">
     <h2>Existencias por producto</h2>
-    <span class="chip">Valor total: S/ {{ total_valor|floatformat:2 }}</span>  </header>
+    <span class="chip">{% if q %}Valor de resultados{% else %}Valor total{% endif %}: S/ {{ total_valor|floatformat:2 }}</span>  </header>
 
   {% if filas %}
   <table class="tabla-doc">

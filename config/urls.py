@@ -13,6 +13,7 @@ urlpatterns = [
     path("cuentas/", include("django.contrib.auth.urls")),
     path("ventas/", include("ventas.urls")),
     path("compras/", include("compras.urls")),
+    path("tesoreria/", include("tesoreria.urls")),
     path("reportes/", include("reportes.urls")),
     path("", include("core.urls")),
 ]
