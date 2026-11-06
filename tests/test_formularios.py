@@ -102,6 +102,7 @@ class ConfirmacionVentaTest(SimpleTestCase):
         request.user = SimpleNamespace(is_authenticated=True, perfil=None)
         compra = SimpleNamespace(pk=1)
         with (
+            patch("compras.views.empresa_actual", return_value=object()),
             patch("compras.views.get_object_or_404", return_value=compra),
             patch("compras.views.confirmar", side_effect=StockError("Existe una salida posterior")),
             patch("compras.views.messages.error") as mostrar_error,
