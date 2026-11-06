@@ -643,12 +643,11 @@ for cod in ["1061", "1031", "40111", "40171", "4212"]:
   reglas del período de anotación; no trasladar importes ni presentar cifras
   como definitivas hasta resolverlo. Las fechas contables y tributarias pueden
   diferir y deben poder explicarse por separado.
-- Corrección del 06/11: la estimación usa la fecha del comprobante, no el
-  devengo, y advierte que debe contrastarse con el RCE. Consultando los datos
-  reales en modo lectura se obtienen 60,00 / 43,00 / 28,00 para septiembre,
-  octubre y noviembre respectivamente. La estimación no implementa aún el
-  período efectivo de anotación: una anotación posterior necesita revisión
-  manual. Los valores 78/53/0 en secciones históricas quedaron supersedidos.
+- Corrección inicial del 06/11: se dejó de usar el devengo para la estimación
+  tributaria. Con los datos reales se obtuvieron 60,00 / 43,00 / 28,00 para
+  septiembre, octubre y noviembre respectivamente. Los valores 78/53/0 en
+  secciones históricas quedaron supersedidos. Después se agregó la anotación
+  opcional descrita más adelante; los períodos reales requieren verificación.
 - Inventario: se impide que una salida consuma una capa de fecha posterior;
   la base real no tiene consumos con fecha posterior ni producto distinto.
   Se bloquean entradas y salidas anteriores a una salida ya registrada para el
@@ -704,6 +703,12 @@ for cod in ["1061", "1031", "40111", "40171", "4212"]:
   mes posterior. El registro ahora comprueba que esté abierto el período de la
   fecha de pago, sin exigir reabrir el mes al que corresponde la deuda. El
   saldo del 621 sigue siendo una estimación y debe cotejarse con lo declarado.
+- Se incorporó una fecha de anotación opcional para compras y gastos, separada
+  de la emisión y el devengo. El usuario puede consignarla desde el detalle; el
+  cambio guarda historial, valida empresa y períodos cerrados, y actualiza el
+  registro, CSV y estimación del 621. Sin fecha indicada se conserva la
+  estimación por emisión. No se asignaron fechas a datos históricos ni se
+  implementó la verificación del plazo de crédito fiscal.
 - Identificación de gastos: se corrigió la restricción para incluir al proveedor
   además de empresa, tipo, serie y número. La prueba confirma que proveedores
   distintos pueden usar el mismo número y que no se repite el del mismo emisor.

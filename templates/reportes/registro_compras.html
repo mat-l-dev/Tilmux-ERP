@@ -21,7 +21,8 @@
   <table class="tabla-doc tabla-registro">
     <thead>
       <tr>
-        <th>Fecha</th>
+        <th>Emisión</th>
+        <th>Anotación</th>
         <th>Tipo</th>
         <th>Serie y número</th>
         <th>RUC</th>
@@ -38,6 +39,7 @@
       {% for f in filas %}
       <tr>
         <td>{{ f.fecha|date:"d/m/Y" }}</td>
+        <td>{% if f.fecha_anotacion %}{{ f.fecha_anotacion|date:"d/m/Y" }}{% else %}Estimada por emisión{% endif %}</td>
         <td>
           {{ f.tipo }}
           {% if f.pendiente %}<span class="chip chip-warn">Pendiente</span>{% endif %}
@@ -58,7 +60,7 @@
     </tbody>
     <tfoot>
       <tr>
-        <td colspan="7"><strong>Totales</strong></td>
+        <td colspan="8"><strong>Totales</strong></td>
         <td class="num der"><strong>{{ base|floatformat:2 }}</strong></td>
         <td class="num der"><strong>{{ no_gravado|floatformat:2 }}</strong></td>
         <td class="num der"><strong>{{ igv|floatformat:2 }}</strong></td>
@@ -75,8 +77,9 @@
   </nav>
   {% endif %}
   <p class="preview-note">
-    Solo las filas con crédito «Sí» alimentan las casillas 107 y 108. Las boletas
-    no otorgan crédito fiscal ni sustentan gasto, así que no suman base ni IGV.
+    El filtro usa la fecha de anotación indicada; si no se conoce, estima el período por la fecha de emisión.
+    Solo las filas con crédito «Sí» alimentan las casillas 107 y 108. En esta
+    estimación, las boletas no suman base ni IGV como crédito fiscal.
     Las compras no gravadas van a la casilla 120. Las filas con chip «Pendiente»
     no entran al PDT 621 hasta completar RUC, serie y número.
   </p>

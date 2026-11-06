@@ -28,6 +28,10 @@ class Compra(models.Model):
         limit_choices_to={"rol__in": ["PROVEEDOR", "AMBOS"]},
     )
     fecha = models.DateField()
+    fecha_anotacion = models.DateField(
+        null=True, blank=True,
+        help_text="Fecha de anotación en el registro de compras; si no se indica, se estima con la emisión.",
+    )
     tipo_doc = models.CharField(
         max_length=8, choices=TipoDoc.choices, default=TipoDoc.FACTURA
     )

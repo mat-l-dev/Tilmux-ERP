@@ -13,6 +13,7 @@
       </header>
       <dl class="datos">
         <div><dt>Fecha</dt><dd>{{ compra.fecha|date:"d/m/Y" }}</dd></div>
+        <div><dt>Período tributario</dt><dd>{% if compra.fecha_anotacion %}{{ compra.fecha_anotacion|date:"m/Y" }}{% else %}Estimado por emisión{% endif %}</dd></div>
         <div><dt>Proveedor</dt><dd>{{ compra.proveedor.nombre }}</dd></div>
         <div><dt>Documento</dt><dd>{{ compra.serie }}-{{ compra.numero }}</dd></div>
         <div><dt>Tipo</dt><dd>{{ compra.get_tipo_doc_display }}</dd></div>
@@ -93,6 +94,14 @@
   <aside class="doc-side">
     <div class="card sticky">
       <header class="card-head"><h2>Acciones</h2></header>
+      {% if compra.estado == "CONFIRMADA" %}
+      <form method="post" action="{% url 'compras:anotacion' 'compra' compra.pk %}">
+        {% csrf_token %}
+        <label class="field"><span>Fecha dentro del período RCE</span><input type="date" name="fecha_anotacion" value="{{ compra.fecha_anotacion|date:'Y-m-d' }}"></label>
+        <button class="btn btn-ghost btn-block" type="submit">Guardar anotación</button>
+      </form>
+      <p class="preview-note">Indica una fecha del mes verificado en el RCE. Si queda vacía, el período se estima por emisión. El sistema no genera el RCE ni valida el plazo de crédito fiscal.</p>
+      {% endif %}
       {% if compra.estado == "BORRADOR" or compra.estado == "PENDIENTE" %}
       <a class="btn btn-ghost btn-block" href="{% url 'compras:nueva' %}?editar={{ compra.pk }}">Editar</a>
       {% if compra.estado == "BORRADOR" %}

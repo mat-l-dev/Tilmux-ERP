@@ -7,6 +7,7 @@ from datetime import date
 from decimal import Decimal
 
 from django.db.models import Sum
+from django.db.models.functions import Coalesce
 
 from compras.models import Compra
 from compras.models_gasto import Gasto
@@ -45,10 +46,10 @@ def calcular(empresa, anio: int, mes: int) -> dict:
     igv_ventas += debitos["i"] or CERO
 
     compras = list(
-        Compra.objects.filter(
+        Compra.objects.annotate(fecha_tributaria=Coalesce("fecha_anotacion", "fecha")).filter(
             empresa=empresa,
             estado=Compra.Estado.CONFIRMADA,
-            fecha__range=(desde, hasta),
+            fecha_tributaria__range=(desde, hasta),
             con_credito=True,
         ).select_related("proveedor")
     )
@@ -68,11 +69,11 @@ def calcular(empresa, anio: int, mes: int) -> dict:
     no_gravado = sum((c.subtotal for c in compras if c.igv == 0), CERO)
 
     gastos = list(
-        Gasto.objects.filter(
+        Gasto.objects.annotate(fecha_tributaria=Coalesce("fecha_anotacion", "fecha")).filter(
             empresa=empresa,
             con_credito=True,
             provision=False,
-            fecha__range=(desde, hasta),
+            fecha_tributaria__range=(desde, hasta),
         )
         .exclude(estado=Gasto.Estado.ANULADO)
         .exclude(tipo_doc="OTRO")

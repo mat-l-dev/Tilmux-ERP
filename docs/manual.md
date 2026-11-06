@@ -127,10 +127,13 @@ El vínculo con la factura no liquida automáticamente la provisión ni su cuent
 por pagar. El flujo completo para registrar y liquidar nuevas provisiones aún
 está pendiente; revisa los asientos antes de registrar la factura o el pago.
 
-**Fecha devengado.** Identifica el período económico del gasto y no cambia la
-fecha de emisión del comprobante. La estimación del 621 usa la fecha del
-comprobante; no registra todavía un período de anotación independiente. Contrasta
-las casillas con el RCE, especialmente si la anotación fue posterior a la emisión.
+**Fecha devengado y anotación.** El devengo identifica el período económico del
+gasto. Desde el detalle de una compra confirmada o de un gasto puedes indicar la
+fecha de anotación verificada en el RCE: se conserva la fecha de emisión y se
+registra el cambio en el historial. El registro y la estimación del 621 usan esa
+fecha; si está vacía, estiman el período por la emisión. No se cambian períodos
+contables cerrados ni se envía información a SUNAT. Contrasta el resultado con
+el RCE y la declaración; el sistema no valida aún el plazo de crédito fiscal.
 
 ## Usuarios y roles
 

@@ -10,6 +10,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Q, Sum
+from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
@@ -235,10 +236,10 @@ def registro_compras(request):
     filas = []
 
     if empresa:
-        for compra in Compra.objects.filter(
+        for compra in Compra.objects.annotate(fecha_tributaria=Coalesce("fecha_anotacion", "fecha")).filter(
             empresa=empresa,
             estado=Compra.Estado.CONFIRMADA,
-            fecha__range=(desde, hasta),
+            fecha_tributaria__range=(desde, hasta),
         ).select_related("proveedor").prefetch_related("lineas"):
             usa_credito = (
                 compra.con_credito
@@ -256,6 +257,7 @@ def registro_compras(request):
             filas.append(
                 {
                     "fecha": compra.fecha,
+                    "fecha_anotacion": compra.fecha_anotacion,
                     "tipo": compra.get_tipo_doc_display(),
                     "documento": f"{compra.serie}-{compra.numero}".strip(" -"),
                     "ruc": compra.proveedor.numero_doc,
@@ -270,9 +272,9 @@ def registro_compras(request):
                     "clase": "Mercadería",
                 }
             )
-        for gasto in Gasto.objects.filter(
+        for gasto in Gasto.objects.annotate(fecha_tributaria=Coalesce("fecha_anotacion", "fecha")).filter(
             empresa=empresa,
-            fecha__range=(desde, hasta),
+            fecha_tributaria__range=(desde, hasta),
             provision=False,
         ).exclude(estado=Gasto.Estado.ANULADO).select_related("proveedor"):
             usa_credito = (
@@ -285,6 +287,7 @@ def registro_compras(request):
             filas.append(
                 {
                     "fecha": gasto.fecha,
+                    "fecha_anotacion": gasto.fecha_anotacion,
                     "tipo": gasto.get_tipo_doc_display(),
                     "documento": f"{gasto.serie}-{gasto.numero}".strip(" -"),
                     "ruc": gasto.proveedor.numero_doc,

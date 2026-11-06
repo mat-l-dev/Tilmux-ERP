@@ -12,6 +12,7 @@ from datetime import date
 from decimal import Decimal
 
 from django.contrib.auth.decorators import login_required
+from django.db.models.functions import Coalesce
 from django.http import HttpResponse
 from openpyxl import Workbook
 from openpyxl.styles import Font
@@ -166,10 +167,10 @@ def compras(request):
     filas: list[list] = []
 
     if empresa:
-        for compra in Compra.objects.filter(
+        for compra in Compra.objects.annotate(fecha_tributaria=Coalesce("fecha_anotacion", "fecha")).filter(
             empresa=empresa,
             estado=Compra.Estado.CONFIRMADA,
-            fecha__range=(desde, hasta),
+            fecha_tributaria__range=(desde, hasta),
         ).select_related("proveedor").order_by("fecha", "serie", "numero"):
             usa_credito = (
                 compra.con_credito
@@ -179,7 +180,7 @@ def compras(request):
             )
             filas.append(
                 [
-                    _periodo(compra.fecha),
+                    _periodo(compra.fecha_anotacion or compra.fecha),
                     compra.fecha.isoformat(),
                     TIPO_SUNAT_COMPRA.get(compra.tipo_doc, "00"),
                     compra.serie,
@@ -200,9 +201,9 @@ def compras(request):
                 ]
             )
 
-        for gasto in Gasto.objects.filter(
+        for gasto in Gasto.objects.annotate(fecha_tributaria=Coalesce("fecha_anotacion", "fecha")).filter(
             empresa=empresa,
-            fecha__range=(desde, hasta),
+            fecha_tributaria__range=(desde, hasta),
             provision=False,
         ).exclude(estado=Gasto.Estado.ANULADO).select_related("proveedor").order_by("fecha", "serie", "numero"):
             usa_credito = (
@@ -214,7 +215,7 @@ def compras(request):
             )
             filas.append(
                 [
-                    _periodo(gasto.fecha),
+                    _periodo(gasto.fecha_anotacion or gasto.fecha),
                     gasto.fecha.isoformat(),
                     "01" if gasto.tipo_doc == "FACTURA" else ("03" if gasto.tipo_doc == "BOLETA" else "00"),
                     gasto.serie,

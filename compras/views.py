@@ -32,6 +32,7 @@ from tesoreria.models import MovimientoTesoreria
 from ventas.models import Venta
 from ventas.models_guia import GuiaRemision
 
+from .anotacion import AnotacionError, cambiar_fecha_anotacion
 from .forms import CabeceraCompraForm, GastoPagadoForm
 from .models import Compra, CompraLinea, CostoAdicional
 from .models_gasto import Gasto
@@ -108,6 +109,27 @@ def lista(request):
         "compras/lista.html",
         {"compras": pagina, "page_obj": pagina, "q": busqueda, "tipo": tipo},
     )
+
+
+@login_required
+@requiere_escritura
+@require_POST
+def anotacion(request, clase: str, pk: int):
+    empresa = empresa_actual(request)
+    if clase not in {"compra", "gasto"} or empresa is None:
+        messages.error(request, "No se pudo identificar el documento o la empresa.")
+        return redirect("compras:lista")
+    get_object_or_404(Compra if clase == "compra" else Gasto, pk=pk, empresa=empresa)
+    destino = "compras:detalle" if clase == "compra" else "compras:detalle_gasto"
+    try:
+        texto = request.POST.get("fecha_anotacion", "").strip()
+        fecha = date.fromisoformat(texto) if texto else None
+        cambiar_fecha_anotacion(empresa=empresa, clase=clase, pk=pk, fecha=fecha, usuario=request.user)
+    except (ValueError, AnotacionError) as exc:
+        messages.error(request, str(exc) if isinstance(exc, AnotacionError) else "Revisa la fecha de anotación.")
+    else:
+        messages.success(request, "Período de anotación actualizado; revisa la comparación con el RCE.")
+    return redirect(destino, pk=pk)
 
 
 @login_required
@@ -785,7 +807,7 @@ def pagar_compra(request, pk: int):
 
 @login_required
 def detalle(request, pk: int):
-    compra = get_object_or_404(Compra, pk=pk)
+    compra = get_object_or_404(Compra, pk=pk, empresa=empresa_actual(request))
     asiento = Asiento.objects.filter(
         origen_tipo="COMPRA", origen_id=compra.pk, tipo_operacion="COMPRA"
     ).first()

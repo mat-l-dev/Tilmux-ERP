@@ -25,6 +25,10 @@ class Gasto(models.Model):
         "catalogo.Tercero", on_delete=models.PROTECT, related_name="gastos"
     )
     fecha = models.DateField()
+    fecha_anotacion = models.DateField(
+        null=True, blank=True,
+        help_text="Fecha de anotación en el registro de compras; si no se indica, se estima con la emisión.",
+    )
     fecha_devengado = models.DateField(
         null=True,
         blank=True,
