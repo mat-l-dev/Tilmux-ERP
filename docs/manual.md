@@ -123,9 +123,13 @@ La provisión:
 - No mueve tesorería: todavía no ha salido dinero.
 - No aparece en el registro de compras ni en el PDT 621.
 
-El vínculo con la factura no liquida automáticamente la provisión ni su cuenta
-por pagar. El flujo completo para registrar y liquidar nuevas provisiones aún
-está pendiente; revisa los asientos antes de registrar la factura o el pago.
+Al registrar un gasto pagado puedes seleccionar las provisiones pendientes del
+mismo proveedor. Si suman exactamente el total y tanto ellas como el comprobante
+no tienen IGV, el sistema vincula los documentos y cancela la 4212 sin volver a
+registrar el gasto. Revisa la selección: si no seleccionas provisiones, se
+registra un gasto nuevo. No admite pagos parciales ni diferencias o IGV; la
+creación manual de nuevas provisiones desde la interfaz está pendiente. Los
+vínculos históricos por sí solos no implican que se haya liquidado la deuda.
 
 **Fecha devengado y anotación.** El devengo identifica el período económico del
 gasto. Desde el detalle de una compra confirmada o de un gasto puedes indicar la

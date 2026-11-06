@@ -16,6 +16,7 @@
         <label class="field{% if campo.name == 'glosa' %} field-full{% endif %}">
           <span>{{ campo.label }}</span>
           {{ campo }}
+          {% if campo.help_text %}<span class="preview-note">{{ campo.help_text }}</span>{% endif %}
           {% if campo.errors %}<span class="message error">{{ campo.errors|join:", " }}</span>{% endif %}
         </label>
         {% endfor %}

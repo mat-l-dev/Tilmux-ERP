@@ -667,8 +667,9 @@ for cod in ["1061", "1031", "40111", "40171", "4212"]:
   ejecutar las operaciones contables. Se dejó en modo de consulta; las compras
   se registran desde su módulo y los gastos mediante importación o el nuevo
   formulario de gasto pagado en soles, con comprobante y pago de igual fecha.
-  El vínculo de una provisión con su factura no la liquida por sí solo; falta
-  implementar la liquidación completa y auditada de provisiones.
+  El vínculo histórico de una provisión con su factura no la liquida por sí solo.
+  El registro de gastos pagados permite liquidar explícitamente provisiones sin
+  IGV por el importe exacto; siguen pendientes pagos parciales y diferencias.
 - Asientos, capas y movimientos de inventario y movimientos de tesorería
   también se dejaron de solo consulta en administración para impedir cambios
   directos sin sus efectos relacionados. La marca de conciliación bancaria

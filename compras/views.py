@@ -153,6 +153,7 @@ def nuevo_gasto(request):
                     total=datos["base"] + datos["igv"], cuenta=datos["cuenta"],
                     medio=datos["medio"], glosa=datos["glosa"],
                     con_credito=datos["con_credito"], deducible=datos["deducible"],
+                    provisiones_ids=[p.pk for p in datos["provisiones"]],
                 )
                 HistorialDocumento.objects.create(
                     empresa=empresa, tipo=HistorialDocumento.Tipo.GASTO, documento_id=gasto.pk,

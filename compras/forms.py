@@ -57,6 +57,11 @@ class GastoPagadoForm(forms.Form):
         required=False, label="Incluir en la estimación tributaria de compras", initial=False
     )
     deducible = forms.BooleanField(required=False, label="Sustenta costo o gasto tributario", initial=False)
+    provisiones = forms.ModelMultipleChoiceField(
+        queryset=Gasto.objects.none(), required=False, label="Provisiones que liquida (opcional)",
+        help_text=("Mismo proveedor y total, sin IGV. Se usa la cuenta de gasto de cada provisión; "
+                   "la cuenta elegida arriba no registra otro gasto."),
+    )
 
     def __init__(self, *args, empresa, **kwargs):
         super().__init__(*args, **kwargs)
@@ -67,6 +72,9 @@ class GastoPagadoForm(forms.Form):
         self.fields["medio"].queryset = CuentaTesoreria.objects.filter(
             empresa=empresa, activa=True, cuenta_contable__isnull=False
         )
+        self.fields["provisiones"].queryset = Gasto.objects.filter(
+            empresa=empresa, provision=True, estado=Gasto.Estado.PROVISION, gasto_origen__isnull=True,
+        ).select_related("proveedor")
 
     def clean(self):
         datos = super().clean()

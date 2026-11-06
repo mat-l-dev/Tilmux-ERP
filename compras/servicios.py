@@ -182,6 +182,7 @@ def registrar_gasto(
     gasto_origen: Gasto | None = None,
     fecha_devengado=None,
     estado: str | None = None,
+    provisiones_ids=(),
 ) -> Gasto:
     serie, numero = serie[:4], numero[:20]
     base, igv, total = _cent(base), _cent(igv), _cent(total)
@@ -201,6 +202,17 @@ def registrar_gasto(
             empresa=empresa, proveedor=proveedor, tipo_doc=tipo_doc,
             serie=serie, numero=numero,
         )
+
+    from .liquidacion import liquidar_provisiones, preparar_provisiones
+
+    if provision and provisiones_ids:
+        raise CompraError("Una provisión no puede liquidar otras provisiones.")
+    if provisiones_ids and (origen_tipo or origen_id or not medio.cuenta_contable_id):
+        raise CompraError("La liquidación necesita una cuenta contable y un gasto de origen propio.")
+    provisiones = preparar_provisiones(
+        empresa=empresa, proveedor=proveedor, fecha=fecha, igv=igv,
+        total=total, ids=provisiones_ids,
+    )
 
     estado_final = estado or (
         Gasto.Estado.PROVISION if provision else Gasto.Estado.PAGADO
@@ -267,21 +279,24 @@ def registrar_gasto(
         )
         return gasto
 
-    postear(
-        empresa=empresa,
-        fecha=fecha,
-        tipo="GASTO_CON_IGV" if usa_credito else "GASTO_SIN_IGV",
-        glosa=f"{documento} · {proveedor.nombre}"[:255],
-        montos=Montos(
-            base=base if usa_credito else total,
-            igv=igv if usa_credito else Decimal("0.00"),
-            total=total,
-        ),
-        origen_tipo=origen_tipo or "GASTO",
-        origen_id=origen_id or gasto.pk,
-        cuenta_medio=medio.cuenta_contable,
-        cuenta_gasto=cuenta,
-    )
+    if provisiones:
+        liquidar_provisiones(gasto=gasto, provisiones=provisiones, medio=medio)
+    else:
+        postear(
+            empresa=empresa,
+            fecha=fecha,
+            tipo="GASTO_CON_IGV" if usa_credito else "GASTO_SIN_IGV",
+            glosa=f"{documento} · {proveedor.nombre}"[:255],
+            montos=Montos(
+                base=base if usa_credito else total,
+                igv=igv if usa_credito else Decimal("0.00"),
+                total=total,
+            ),
+            origen_tipo=origen_tipo or "GASTO",
+            origen_id=origen_id or gasto.pk,
+            cuenta_medio=medio.cuenta_contable,
+            cuenta_gasto=cuenta,
+        )
     anotar(
         empresa=empresa,
         cuenta=medio,
