@@ -22,10 +22,9 @@ from contabilidad.moneda import SinTipoCambio, a_soles
 from contabilidad.servicios import ContabilidadError
 from core.context import empresa_actual
 from core.contexto import usuario_actual
-from core.models import HistorialDocumento
+from core.models import HistorialDocumento, Periodo
 from core.permisos import requiere_escritura
 from documentos.xml_cpe import Guia, XMLInvalido, leer
-from inventario.models import CapaFIFO, ConsumoCapa, MovimientoStock
 from inventario.servicios import StockError
 from reportes.casillas import casillas_documento
 from tesoreria.models import MovimientoTesoreria
@@ -761,7 +760,7 @@ def importar_compra(request):
 @login_required
 @requiere_escritura
 def pagar_compra(request, pk: int):
-    compra = get_object_or_404(Compra, pk=pk)
+    compra = get_object_or_404(Compra, pk=pk, empresa=empresa_actual(request))
     cuentas = list(
         CuentaTesoreria.objects.filter(empresa=compra.empresa, activa=True)
     )
@@ -830,7 +829,7 @@ def detalle(request, pk: int):
 @requiere_escritura
 @require_POST
 def confirmar_compra(request, pk: int):
-    compra = get_object_or_404(Compra, pk=pk)
+    compra = get_object_or_404(Compra, pk=pk, empresa=empresa_actual(request))
     try:
         confirmar(compra)
     except (CompraError, StockError) as exc:
@@ -844,13 +843,29 @@ def confirmar_compra(request, pk: int):
 @requiere_escritura
 @transaction.atomic
 def corregir(request, pk: int):
-    compra = get_object_or_404(Compra, pk=pk)
+    empresa = empresa_actual(request)
+    compra = get_object_or_404(Compra, pk=pk, empresa=empresa)
     if compra.estado != Compra.Estado.CONFIRMADA:
         messages.info(request, "Esta compra todavía se puede editar completa.")
         return redirect(f"{reverse('compras:nueva')}?editar={compra.pk}")
 
     if request.method == "POST":
-        compra = get_object_or_404(Compra.objects.select_for_update(), pk=pk)
+        compra = get_object_or_404(Compra.objects.select_for_update(), pk=pk, empresa=empresa)
+        fechas = {compra.fecha, compra.fecha_anotacion or compra.fecha}
+        periodos = Q()
+        for fecha in fechas:
+            periodos |= Q(anio=fecha.year, mes=fecha.month)
+        asientos = Asiento.objects.filter(
+            empresa=empresa, origen_tipo__in=["COMPRA", "COMPRA_PAGO"], origen_id=compra.pk,
+            estado=Asiento.Estado.CONFIRMADO,
+        )
+        periodos |= Q(pk__in=asientos.values("periodo_id"))
+        periodos_afectados = Periodo.objects.select_for_update().filter(
+            periodos, empresa=empresa,
+        ).order_by("pk")
+        if any(periodo.estado == Periodo.Estado.CERRADO for periodo in periodos_afectados):
+            messages.error(request, "No se pueden corregir datos vinculados a un período cerrado.")
+            return redirect("compras:detalle", compra.pk)
         documento_anterior = (compra.tipo_doc, compra.serie, compra.numero)
         compra.glosa = request.POST.get("glosa", "")[:255]
         tipo = request.POST.get("tipo_doc", "")
@@ -934,50 +949,6 @@ def corregir(request, pk: int):
 @requiere_escritura
 @require_POST
 def anular(request, pk: int):
-    compra = get_object_or_404(Compra, pk=pk)
-    if compra.estado != Compra.Estado.CONFIRMADA:
-        messages.error(request, "Solo se anula una compra confirmada.")
-        return redirect("compras:detalle", compra.pk)
-    if compra.pagada or compra.monto_pagado > 0:
-        messages.error(
-            request,
-            "La compra tiene pagos registrados. Corrige con una nota de crédito "
-            "del proveedor o regulariza el pago antes de anular.",
-        )
-        return redirect("compras:detalle", compra.pk)
-
-    capas = CapaFIFO.objects.filter(
-        empresa=compra.empresa, origen_tipo="COMPRA", origen_id=compra.pk
-    )
-    if ConsumoCapa.objects.filter(capa__in=capas).exists():
-        messages.error(
-            request,
-            "La mercadería de esta compra ya se vendió o consumió. No se puede "
-            "anular sin ajustar el stock.",
-        )
-        return redirect("compras:detalle", compra.pk)
-
-    Asiento.objects.filter(
-        empresa=compra.empresa, origen_tipo="COMPRA", origen_id=compra.pk
-    ).update(estado=Asiento.Estado.ANULADO)
-    MovimientoStock.objects.filter(
-        empresa=compra.empresa, origen_tipo="COMPRA", origen_id=compra.pk
-    ).delete()
-    capas.delete()
-    compra.estado = Compra.Estado.ANULADA
-    compra.modificado_por = usuario_actual.get()
-    compra.modificado_en = timezone.now()
-    compra.save(update_fields=["estado", "modificado_por", "modificado_en"])
-    HistorialDocumento.objects.create(
-        empresa=compra.empresa,
-        tipo="COMPRA",
-        documento_id=compra.pk,
-        usuario=usuario_actual.get(),
-        accion="ANULACION",
-        detalle="Compra anulada y asiento revertido",
-    )
-    messages.warning(
-        request,
-        "Compra anulada. El asiento quedó anulado y el stock se retiró.",
-    )
+    compra = get_object_or_404(Compra, pk=pk, empresa=empresa_actual(request))
+    messages.error(request, "La anulación está temporalmente deshabilitada hasta contar con una reversión auditable.")
     return redirect("compras:detalle", compra.pk)

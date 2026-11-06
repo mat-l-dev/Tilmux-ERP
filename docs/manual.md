@@ -63,6 +63,11 @@ número. Mientras esté pendiente no entra al PDT 621.
 Al confirmar: se crean las capas de stock y el asiento por pagar. Una compra con
 crédito fiscal no se confirma sin RUC, serie y número.
 
+La anulación de compras confirmadas está temporalmente deshabilitada: el flujo
+anterior eliminaba movimientos de inventario. Queda pendiente implementar una
+reversión que conserve el historial y compruebe stock, pagos y períodos. La
+corrección de datos tampoco se permite si afecta un período cerrado.
+
 **Registrar gasto pagado.** Desde la lista de compras puedes registrar comisiones
 y otros gastos pagados en soles cuando la fecha del documento y la del pago
 coinciden. El registro crea el gasto, el asiento y la salida de tesorería en una

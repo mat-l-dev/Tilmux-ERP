@@ -124,10 +124,7 @@
       {% if compra.pagada or compra.monto_pagado > 0 %}
       <p class="preview-note">Para cambiar importes, usa una nota de crédito del proveedor: la compra ya tiene pagos.</p>
       {% else %}
-      <form method="post" action="{% url 'compras:anular' compra.pk %}">
-        {% csrf_token %}
-        <button class="btn btn-ghost btn-block" type="submit">Anular compra</button>
-      </form>
+      <p class="preview-note">La anulación está temporalmente deshabilitada mientras se implementa una reversión auditable.</p>
       {% endif %}
       {% endif %}
       <a class="btn btn-ghost btn-block" href="{% url 'compras:lista' %}">Volver a la lista</a>

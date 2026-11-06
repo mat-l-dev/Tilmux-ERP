@@ -738,3 +738,13 @@ for cod in ["1061", "1031", "40111", "40171", "4212"]:
   Ruff sin hallazgos. Posteriormente se ejecutó la suite completa: 96 pruebas
   aprobadas. El ajuste final de importación se realizó durante esa ejecución y
   se comprobó después por separado junto con duplicados: seis pruebas aprobadas.
+
+### Protección de compras (06/11/2026)
+
+- Pago, confirmación, corrección y anulación verifican la empresa seleccionada.
+  Esta protección no sustituye un modelo de permisos de acceso por empresa.
+- La corrección de datos se bloquea cuando el período del comprobante, de su
+  anotación o de un asiento vinculado está cerrado.
+- Se deshabilitó la anulación anterior porque eliminaba capas y movimientos de
+  stock. Falta implementar una reversión auditable que conserve el historial y
+  valide la disponibilidad de inventario y las obligaciones y pagos asociados.
