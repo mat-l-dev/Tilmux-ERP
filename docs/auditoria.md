@@ -683,6 +683,11 @@ for cod in ["1061", "1031", "40111", "40171", "4212"]:
   incluso entre ventas distintas y con ceros iniciales; separan notas de crédito
   y débito. Ventas y notas de crédito son de solo consulta en administración;
   la restricción de base sigue siendo por venta y no cubre escrituras directas.
+- Devoluciones parciales: el redondeo independiente podía dejar céntimos sin
+  acreditar y hacer que el costo del reingreso no coincidiera con el asiento.
+  Se reparte el redondeo con el acumulado de la línea y se usa el costo asignado
+  a cada devolución para valorizar su entrada. Las unidades que no reingresan
+  no devuelven costo al inventario. Las notas anteriores se conservan intactas.
 - Conciliación SIRE: el lector sumaba importes DGNG y DNG como si fueran
   compras destinadas exclusivamente a operaciones gravadas. Ahora advierte y
   detiene la comparación al encontrar valores en esas columnas; no calcula la

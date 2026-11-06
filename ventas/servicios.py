@@ -7,7 +7,7 @@ from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.db.models.functions import Trim, Upper
 from django.utils import timezone
 
@@ -29,6 +29,7 @@ from .models import (
 logger = logging.getLogger(__name__)
 
 CENT = Decimal("0.01")
+PRECISION_COSTO = Decimal("0.0000000001")
 LIMITE_IDENTIFICACION = Decimal("700.00")
 MOTIVOS_CREDITO_IMPLEMENTADOS = frozenset({"01", "06", "07"})
 
@@ -201,10 +202,16 @@ def emitir_nota_credito(
         cantidades = {linea.pk: linea.cantidad for linea in lineas}
 
     acreditado = {
-        fila["venta_linea_id"]: fila["total"]
+        fila["venta_linea_id"]: fila
         for fila in NotaCreditoLinea.objects.filter(nota__venta=venta)
         .values("venta_linea_id")
-        .annotate(total=Sum("cantidad"))
+        .annotate(
+            cantidad_acreditada=Sum("cantidad"),
+            base_acreditada=Sum("base"),
+            igv_acreditado=Sum("igv"),
+            costo_reingresado=Sum("costo_total"),
+            cantidad_sin_reingreso=Sum("cantidad", filter=Q(nota__reingresa_stock=False)),
+        )
     }
     if motivo_codigo in {"01", "06"} and (
         acreditado
@@ -221,16 +228,27 @@ def emitir_nota_credito(
         pedida = Decimal(cantidades.get(linea.pk, 0) or 0)
         if pedida <= 0:
             continue
-        disponible = linea.cantidad - acreditado.get(linea.pk, Decimal("0"))
+        anterior = acreditado.get(linea.pk, {})
+        cantidad_anterior = anterior.get("cantidad_acreditada") or Decimal("0")
+        disponible = linea.cantidad - cantidad_anterior
         if pedida > disponible:
             raise VentaError(
                 f"No puedes acreditar {pedida} de {linea.producto.sku}: "
                 f"solo quedan {disponible}."
             )
-        proporcion = pedida / linea.cantidad
-        base = (linea.base * proporcion).quantize(CENT)
-        igv = (linea.igv * proporcion).quantize(CENT)
-        costo = (linea.costo_total * proporcion).quantize(CENT) if reingresa_stock else Decimal("0.00")
+        proporcion_acumulada = (cantidad_anterior + pedida) / linea.cantidad
+        base = (linea.base * proporcion_acumulada).quantize(CENT) - (anterior.get("base_acreditada") or Decimal("0"))
+        igv = (linea.igv * proporcion_acumulada).quantize(CENT) - (anterior.get("igv_acreditado") or Decimal("0"))
+        costo = Decimal("0.00")
+        if reingresa_stock:
+            costo_acumulado = (linea.costo_total * proporcion_acumulada).quantize(CENT)
+            if anterior.get("cantidad_sin_reingreso"):
+                costo_anterior = (linea.costo_total * cantidad_anterior / linea.cantidad).quantize(CENT)
+            else:
+                costo_anterior = anterior.get("costo_reingresado") or Decimal("0")
+            costo = costo_acumulado - costo_anterior
+        if base < 0 or igv < 0 or costo < 0:
+            raise VentaError("Las notas anteriores exceden el importe proporcional; revisa el historial de la venta.")
         seleccion.append((linea, pedida, base, igv, base + igv, costo))
         base_total += base
         igv_total += igv
@@ -264,12 +282,15 @@ def emitir_nota_credito(
             costo_total=costo,
         )
         if reingresa_stock:
+            costo_unitario = (costo / pedida).quantize(PRECISION_COSTO, rounding=ROUND_HALF_UP)
+            if _cent(costo_unitario * pedida) != costo:
+                raise VentaError("El costo de la devolución no se puede representar con la precisión disponible.")
             entrar(
                 empresa=venta.empresa,
                 producto=linea.producto,
                 fecha=fecha,
                 cantidad=pedida,
-                costo_unitario=linea.costo_unitario,
+                costo_unitario=costo_unitario,
                 origen_tipo="NOTA_CREDITO",
                 origen_id=nota.pk,
                 glosa=f"Devolución {serie}-{numero}",
