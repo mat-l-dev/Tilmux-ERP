@@ -186,7 +186,7 @@ def compras(request):
                     compra.numero,
                     compra.proveedor.numero_doc,
                     compra.proveedor.nombre,
-                    _importe(compra.subtotal if usa_credito else 0),
+                    _importe(compra.subtotal if usa_credito and compra.igv > 0 else 0),
                     _importe(compra.igv if usa_credito else 0),
                     _importe(
                         compra.subtotal
@@ -201,8 +201,10 @@ def compras(request):
             )
 
         for gasto in Gasto.objects.filter(
-            empresa=empresa, fecha__range=(desde, hasta)
-        ).select_related("proveedor").order_by("fecha", "serie", "numero"):
+            empresa=empresa,
+            fecha__range=(desde, hasta),
+            provision=False,
+        ).exclude(estado=Gasto.Estado.ANULADO).select_related("proveedor").order_by("fecha", "serie", "numero"):
             usa_credito = (
                 gasto.con_credito
                 and gasto.tipo_doc != "OTRO"

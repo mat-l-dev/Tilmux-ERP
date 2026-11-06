@@ -39,6 +39,12 @@ unidades, series y cuentas de tesorería. Las cuentas contables ya están cargad
 
 ## Compras
 
+La lista de **Compras** reúne mercadería, gastos y provisiones. Usa **Tipo**
+para filtrar y busca por proveedor, comprobante o concepto. Al abrir un gasto
+puedes consultar sus importes, cuenta, asiento, movimientos de tesorería y
+provisiones vinculadas cuando existan. Las provisiones se identifican por
+separado para no confundirlas con facturas adicionales.
+
 **Compras → Nueva compra.** Escribes la factura del proveedor, agregas las líneas
 (con su descripción) y, si hubo flete o aduana, los costos de internamiento. Se
 prorratean por valor y el costo unitario final los incluye.
@@ -57,10 +63,30 @@ número. Mientras esté pendiente no entra al PDT 621.
 Al confirmar: se crean las capas de stock y el asiento por pagar. Una compra con
 crédito fiscal no se confirma sin RUC, serie y número.
 
+**Registrar gasto pagado.** Desde la lista de compras puedes registrar comisiones
+y otros gastos pagados en soles cuando la fecha del documento y la del pago
+coinciden. El registro crea el gasto, el asiento y la salida de tesorería en una
+misma operación. Si marcas su inclusión tributaria, el sistema considera todo
+el IGV como crédito o, si no tiene IGV, el valor como compra no gravada; revisa
+primero que corresponda. Para pagos en otra fecha aún no hay flujo manual.
+
+Para proteger el costo PEPS, no se puede ingresar una entrada o salida con fecha
+anterior a una salida ya registrada del mismo producto. Si necesitas corregir
+un movimiento anterior, revisa el historial y los costos antes de proceder; el
+sistema todavía no recalcula automáticamente esas operaciones.
+
+El sistema comprueba proveedor, tipo, serie y número antes de confirmar una
+compra o registrar un gasto. Si el comprobante ya está registrado, incluso con
+ceros iniciales distintos, muestra un aviso. Las provisiones no se consideran
+facturas recibidas. Actualmente un comprobante mixto no puede dividirse entre
+una compra de mercadería y un gasto separado; ese caso requiere revisión.
+
 **Corregir datos.** En una compra confirmada puedes completar serie, número,
 tipo, glosa y descripciones desde **Corregir datos**. Los importes, la fecha y el
 RUC no se editan en una compra confirmada: si están mal, usa una nota de crédito
 del proveedor o **Anular compra** (solo si no tiene pagos ni stock consumido).
+Al corregir serie, número o glosa, el sistema actualiza también la glosa del
+asiento y del movimiento de tesorería vinculados.
 
 **Compras → Importar XML.** Subes el XML de SUNAT y el sistema extrae RUC, serie,
 número, base, IGV y total. Confirma como gasto o como mercadería.
@@ -84,6 +110,28 @@ como pagada cuando el saldo llega a cero.
 Si la compra es en dólares y pagas con otro tipo de cambio, la diferencia se
 reconoce en la 6761 o 7761, proporcional a la parte pagada.
 
+## Provisión de gastos
+
+Una **provisión** reconoce un gasto antes de que llegue la factura. Puedes
+consultar las provisiones existentes desde **Compras** y ver sus vínculos con
+comprobantes. La administración de compras y gastos es de solo consulta para
+evitar cambios directos que no actualicen la contabilidad.
+
+La provisión:
+
+- Debita la cuenta de gasto y acredita la cuenta por pagar 4212.
+- No mueve tesorería: todavía no ha salido dinero.
+- No aparece en el registro de compras ni en el PDT 621.
+
+El vínculo con la factura no liquida automáticamente la provisión ni su cuenta
+por pagar. El flujo completo para registrar y liquidar nuevas provisiones aún
+está pendiente; revisa los asientos antes de registrar la factura o el pago.
+
+**Fecha devengado.** Identifica el período económico del gasto y no cambia la
+fecha de emisión del comprobante. La estimación del 621 usa la fecha del
+comprobante; no registra todavía un período de anotación independiente. Contrasta
+las casillas con el RCE, especialmente si la anotación fue posterior a la emisión.
+
 ## Usuarios y roles
 
 En **Configuración → Perfiles** se asigna a cada usuario un rol:
@@ -102,10 +150,13 @@ Un usuario sin perfil se trata como administrador.
 panel derecho muestra el asiento que se generará.
 
 Mientras la venta esté en borrador, el detalle tiene **Editar** para corregir
-descripciones, cantidades o precios. Una venta confirmada no se edita: se corrige
-con nota de crédito o débito, que es lo que exige SUNAT.
+descripciones, cantidades o precios. Una venta confirmada no se edita; revisa
+el procedimiento aplicable al comprobante antes de registrar una nota.
 
 Al confirmar: descuenta stock por PEPS, calcula el costo real y registra el cobro.
+El correlativo de la serie (`Serie.ultimo_numero`) se actualiza de forma atómica
+en ese momento; una venta en borrador no consume número. Las facturas E001 ya
+aceptadas por SUNAT no se modifican.
 
 Una factura exige RUC. Una boleta mayor a S/ 700 exige identificar al comprador.
 
@@ -113,10 +164,14 @@ Una factura exige RUC. Una boleta mayor a S/ 700 exige identificar al comprador.
 
 En el detalle de una venta confirmada:
 
-- **Nota de crédito**: total o por ítem. Devuelve el stock al costo original.
+- **Nota de crédito**: el registro admite anulación y devolución total o por
+  ítem. Si el bien reingresa, devuelve el stock a su costo original; si no,
+  el asiento no registra una entrada de inventario.
 - **Nota de débito**: intereses o penalidades. Aumenta la cuenta por cobrar.
 
-Cada nota modifica un solo comprobante y usa los catálogos 09 y 10 de SUNAT.
+El ERP registra estas notas localmente: no las emite ni las envía a SUNAT. Los
+motivos de descuento y corrección de descripción aún no están implementados. La
+anulación o devolución total requiere acreditar toda la venta sin notas previas.
 
 ## Reportes
 
@@ -125,7 +180,7 @@ Cada nota modifica un solo comprobante y usa los catálogos 09 y 10 de SUNAT.
 | Balance de comprobación | Debe, haber y saldos por cuenta |
 | Libro mayor | Movimientos con saldo corrido |
 | Registro de ventas | Ventas y notas, con exportación CSV |
-| Registro de compras | Compras y gastos, con exportación CSV |
+| Registro de compras | Compras y gastos, con exportación CSV; no incluye provisiones |
 | IGV y RER | IGV del mes y renta del 1,5 % |
 | Estados financieros | Situación, resultados, cambios y flujo |
 | Conciliación SUNAT | Casillas contra la vista preliminar o contra la propuesta del SIRE |
@@ -134,13 +189,29 @@ Cada nota modifica un solo comprobante y usa los catálogos 09 y 10 de SUNAT.
 
 **IGV y RER.** El reporte calcula el IGV del mes y la renta del 1,5 %. En el
 panel, **IGV por pagar** muestra el saldo real de la cuenta 40111. En
-**Impuestos**, el KPI y la tabla **PDT 621** muestran lo que se declara: el 140
-es el IGV del mes, el 145 el saldo a favor anterior y el 184 lo que resulta
-(140 - 145). Si el libro y el 621 no coinciden, revisa si quedó una declaración
-anterior sin pagar.
+**Impuestos**, el KPI y la tabla **PDT 621** muestran una estimación que debe
+compararse con el registro y la declaración: el 140 es el IGV del mes, el 145
+el saldo a favor anterior y el 184 el resultado (140 - 145). Si el libro y el
+621 no coinciden, revisa si quedó una declaración anterior sin pagar.
 
 La tarjeta **Renta RER por pagar** muestra el saldo de la 40171, es decir, la
 renta de meses anteriores que aún no se paga.
+
+### Pagar el IGV
+
+En **Impuestos**, la tarjeta **IGV por pagar** muestra el IGV del periodo
+(casilla 184), lo ya pagado en el libro y lo pendiente. Si hay saldo pendiente,
+aparece el formulario **Registrar pago de IGV**:
+
+- Fecha del pago y cuenta de tesorería.
+- Importe total o parcial; no se permite superar el saldo pendiente.
+- El sistema crea el asiento D 40111 / H banco, el movimiento de tesorería y el
+  registro de historial.
+
+Un pago parcial reduce el pendiente y puede completarse después. El pago de
+un período cerrado puede registrarse en una fecha posterior cuyo período
+contable esté abierto. El pago de octubre solo debe registrarse cuando se
+confirme la fecha y la cuenta.
 
 ### PDT 621
 

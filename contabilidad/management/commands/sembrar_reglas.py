@@ -42,6 +42,10 @@ REGLAS = {
         "Gasto sin IGV",
         [(None, D, GASTO, "Gasto"), (None, H, MEDIO, "Salida de dinero")],
     ),
+    "PROVISION_GASTO": (
+        "Provisión de gasto",
+        [(None, D, GASTO, "Gasto"), ("4212", H, TOTAL, "Por pagar")],
+    ),
     "NOTA_CREDITO": (
         "Nota de crédito de venta",
         [("70911", D, BASE, "Devolución"), ("40111", D, IGV, "IGV"), ("1212", H, TOTAL, "Cobranza revertida"), ("69121", H, COSTO, "Costo revertido"), ("20111", D, COSTO, "Reingreso de inventario")],  # noqa: E501

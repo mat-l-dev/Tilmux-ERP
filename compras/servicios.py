@@ -14,10 +14,11 @@ from contabilidad.models import Cuenta
 from contabilidad.moneda import tipo_cambio_de
 from contabilidad.servicios import Montos, postear, postear_lineas
 from core.contexto import usuario_actual
-from core.models import TipoCambio
+from core.models import Empresa, TipoCambio
 from inventario.servicios import entrar
 from tesoreria.servicios import anotar
 
+from .comprobantes import buscar_comprobante
 from .models import Compra
 from .models_gasto import Gasto
 
@@ -29,6 +30,17 @@ DIEZ = Decimal("0.0000000001")
 
 class CompraError(Exception):
     pass
+
+
+def validar_comprobante(*, empresa, proveedor, tipo_doc, serie, numero, compra_id=None):
+    # El bloqueo serializa las comprobaciones y registros entre ambos módulos.
+    Empresa.objects.select_for_update().get(pk=empresa.pk)
+    origen = buscar_comprobante(
+        empresa=empresa, proveedor=proveedor, tipo_doc=tipo_doc,
+        serie=serie, numero=numero, compra_id=compra_id,
+    )
+    if origen:
+        raise CompraError(f"El comprobante {serie}-{numero} ya está registrado como {origen} para este proveedor.")
 
 
 def _cent(valor) -> Decimal:
@@ -45,6 +57,10 @@ def confirmar(compra: Compra) -> Compra:
         )
     if compra.estado != Compra.Estado.BORRADOR:
         raise CompraError("Solo se confirma una compra en borrador.")
+    validar_comprobante(
+        empresa=compra.empresa, proveedor=compra.proveedor, tipo_doc=compra.tipo_doc,
+        serie=compra.serie, numero=compra.numero, compra_id=compra.pk,
+    )
     if compra.con_credito:
         if not compra.serie.strip() or not compra.numero.strip():
             raise CompraError(
@@ -162,22 +178,42 @@ def registrar_gasto(
     origen_id: int | None = None,
     con_credito: bool = True,
     deducible: bool = True,
+    provision: bool = False,
+    gasto_origen: Gasto | None = None,
+    fecha_devengado=None,
+    estado: str | None = None,
 ) -> Gasto:
+    serie, numero = serie[:4], numero[:20]
     base, igv, total = _cent(base), _cent(igv), _cent(total)
     if base + igv != total:
         raise CompraError("El gasto no cuadra: base más IGV no da el total.")
-    if medio is None:
+    if not provision and medio is None:
         raise CompraError("El gasto necesita una cuenta de tesorería.")
     if cuenta is None:
         raise CompraError("El gasto necesita una cuenta contable.")
+    if gasto_origen is not None and not provision:
+        raise CompraError("Solo una provisión puede tener un gasto de origen.")
+    if gasto_origen is not None and gasto_origen.empresa_id != empresa.pk:
+        raise CompraError("La factura de origen pertenece a otra empresa.")
 
-    gasto = Gasto.objects.create(creado_por=usuario_actual.get(), 
+    if not provision:
+        validar_comprobante(
+            empresa=empresa, proveedor=proveedor, tipo_doc=tipo_doc,
+            serie=serie, numero=numero,
+        )
+
+    estado_final = estado or (
+        Gasto.Estado.PROVISION if provision else Gasto.Estado.PAGADO
+    )
+    gasto = Gasto.objects.create(
+        creado_por=usuario_actual.get(),
         empresa=empresa,
         proveedor=proveedor,
         fecha=fecha,
+        fecha_devengado=fecha_devengado,
         tipo_doc=tipo_doc,
-        serie=serie[:4],
-        numero=numero[:20],
+        serie=serie,
+        numero=numero,
         base=base,
         igv=igv,
         total=total,
@@ -186,10 +222,51 @@ def registrar_gasto(
         glosa=glosa[:255],
         con_credito=con_credito,
         deducible=deducible,
+        provision=provision,
+        gasto_origen=gasto_origen,
+        estado=estado_final,
     )
 
     documento = f"{serie}-{numero}".strip(" -") or "sin comprobante"
     usa_credito = con_credito and igv > 0
+    if provision:
+        cuentas = {
+            c.codigo: c
+            for c in Cuenta.objects.filter(
+                version="2026", codigo__in=["40111", "4212"]
+            )
+        }
+        lineas = [
+            (
+                cuenta,
+                base if usa_credito else total,
+                Decimal("0.00"),
+                "Gasto provisionado",
+            )
+        ]
+        if usa_credito:
+            lineas.append(
+                (
+                    cuentas["40111"],
+                    igv,
+                    Decimal("0.00"),
+                    "IGV de la provisión",
+                )
+            )
+        lineas.append(
+            (cuentas["4212"], Decimal("0.00"), total, "Por pagar")
+        )
+        postear_lineas(
+            empresa=empresa,
+            fecha=fecha_devengado or fecha,
+            tipo="PROVISION_GASTO",
+            glosa=f"Provisión {documento} · {proveedor.nombre}"[:255],
+            lineas=lineas,
+            origen_tipo=origen_tipo or "GASTO",
+            origen_id=origen_id or gasto.pk,
+        )
+        return gasto
+
     postear(
         empresa=empresa,
         fecha=fecha,

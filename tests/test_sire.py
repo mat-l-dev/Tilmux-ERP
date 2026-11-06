@@ -4,11 +4,16 @@ from __future__ import annotations
 
 import io
 from decimal import Decimal
+from types import SimpleNamespace
+from unittest.mock import patch
 
-from django.test import SimpleTestCase
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.http import HttpResponse
+from django.test import RequestFactory, SimpleTestCase
 from openpyxl import Workbook
 
-from reportes.sire import ArchivoInvalido, leer_filas, sumar
+from reportes.sire import ArchivoInvalido, leer_filas, sumar, validar_contexto
+from reportes.views import conciliacion_archivo
 
 
 class Archivo:
@@ -18,6 +23,26 @@ class Archivo:
 
     def read(self):
         return self._contenido
+
+
+class ConciliacionContextoTest(SimpleTestCase):
+    def test_propuesta_de_otro_mes_no_se_compara(self):
+        archivo = SimpleUploadedFile(
+            "rce.csv",
+            b"RUC,Periodo,BI Gravada,IGV,Importe Total\n20123456789,202610,100,18,118\n",
+        )
+        solicitud = RequestFactory().post(
+            "/reportes/conciliacion/", {"anio": "2026", "mes": "9", "registro": "compras", "archivo": archivo}
+        )
+        solicitud.user = SimpleNamespace(is_authenticated=True)
+        with (
+            patch("reportes.views.empresa_actual", return_value=SimpleNamespace(ruc="20123456789")),
+            patch("reportes.views.calcular") as calcular_reporte,
+            patch("reportes.views.render", return_value=HttpResponse()) as renderizar,
+        ):
+            conciliacion_archivo(solicitud)
+        self.assertIn("período", renderizar.call_args.args[2]["error"])
+        calcular_reporte.assert_not_called()
 
 
 CSV = """Reporte: PROPUESTA RCE
@@ -30,6 +55,49 @@ Total;;;;;;765,25;137,75;903,00
 
 
 class SireCsvTest(SimpleTestCase):
+    def test_verifica_ruc_y_periodo_de_la_propuesta(self):
+        contenido = (
+            "RUC,Periodo,BI Gravado DG,IGV / IPM DG,Total CP\n"
+            "20123456789,202610,100.00,18.00,118.00\n"
+        )
+        filas = leer_filas(Archivo("rce.csv", contenido.encode("utf-8")))
+        self.assertEqual(
+            validar_contexto(filas, ruc="20123456789", anio=2026, mes=10),
+            {"ruc": True, "periodo": True},
+        )
+        with self.assertRaisesRegex(ArchivoInvalido, "período"):
+            validar_contexto(filas, ruc="20123456789", anio=2026, mes=9)
+        with self.assertRaisesRegex(ArchivoInvalido, "RUC"):
+            validar_contexto(filas, ruc="20999999999", anio=2026, mes=10)
+
+    def test_una_fila_sin_periodo_no_se_da_por_verificada(self):
+        contenido = (
+            "RUC,Periodo,BI Gravada,IGV,Importe Total\n"
+            "20123456789,202610,100,18,118\n"
+            "20123456789,,100,18,118\n"
+        )
+        filas = leer_filas(Archivo("rce.csv", contenido.encode("utf-8")))
+        self.assertEqual(
+            validar_contexto(filas, ruc="20123456789", anio=2026, mes=10),
+            {"ruc": True, "periodo": False},
+        )
+
+    def test_sin_datos_de_empresa_o_periodo_no_los_da_por_verificados(self):
+        filas = leer_filas(Archivo("rce.csv", CSV.encode("utf-8")))
+        self.assertEqual(
+            validar_contexto(filas, ruc="20123456789", anio=2026, mes=9),
+            {"ruc": False, "periodo": False},
+        )
+
+    def test_razon_social_con_total_no_descarta_un_comprobante(self):
+        contenido = (
+            "RUC,Razón Social,Periodo,BI Gravada,IGV,Importe Total\n"
+            "20123456789,Total Market SAC,202610,100.00,18.00,118.00\n"
+        )
+        filas = leer_filas(Archivo("rce.csv", contenido.encode("utf-8")))
+        self.assertEqual(sumar(filas)["total"], Decimal("118"))
+        self.assertTrue(validar_contexto(filas, ruc="20123456789", anio=2026, mes=10)["ruc"])
+
     def test_separador_no_depende_de_cantidad_de_comas_decimales(self):
         contenido = (
             "BI Gravada;IGV;Importe Total\n"

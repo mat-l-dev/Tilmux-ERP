@@ -8,8 +8,8 @@ from decimal import Decimal, InvalidOperation
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.db import IntegrityError
-from django.db.models import Q
+from django.db import IntegrityError, transaction
+from django.db.models import CharField, F, Q, Value
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -19,19 +19,23 @@ from catalogo.models import CuentaTesoreria, Producto, Tercero
 from contabilidad.calculos import calcular_linea
 from contabilidad.models import Asiento, Cuenta
 from contabilidad.moneda import SinTipoCambio, a_soles
+from contabilidad.servicios import ContabilidadError
 from core.context import empresa_actual
 from core.contexto import usuario_actual
 from core.models import HistorialDocumento
 from core.permisos import requiere_escritura
 from documentos.xml_cpe import Guia, XMLInvalido, leer
 from inventario.models import CapaFIFO, ConsumoCapa, MovimientoStock
+from inventario.servicios import StockError
 from reportes.casillas import casillas_documento
+from tesoreria.models import MovimientoTesoreria
 from ventas.models import Venta
 from ventas.models_guia import GuiaRemision
 
-from .forms import CabeceraCompraForm
+from .forms import CabeceraCompraForm, GastoPagadoForm
 from .models import Compra, CompraLinea, CostoAdicional
-from .servicios import CompraError, confirmar, pagar, registrar_gasto
+from .models_gasto import Gasto
+from .servicios import CompraError, confirmar, pagar, registrar_gasto, validar_comprobante
 
 
 def _decimal(texto: str) -> Decimal:
@@ -41,34 +45,133 @@ def _decimal(texto: str) -> Decimal:
 @login_required
 def lista(request):
     empresa = empresa_actual(request)
-    consulta = (
-        Compra.objects.filter(empresa=empresa).select_related("proveedor")
-        if empresa
-        else Compra.objects.none()
-    )
+    compras = Compra.objects.filter(empresa=empresa) if empresa else Compra.objects.none()
+    gastos = Gasto.objects.filter(empresa=empresa) if empresa else Gasto.objects.none()
     periodo = request.GET.get("periodo", "")
-    if periodo and "-" in periodo:
-        anio, mes = (int(p) for p in periodo.split("-", 1))
-        consulta = consulta.filter(fecha__year=anio, fecha__month=mes)
+    if periodo:
+        try:
+            fecha = date.fromisoformat(f"{periodo}-01")
+        except ValueError:
+            periodo = ""
+        else:
+            compras = compras.filter(fecha__year=fecha.year, fecha__month=fecha.month)
+            gastos = gastos.filter(fecha__year=fecha.year, fecha__month=fecha.month)
 
     busqueda = request.GET.get("q", "").strip()
     if busqueda:
-        consulta = consulta.filter(
+        filtro = (
             Q(proveedor__nombre__icontains=busqueda)
             | Q(proveedor__numero_doc__icontains=busqueda)
             | Q(serie__icontains=busqueda)
             | Q(numero__icontains=busqueda)
+            | Q(glosa__icontains=busqueda)
         )
-    pagina = Paginator(consulta, 25).get_page(request.GET.get("page"))
+        compras = compras.filter(filtro)
+        gastos = gastos.filter(filtro)
+
+    tipo = request.GET.get("tipo", "")
+    if tipo not in {"compra", "gasto"}:
+        tipo = ""
+
+    def indices(queryset, clase):
+        return queryset.order_by().annotate(
+            registro_id=F("pk"), clase=Value(clase, output_field=CharField())
+        ).values("fecha", "registro_id", "clase")
+
+    if tipo == "compra":
+        consulta = indices(compras, "compra")
+    elif tipo == "gasto":
+        consulta = indices(gastos, "gasto")
+    else:
+        consulta = indices(compras, "compra").union(indices(gastos, "gasto"), all=True)
+    pagina = Paginator(
+        consulta.order_by("-fecha", "-clase", "-registro_id"), 25
+    ).get_page(request.GET.get("page"))
+    indices_pagina = list(pagina.object_list)
+    ids_compras = [i["registro_id"] for i in indices_pagina if i["clase"] == "compra"]
+    ids_gastos = [i["registro_id"] for i in indices_pagina if i["clase"] == "gasto"]
+    compras_pagina = {
+        c.pk: c for c in compras.filter(pk__in=ids_compras).select_related("proveedor")
+    }
+    gastos_pagina = {
+        g.pk: g for g in gastos.filter(pk__in=ids_gastos).select_related("proveedor")
+    }
+    pagina.object_list = [
+        {
+            "clase": i["clase"],
+            "registro": (compras_pagina if i["clase"] == "compra" else gastos_pagina)[i["registro_id"]],
+        }
+        for i in indices_pagina
+    ]
     return render(
         request,
         "compras/lista.html",
-        {"compras": pagina, "page_obj": pagina, "q": busqueda},
+        {"compras": pagina, "page_obj": pagina, "q": busqueda, "tipo": tipo},
     )
 
 
 @login_required
 @requiere_escritura
+def nuevo_gasto(request):
+    empresa = empresa_actual(request)
+    if empresa is None:
+        messages.error(request, "Primero configura una empresa.")
+        return redirect("core:panel")
+    formulario = GastoPagadoForm(
+        request.POST or None, empresa=empresa, initial={"fecha": date.today(), "igv": 0}
+    )
+    if request.method == "POST" and formulario.is_valid():
+        datos = formulario.cleaned_data
+        try:
+            with transaction.atomic():
+                gasto = registrar_gasto(
+                    empresa=empresa, proveedor=datos["proveedor"], fecha=datos["fecha"],
+                    tipo_doc=datos["tipo_doc"], serie=datos["serie"].strip().upper(),
+                    numero=datos["numero"].strip(), base=datos["base"], igv=datos["igv"],
+                    total=datos["base"] + datos["igv"], cuenta=datos["cuenta"],
+                    medio=datos["medio"], glosa=datos["glosa"],
+                    con_credito=datos["con_credito"], deducible=datos["deducible"],
+                )
+                HistorialDocumento.objects.create(
+                    empresa=empresa, tipo=HistorialDocumento.Tipo.GASTO, documento_id=gasto.pk,
+                    usuario=request.user, accion="REGISTRO", detalle="Gasto pagado registrado manualmente.",
+                )
+        except (CompraError, ContabilidadError) as exc:
+            formulario.add_error(None, str(exc))
+        except IntegrityError:
+            formulario.add_error(None, "El comprobante ya está registrado. Revisa los datos del proveedor.")
+        else:
+            messages.success(request, "Gasto pagado registrado con su asiento y movimiento de tesorería.")
+            return redirect("compras:detalle_gasto", gasto.pk)
+    return render(request, "compras/nuevo_gasto.html", {"formulario": formulario})
+
+
+@login_required
+def detalle_gasto(request, pk: int):
+    empresa = empresa_actual(request)
+    gasto = get_object_or_404(
+        Gasto.objects.select_related("proveedor", "cuenta", "medio", "gasto_origen"),
+        pk=pk, empresa=empresa,
+    )
+    asientos = Asiento.objects.filter(
+        empresa=empresa, origen_tipo="GASTO", origen_id=gasto.pk
+    ).prefetch_related("lineas__cuenta")
+    movimientos = MovimientoTesoreria.objects.filter(
+        empresa=empresa, origen_tipo="GASTO", origen_id=gasto.pk
+    ).select_related("cuenta")
+    historial = HistorialDocumento.objects.filter(
+        empresa=empresa, tipo="GASTO", documento_id=gasto.pk
+    ).order_by("-fecha")[:10]
+    provisiones = gasto.provisiones.filter(empresa=empresa).select_related("proveedor")
+    return render(request, "compras/detalle_gasto.html", {
+        "gasto": gasto, "asientos": asientos, "movimientos": movimientos,
+        "historial": historial, "provisiones": provisiones,
+    })
+
+
+@login_required
+@requiere_escritura
+@transaction.atomic
 def nueva(request):
     empresa = empresa_actual(request)
     if empresa is None:
@@ -569,56 +672,48 @@ def importar_compra(request):
         elif len(elegidos) != len(lineas) or not all(elegidos):
             messages.error(request, "Elige un producto en cada línea.")
         else:
-            proveedor, _ = Tercero.objects.get_or_create(
-                tipo_doc="RUC",
-                numero_doc=datos["emisor_ruc"],
-                defaults={
-                    "nombre": datos["emisor_nombre"] or "Proveedor",
-                    "rol": "PROVEEDOR",
-                },
-            )
-            compra = Compra.objects.create(creado_por=usuario_actual.get(), 
-                empresa=empresa,
-                proveedor=proveedor,
-                fecha=date.fromisoformat(datos["fecha"]),
-                tipo_doc=datos["tipo"],
-                serie=datos["serie"],
-                numero=datos["numero"],
-                glosa=f"{datos['tipo']} {datos['serie']}-{datos['numero']}",
-                con_credito=con_credito,
-            )
-
-            base_total = sum((Decimal(linea["base"]) for linea in lineas), Decimal("0.00"))
-            igv_total = Decimal(datos["igv"])
-            acumulado = Decimal("0.00")
-            for indice, (linea, producto_id) in enumerate(zip(lineas, elegidos, strict=False)):
-                producto = Producto.objects.get(pk=producto_id)
-                base = Decimal(linea["base"])
-                if indice == len(lineas) - 1:
-                    igv = igv_total - acumulado
-                else:
-                    igv = (
-                        (igv_total * base / base_total).quantize(Decimal("0.01"))
-                        if base_total
-                        else Decimal("0.00")
-                    )
-                    acumulado += igv
-                CompraLinea.objects.create(
-                    compra=compra,
-                    orden=indice + 1,
-                    producto=producto,
-                    descripcion=linea["descripcion"][:200],
-                    cantidad=Decimal(linea["cantidad"]),
-                    precio_unitario=Decimal(linea["valor_unitario"]),
-                    base=base,
-                    igv=igv,
-                    total=base + igv,
-                )
-
             try:
-                confirmar(compra)
-            except CompraError as exc:
+                with transaction.atomic():
+                    proveedor, _ = Tercero.objects.get_or_create(
+                        tipo_doc="RUC",
+                        numero_doc=datos["emisor_ruc"],
+                        defaults={
+                            "nombre": datos["emisor_nombre"] or "Proveedor",
+                            "rol": "PROVEEDOR",
+                        },
+                    )
+                    compra = Compra.objects.create(
+                        creado_por=usuario_actual.get(), empresa=empresa, proveedor=proveedor,
+                        fecha=date.fromisoformat(datos["fecha"]), tipo_doc=datos["tipo"],
+                        serie=datos["serie"], numero=datos["numero"],
+                        glosa=f"{datos['tipo']} {datos['serie']}-{datos['numero']}",
+                        con_credito=con_credito,
+                    )
+                    base_total = sum((Decimal(linea["base"]) for linea in lineas), Decimal("0.00"))
+                    igv_total = Decimal(datos["igv"])
+                    acumulado = Decimal("0.00")
+                    for indice, (linea, producto_id) in enumerate(zip(lineas, elegidos, strict=False)):
+                        producto = Producto.objects.get(pk=producto_id)
+                        base = Decimal(linea["base"])
+                        if indice == len(lineas) - 1:
+                            igv = igv_total - acumulado
+                        else:
+                            igv = (
+                                (igv_total * base / base_total).quantize(Decimal("0.01"))
+                                if base_total else Decimal("0.00")
+                            )
+                            acumulado += igv
+                        CompraLinea.objects.create(
+                            compra=compra, orden=indice + 1, producto=producto,
+                            descripcion=linea["descripcion"][:200], cantidad=Decimal(linea["cantidad"]),
+                            precio_unitario=Decimal(linea["valor_unitario"]), base=base,
+                            igv=igv, total=base + igv,
+                        )
+                    confirmar(compra)
+            except (CompraError, StockError) as exc:
                 messages.error(request, f"No se pudo confirmar: {exc}")
+            except (Producto.DoesNotExist, ValueError):
+                messages.error(request, "Revisa los productos y los datos del comprobante antes de continuar.")
             else:
                 request.session.pop("xml_pendiente", None)
                 messages.success(
@@ -715,7 +810,7 @@ def confirmar_compra(request, pk: int):
     compra = get_object_or_404(Compra, pk=pk)
     try:
         confirmar(compra)
-    except CompraError as exc:
+    except (CompraError, StockError) as exc:
         messages.error(request, str(exc))
     else:
         messages.success(request, "Compra confirmada: stock y asiento generados.")
@@ -724,6 +819,7 @@ def confirmar_compra(request, pk: int):
 
 @login_required
 @requiere_escritura
+@transaction.atomic
 def corregir(request, pk: int):
     compra = get_object_or_404(Compra, pk=pk)
     if compra.estado != Compra.Estado.CONFIRMADA:
@@ -731,6 +827,8 @@ def corregir(request, pk: int):
         return redirect(f"{reverse('compras:nueva')}?editar={compra.pk}")
 
     if request.method == "POST":
+        compra = get_object_or_404(Compra.objects.select_for_update(), pk=pk)
+        documento_anterior = (compra.tipo_doc, compra.serie, compra.numero)
         compra.glosa = request.POST.get("glosa", "")[:255]
         tipo = request.POST.get("tipo_doc", "")
         if tipo in Compra.TipoDoc.values:
@@ -746,6 +844,15 @@ def corregir(request, pk: int):
             compra.serie = request.POST.get("serie", "").upper()[:4]
         if not compra.numero.strip():
             compra.numero = request.POST.get("numero", "")[:20]
+        if (compra.tipo_doc, compra.serie, compra.numero) != documento_anterior:
+            try:
+                validar_comprobante(
+                    empresa=compra.empresa, proveedor=compra.proveedor, tipo_doc=compra.tipo_doc,
+                    serie=compra.serie, numero=compra.numero, compra_id=compra.pk,
+                )
+            except CompraError as exc:
+                messages.error(request, str(exc))
+                return redirect("compras:detalle", compra.pk)
         compra.modificado_por = usuario_actual.get()
         compra.modificado_en = timezone.now()
         compra.save(
@@ -758,6 +865,27 @@ def corregir(request, pk: int):
                 "modificado_en",
             ]
         )
+
+        documento = f"{compra.serie}-{compra.numero}".strip(" -")
+        Asiento.objects.filter(
+            empresa=compra.empresa,
+            origen_tipo="COMPRA",
+            origen_id=compra.pk,
+            tipo_operacion="COMPRA",
+            estado=Asiento.Estado.CONFIRMADO,
+        ).update(glosa=f"Compra {documento}".strip()[:255])
+        Asiento.objects.filter(
+            empresa=compra.empresa,
+            origen_tipo="COMPRA_PAGO",
+            origen_id=compra.pk,
+            tipo_operacion="PAGO_PROVEEDOR",
+            estado=Asiento.Estado.CONFIRMADO,
+        ).update(glosa=f"Pago compra {documento}".strip()[:255])
+        MovimientoTesoreria.objects.filter(
+            empresa=compra.empresa,
+            origen_tipo="COMPRA_PAGO",
+            origen_id=compra.pk,
+        ).update(concepto=f"Pago compra {documento}".strip()[:200])
 
         for linea in compra.lineas.all():
             nueva = request.POST.get(f"desc_{linea.pk}")

@@ -60,9 +60,11 @@
     </tbody>
   </table>
   <p class="preview-note">
+    Estimación según la fecha del comprobante: contrasta las compras con el RCE
+    del periodo, especialmente cuando se anotan en un mes posterior.
     Solo suman las compras con RUC, serie y número. Las pendientes de factura o sin
-    comprobante no entran en 107/108. El 184 es lo que se declara; el 140 es antes
-    del saldo a favor anterior. Si el libro muestra otro IGV por pagar, revisa si
+    comprobante no entran en 107/108. La casilla 184 es una estimación; el 140 es
+    anterior al saldo a favor. Si el libro muestra otro IGV por pagar, revisa si
     quedó una declaración anterior sin pagar.
   </p>
   {% else %}
@@ -71,6 +73,46 @@
   </p>
   {% endif %}
 </section>
+
+{% if es_mes %}
+<section class="card" style="margin-top:12px">
+  <header class="card-head">
+    <h2>IGV por pagar</h2>
+    <span class="chip">Cuenta 40111</span>
+  </header>
+
+  <dl class="totales">
+    <div><dt>IGV del periodo (casilla 184)</dt><dd class="num">{{ c184|floatformat:2 }}</dd></div>
+    <div><dt>Pagado en el libro</dt><dd class="num">{{ igv_pagado|floatformat:2 }}</dd></div>
+    <div class="total"><dt>Pendiente de pago</dt><dd class="num">{{ igv_pendiente|floatformat:2 }}</dd></div>
+  </dl>
+
+  {% if puede_pagar_igv %}
+  <form method="post" action="{% url 'reportes:pagar_igv' %}" class="filtro" style="margin-top:14px">
+    {% csrf_token %}
+    <input type="hidden" name="anio" value="{{ anio }}">
+    <input type="hidden" name="mes" value="{{ mes }}">
+    <label>Fecha
+      <input type="date" name="fecha" value="{{ hoy|date:'Y-m-d' }}" required>
+    </label>
+    <label>Importe
+      <input type="number" name="importe" step="0.01" min="0.01" value="{{ igv_pendiente|stringformat:'0.2f' }}" required>
+    </label>
+    <label>Medio
+      <select name="medio" required>
+        {% for medio in medios %}<option value="{{ medio.pk }}">{{ medio.nombre }}</option>{% endfor %}
+      </select>
+    </label>
+    <button class="btn btn-primary" type="submit">Registrar pago de IGV</button>
+  </form>
+  <p class="preview-note">La fecha de pago debe pertenecer a un período contable abierto.</p>
+  {% elif c184 > 0 %}
+  <p class="preview-note">El IGV de este periodo ya está pagado en el libro.</p>
+  {% else %}
+  <p class="preview-note">Este periodo no tiene IGV por pagar.</p>
+  {% endif %}
+</section>
+{% endif %}
 
 <section class="card" style="margin-top:12px">
   <header class="card-head">

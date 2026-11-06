@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block titulo %}Registrar gasto pagado{% endblock %}
+{% block titulo_pagina %}Registrar gasto pagado{% endblock %}
+
+{% block contenido %}
+<div class="doc">
+  <div class="doc-main">
+    <form method="post" class="card form">
+      {% csrf_token %}
+      <header class="card-head"><h2>Datos del gasto</h2></header>
+      <p class="preview-note">Usa este formulario cuando la fecha del comprobante y la del pago coincidan. Registra importes en soles.</p>
+      {% if formulario.non_field_errors %}<div class="message error">{{ formulario.non_field_errors }}</div>{% endif %}
+      <div class="grid-fields">
+        {% for campo in formulario %}
+        <label class="field{% if campo.name == 'glosa' %} field-full{% endif %}">
+          <span>{{ campo.label }}</span>
+          {{ campo }}
+          {% if campo.errors %}<span class="message error">{{ campo.errors|join:", " }}</span>{% endif %}
+        </label>
+        {% endfor %}
+      </div>
+      <p class="preview-note">Si incluyes una factura en la estimación, su IGV se tratará como crédito fiscal completo; si no tiene IGV, se incluirá como compra no gravada. Verifica que corresponda. El registro no envía información a SUNAT.</p>
+      <button class="btn btn-primary" type="submit">Registrar gasto y pago</button>
+      <a class="btn btn-ghost" href="{% url 'compras:lista' %}">Cancelar</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

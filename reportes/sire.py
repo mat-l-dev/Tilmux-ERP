@@ -38,6 +38,11 @@ def _limpio(texto) -> str:
     return " ".join(str(texto or "").strip().split())
 
 
+def _es_fila_total(fila: list) -> bool:
+    primer_valor = next((_normalizar(celda) for celda in fila[:2] if _normalizar(celda)), "")
+    return primer_valor in {"total", "totales", "total general", "total del periodo", "total del período"}
+
+
 def leer_filas(archivo) -> list[list]:
     nombre = (archivo.name or "").lower()
     contenido = archivo.read()
@@ -135,6 +140,42 @@ def _cabecera(
     )
 
 
+def validar_contexto(filas: list[list], *, ruc: str, anio: int, mes: int) -> dict:
+    """Comprueba datos de empresa y periodo cuando figuran en cada fila."""
+    cabecera, *_ = _cabecera(filas)
+    titulos = [_normalizar(celda) for celda in filas[cabecera]]
+    indices = {
+        "ruc": next((i for i, titulo in enumerate(titulos) if titulo == "ruc"), None),
+        "periodo": next((i for i, titulo in enumerate(titulos) if titulo in {"periodo", "período"}), None),
+    }
+    verificado = {"ruc": indices["ruc"] is not None, "periodo": indices["periodo"] is not None}
+    filas_datos = 0
+    esperado = f"{anio:04d}{mes:02d}"
+    for fila in filas[cabecera + 1:]:
+        if not any(celda not in (None, "") for celda in fila):
+            continue
+        if _es_fila_total(fila):
+            continue
+        filas_datos += 1
+        for campo, indice in indices.items():
+            if indice is None:
+                continue
+            valor = fila[indice] if indice < len(fila) else None
+            if valor is None or not str(valor).strip():
+                verificado[campo] = False
+                continue
+            if isinstance(valor, float) and valor.is_integer():
+                valor = int(valor)
+            texto = str(valor).strip()
+            if campo == "ruc" and texto != ruc:
+                raise ArchivoInvalido("El RUC del archivo no corresponde a la empresa seleccionada.")
+            if campo == "periodo" and texto not in {esperado, esperado + "00"}:
+                raise ArchivoInvalido("El período del archivo no corresponde al período seleccionado.")
+    if not filas_datos:
+        return {"ruc": False, "periodo": False}
+    return verificado
+
+
 def _numero_validado(valor) -> Decimal | None:
     numero = _numero(valor)
     if numero is None:
@@ -178,8 +219,7 @@ def sumar(filas: list[list]) -> dict:
     for fila in filas[cabecera + 1 :]:
         if not any(celda not in (None, "") for celda in fila):
             continue
-        primera = " ".join(_normalizar(celda) for celda in fila[:2])
-        if "total" in primera:
+        if _es_fila_total(fila):
             continue
 
         if any(_numero_validado(fila[i]) not in (None, Decimal("0")) for i in columnas_mixtas if i < len(fila)):

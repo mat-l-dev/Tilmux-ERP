@@ -8,6 +8,7 @@ from decimal import Decimal, InvalidOperation
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.db.models import Q, Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -20,11 +21,18 @@ from core.context import empresa_actual
 from core.contexto import usuario_actual
 from core.models import HistorialDocumento
 from core.permisos import requiere_escritura
+from inventario.servicios import StockError
 from reportes.casillas import casillas_documento
 
 from .forms import CabeceraVentaForm
 from .models import NotaCredito, NotaCreditoLinea, NotaDebito, Venta, VentaLinea
-from .servicios import VentaError, confirmar, emitir_nota_credito, emitir_nota_debito
+from .servicios import (
+    MOTIVOS_CREDITO_IMPLEMENTADOS,
+    VentaError,
+    confirmar,
+    emitir_nota_credito,
+    emitir_nota_debito,
+)
 
 
 def _numero_siguiente(empresa, tipo_doc: str, serie: str) -> str:
@@ -158,6 +166,7 @@ def lista(request):
 
 @login_required
 @requiere_escritura
+@transaction.atomic
 def nueva(request):
     empresa = empresa_actual(request)
     if empresa is None:
@@ -353,7 +362,7 @@ def nota_credito(request, pk: int):
                     reingresa_stock=bool(request.POST.get("reingresa")),
                     descripcion=request.POST.get("descripcion", ""),
                 )
-            except VentaError as exc:
+            except (VentaError, StockError) as exc:
                 messages.error(request, str(exc))
             else:
                 messages.success(request, f"Nota de crédito {nota} registrada.")
@@ -365,7 +374,10 @@ def nota_credito(request, pk: int):
         {
             "venta": venta,
             "lineas": lineas,
-            "motivos": NotaCredito.Motivo.choices,
+            "motivos": [
+                (codigo, texto) for codigo, texto in NotaCredito.Motivo.choices
+                if codigo in MOTIVOS_CREDITO_IMPLEMENTADOS
+            ],
             "hoy": date.today(),
         },
     )
@@ -437,7 +449,7 @@ def confirmar_venta(request, pk: int):
     venta = get_object_or_404(Venta, pk=pk)
     try:
         confirmar(venta)
-    except VentaError as exc:
+    except (VentaError, StockError) as exc:
         messages.error(request, str(exc))
     else:
         messages.success(request, "Venta confirmada: stock, asiento y cobro listos.")

@@ -105,8 +105,13 @@ def construir(empresa, desde: date, hasta: date) -> dict:
             elif elemento in ACTIVO_NO_CORRIENTE and neto != 0:
                 activo_no_corriente.append(_entrada(fila))
             elif elemento == 4 and neto > 0:
-                # Saldo deudor de un tributo: crédito fiscal por recuperar.
-                activo_corriente.append(_entrada(fila))
+                if fila["cuenta__codigo"].startswith("40"):
+                    # Saldo deudor de un tributo: crédito fiscal por recuperar.
+                    activo_corriente.append(_entrada(fila))
+                else:
+                    # Un saldo deudor en una cuenta por pagar (por ejemplo 4212)
+                    # reduce el pasivo; no es un activo.
+                    pasivo.append(_entrada(fila, acreedora=True))
             elif elemento == 4 and neto < 0:
                 pasivo.append(_entrada(fila, acreedora=True))
             elif elemento == 5 and neto != 0:

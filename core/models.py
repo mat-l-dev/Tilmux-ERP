@@ -134,6 +134,9 @@ class HistorialDocumento(models.Model):
     class Tipo(models.TextChoices):
         COMPRA = "COMPRA", "Compra"
         VENTA = "VENTA", "Venta"
+        GASTO = "GASTO", "Gasto"
+        ASIENTO = "ASIENTO", "Asiento"
+        IMPUESTO = "IMPUESTO", "Impuesto"
 
     empresa = models.ForeignKey(
         Empresa, on_delete=models.CASCADE, related_name="historial"

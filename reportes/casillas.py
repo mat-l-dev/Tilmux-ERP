@@ -69,8 +69,12 @@ def calcular(empresa, anio: int, mes: int) -> dict:
 
     gastos = list(
         Gasto.objects.filter(
-            empresa=empresa, fecha__range=(desde, hasta), con_credito=True
+            empresa=empresa,
+            con_credito=True,
+            provision=False,
+            fecha__range=(desde, hasta),
         )
+        .exclude(estado=Gasto.Estado.ANULADO)
         .exclude(tipo_doc="OTRO")
         .select_related("proveedor")
     )

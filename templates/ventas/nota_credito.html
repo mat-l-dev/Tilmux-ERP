@@ -72,7 +72,7 @@
           <span>El producto vuelve al inventario</span>
         </label>
 
-        <button class="btn btn-primary" type="submit">Emitir nota de crédito</button>
+        <button class="btn btn-primary" type="submit">Registrar nota de crédito</button>
       </form>
     </section>
   </div>
@@ -86,8 +86,9 @@
       </p>
       <p class="preview-note">
         Una nota de crédito modifica un solo comprobante. Si necesitas ajustar dos,
-        emites dos notas.
+        registras dos notas. Este registro es local y no envía documentos a SUNAT.
       </p>
+      <p class="preview-note">Por ahora se admiten anulación y devoluciones. Otros motivos, como descuentos o corrección de descripción, aún no están implementados.</p>
       <a class="btn btn-ghost btn-block" href="{% url 'ventas:detalle' venta.pk %}">Volver</a>
     </div>
   </aside>

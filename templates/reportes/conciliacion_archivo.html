@@ -41,7 +41,7 @@
   <header class="card-head">
     <h2>{{ resultado.etiqueta }} · {{ mes }}/{{ anio }}</h2>
     <span class="chip {% if resultado.cuadra %}chip-ok{% else %}chip-warn{% endif %}">
-      {% if resultado.cuadra %}Cuadra{% else %}Con diferencias{% endif %}
+      {% if resultado.cuadra %}Totales coinciden{% else %}Con diferencias{% endif %}
     </span>
   </header>
 
@@ -50,6 +50,10 @@
     {{ resultado.filas }} comprobante{{ resultado.filas|pluralize }} leído{{ resultado.filas|pluralize }}.
     Columnas detectadas: {{ resultado.columnas|join:", " }}.
   </p>
+  <p class="preview-note">La comparación es por importes totales; no confirma que cada comprobante coincida.</p>
+  {% if not resultado.contexto_archivo.ruc or not resultado.contexto_archivo.periodo %}
+  <p class="preview-note">No se pudo verificar automáticamente el RUC o el período del archivo. Confírmalos antes de usar esta comparación.</p>
+  {% endif %}
 
   <table class="tabla-doc">
     <thead>

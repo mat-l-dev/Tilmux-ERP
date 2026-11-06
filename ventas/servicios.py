@@ -10,7 +10,9 @@ from django.db import transaction
 from django.db.models import Sum
 from django.utils import timezone
 
+from catalogo.models import Serie
 from contabilidad.servicios import Montos, postear
+from core.models import Empresa
 from inventario.servicios import entrar, salir
 from tesoreria.servicios import registrar
 
@@ -27,6 +29,7 @@ logger = logging.getLogger(__name__)
 
 CENT = Decimal("0.01")
 LIMITE_IDENTIFICACION = Decimal("700.00")
+MOTIVOS_CREDITO_IMPLEMENTADOS = frozenset({"01", "06", "07"})
 
 
 class VentaError(Exception):
@@ -37,11 +40,34 @@ def _cent(valor) -> Decimal:
     return Decimal(valor).quantize(CENT, rounding=ROUND_HALF_UP)
 
 
+def _avanzar_serie(venta: Venta) -> None:
+    """Mantiene el correlativo de la serie al día, sin tocar comprobantes aceptados."""
+    try:
+        numero = int(str(venta.numero).strip())
+    except (TypeError, ValueError):
+        return
+    tipo = (
+        Serie.Tipo.FACTURA
+        if venta.tipo_doc == Venta.TipoDoc.FACTURA
+        else Serie.Tipo.BOLETA
+    )
+    serie, _ = Serie.objects.get_or_create(
+        empresa=venta.empresa,
+        tipo=tipo,
+        serie=venta.serie,
+        defaults={"ultimo_numero": 0},
+    )
+    if numero > serie.ultimo_numero:
+        serie.ultimo_numero = numero
+        serie.save(update_fields=["ultimo_numero"])
+
+
 @transaction.atomic
 def confirmar(venta: Venta) -> Venta:
     venta = Venta.objects.select_for_update().get(pk=venta.pk)
     if venta.estado != Venta.Estado.BORRADOR:
         raise VentaError("Solo se confirma una venta en borrador.")
+    Empresa.objects.select_for_update().get(pk=venta.empresa_id)
 
     lineas = list(venta.lineas.select_related("producto"))
     if not lineas:
@@ -97,6 +123,7 @@ def confirmar(venta: Venta) -> Venta:
             "confirmada_en",
         ]
     )
+    _avanzar_serie(venta)
 
     postear(
         empresa=venta.empresa,
@@ -138,9 +165,14 @@ def emitir_nota_credito(
     descripcion: str = "",
 ) -> NotaCredito:
     """Emite una nota de crédito total o por ítem, según las cantidades."""
-    venta = Venta.objects.get(pk=venta.pk)
+    # Serializa las notas de una misma venta antes de comprobar lo acreditado.
+    venta = Venta.objects.select_for_update().get(pk=venta.pk)
     if venta.estado != Venta.Estado.CONFIRMADA:
         raise VentaError("Solo se acredita una venta confirmada.")
+    if fecha < venta.fecha:
+        raise VentaError("La fecha de la nota no puede ser anterior a la venta.")
+    if motivo_codigo not in MOTIVOS_CREDITO_IMPLEMENTADOS:
+        raise VentaError("Este motivo de nota de crédito todavía no está implementado.")
 
     lineas = list(venta.lineas.select_related("producto"))
     if not lineas:
@@ -155,6 +187,11 @@ def emitir_nota_credito(
         .values("venta_linea_id")
         .annotate(total=Sum("cantidad"))
     }
+    if motivo_codigo in {"01", "06"} and (
+        acreditado
+        or any(Decimal(cantidades.get(linea.pk, 0) or 0) != linea.cantidad for linea in lineas)
+    ):
+        raise VentaError("La anulación o devolución total debe cubrir toda la venta sin notas previas.")
 
     seleccion = []
     base_total = Decimal("0.00")
@@ -174,7 +211,7 @@ def emitir_nota_credito(
         proporcion = pedida / linea.cantidad
         base = (linea.base * proporcion).quantize(CENT)
         igv = (linea.igv * proporcion).quantize(CENT)
-        costo = (linea.costo_total * proporcion).quantize(CENT)
+        costo = (linea.costo_total * proporcion).quantize(CENT) if reingresa_stock else Decimal("0.00")
         seleccion.append((linea, pedida, base, igv, base + igv, costo))
         base_total += base
         igv_total += igv
@@ -252,6 +289,8 @@ def emitir_nota_debito(
     venta = Venta.objects.get(pk=venta.pk)
     if venta.estado != Venta.Estado.CONFIRMADA:
         raise VentaError("Solo se debita una venta confirmada.")
+    if fecha < venta.fecha:
+        raise VentaError("La fecha de la nota no puede ser anterior a la venta.")
 
     base, igv = _cent(base), _cent(igv)
     total = base + igv

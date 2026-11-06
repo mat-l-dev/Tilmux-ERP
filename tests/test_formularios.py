@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
-from django.test import SimpleTestCase
+from types import SimpleNamespace
+from unittest.mock import patch
+
+from django.test import RequestFactory, SimpleTestCase
 
 from compras.forms import CabeceraCompraForm
+from compras.views import confirmar_compra
+from inventario.servicios import StockError
 from ventas.forms import CabeceraVentaForm
+from ventas.views import confirmar_venta
 
 
 class VentaTest(SimpleTestCase):
@@ -75,3 +81,31 @@ class CompraTest(SimpleTestCase):
             }
         )
         self.assertTrue(formulario.is_valid(), formulario.errors)
+
+
+class ConfirmacionVentaTest(SimpleTestCase):
+    def test_muestra_error_de_stock_sin_error_de_servidor(self):
+        request = RequestFactory().post("/ventas/1/confirmar/")
+        request.user = SimpleNamespace(is_authenticated=True, perfil=None)
+        venta = SimpleNamespace(pk=1)
+        with (
+            patch("ventas.views.get_object_or_404", return_value=venta),
+            patch("ventas.views.confirmar", side_effect=StockError("Stock insuficiente")),
+            patch("ventas.views.messages.error") as mostrar_error,
+        ):
+            respuesta = confirmar_venta(request, pk=1)
+        self.assertEqual(respuesta.status_code, 302)
+        mostrar_error.assert_called_once_with(request, "Stock insuficiente")
+
+    def test_compra_muestra_aviso_de_movimiento_retroactivo(self):
+        request = RequestFactory().post("/compras/1/confirmar/")
+        request.user = SimpleNamespace(is_authenticated=True, perfil=None)
+        compra = SimpleNamespace(pk=1)
+        with (
+            patch("compras.views.get_object_or_404", return_value=compra),
+            patch("compras.views.confirmar", side_effect=StockError("Existe una salida posterior")),
+            patch("compras.views.messages.error") as mostrar_error,
+        ):
+            respuesta = confirmar_compra(request, pk=1)
+        self.assertEqual(respuesta.status_code, 302)
+        mostrar_error.assert_called_once_with(request, "Existe una salida posterior")

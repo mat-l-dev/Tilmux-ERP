@@ -2,9 +2,15 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 from django import forms
 
+from catalogo.models import CuentaTesoreria, Tercero
+from contabilidad.models import Cuenta
+
 from .models import Compra
+from .models_gasto import Gasto
 
 
 class CabeceraCompraForm(forms.Form):
@@ -31,4 +37,53 @@ class CabeceraCompraForm(forms.Form):
                     "proveedor_nombre",
                     "Elige un proveedor o escribe su RUC y razón social.",
                 )
+        return datos
+
+
+class GastoPagadoForm(forms.Form):
+    fecha = forms.DateField(label="Fecha de pago y del gasto", widget=forms.DateInput(attrs={"type": "date"}))
+    proveedor = forms.ModelChoiceField(queryset=Tercero.objects.none(), label="Proveedor")
+    tipo_doc = forms.ChoiceField(choices=Gasto.TipoDoc.choices, label="Tipo de documento")
+    serie = forms.CharField(max_length=4, required=False, label="Serie")
+    numero = forms.CharField(max_length=20, required=False, label="Número")
+    base = forms.DecimalField(
+        max_digits=18, decimal_places=2, min_value=Decimal("0.01"), label="Base o importe sin IGV"
+    )
+    igv = forms.DecimalField(max_digits=18, decimal_places=2, min_value=0, label="IGV", initial=0)
+    cuenta = forms.ModelChoiceField(queryset=Cuenta.objects.none(), label="Cuenta de gasto")
+    medio = forms.ModelChoiceField(queryset=CuentaTesoreria.objects.none(), label="Cuenta desde la que se pagó")
+    glosa = forms.CharField(max_length=255, label="Concepto")
+    con_credito = forms.BooleanField(
+        required=False, label="Incluir en la estimación tributaria de compras", initial=False
+    )
+    deducible = forms.BooleanField(required=False, label="Sustenta costo o gasto tributario", initial=False)
+
+    def __init__(self, *args, empresa, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["proveedor"].queryset = Tercero.objects.filter(activo=True, rol__in=["PROVEEDOR", "AMBOS"])
+        self.fields["cuenta"].queryset = Cuenta.objects.filter(
+            version="2026", activa=True, elemento=6, admite_movimiento=True
+        )
+        self.fields["medio"].queryset = CuentaTesoreria.objects.filter(
+            empresa=empresa, activa=True, cuenta_contable__isnull=False
+        )
+
+    def clean(self):
+        datos = super().clean()
+        tipo = datos.get("tipo_doc")
+        if tipo in {Gasto.TipoDoc.FACTURA, Gasto.TipoDoc.BOLETA}:
+            if not datos.get("serie"):
+                self.add_error("serie", "Indica la serie del comprobante.")
+            if not datos.get("numero"):
+                self.add_error("numero", "Indica el número del comprobante.")
+        if datos.get("con_credito") and tipo != Gasto.TipoDoc.FACTURA:
+            self.add_error("con_credito", "Solo se permite marcar crédito en una factura.")
+        proveedor = datos.get("proveedor")
+        if tipo == Gasto.TipoDoc.FACTURA and proveedor and (
+            proveedor.tipo_doc != "RUC" or len(proveedor.numero_doc) != 11 or not proveedor.numero_doc.isdigit()
+        ):
+            self.add_error("proveedor", "La factura requiere un proveedor con RUC de 11 dígitos.")
+        base, igv = datos.get("base"), datos.get("igv")
+        if base is not None and igv is not None and base + igv <= 0:
+            self.add_error("base", "El total del gasto debe ser mayor que cero.")
         return datos

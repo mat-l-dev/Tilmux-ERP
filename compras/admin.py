@@ -4,6 +4,19 @@ from .models import Compra, CompraLinea, CostoAdicional
 from .models_gasto import Gasto
 
 
+class SoloConsultaContable:
+    """Evita guardar documentos sin pasar por sus servicios contables."""
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
 class CompraLineaInline(admin.TabularInline):
     model = CompraLinea
     extra = 3
@@ -18,36 +31,31 @@ class CostoAdicionalInline(admin.TabularInline):
 
 
 @admin.register(Gasto)
-class GastoAdmin(admin.ModelAdmin):
-    list_display = ("fecha", "proveedor", "tipo_doc", "serie", "numero", "total", "medio", "creado_por")
-    list_filter = ("empresa", "tipo_doc", "cuenta")
+class GastoAdmin(SoloConsultaContable, admin.ModelAdmin):
+    list_display = (
+        "fecha",
+        "fecha_devengado",
+        "proveedor",
+        "tipo_doc",
+        "serie",
+        "numero",
+        "total",
+        "provision",
+        "estado",
+        "medio",
+        "creado_por",
+    )
+    list_filter = ("empresa", "tipo_doc", "cuenta", "provision", "estado")
     search_fields = ("proveedor__nombre", "serie", "numero", "glosa")
     date_hierarchy = "fecha"
     autocomplete_fields = ("proveedor", "cuenta")
 
 
 @admin.register(Compra)
-class CompraAdmin(admin.ModelAdmin):
+class CompraAdmin(SoloConsultaContable, admin.ModelAdmin):
     list_display = ("fecha", "proveedor", "serie", "numero", "total", "estado", "creado_por")
     list_filter = ("empresa", "estado", "tipo_doc")
     search_fields = ("proveedor__nombre", "numero", "serie")
     date_hierarchy = "fecha"
     autocomplete_fields = ("proveedor",)
     inlines = [CompraLineaInline, CostoAdicionalInline]
-    actions = ["confirmar_compras"]
-
-    @admin.action(description="Confirmar compras seleccionadas")
-    def confirmar_compras(self, request, queryset):
-        from .servicios import CompraError, confirmar
-
-        hechas, errores = 0, []
-        for compra in queryset:
-            try:
-                confirmar(compra)
-                hechas += 1
-            except CompraError as exc:
-                errores.append(f"{compra}: {exc}")
-        if hechas:
-            self.message_user(request, f"{hechas} compra(s) confirmada(s).")
-        for error in errores:
-            self.message_user(request, error, level="error")

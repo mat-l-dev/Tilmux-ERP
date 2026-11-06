@@ -21,4 +21,5 @@ urlpatterns = [
     path("impuestos/", views.impuestos, name="impuestos"),
     path("impuestos/renta/", views.asentar_renta_mes, name="asentar_renta"),
     path("impuestos/renta/pagar/", views.pagar_renta_mes, name="pagar_renta"),
+    path("impuestos/igv/pagar/", views.pagar_igv_mes, name="pagar_igv"),
 ]

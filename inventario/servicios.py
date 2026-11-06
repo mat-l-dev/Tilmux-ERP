@@ -24,6 +24,27 @@ def _cent(valor) -> Decimal:
     return Decimal(valor).quantize(CENT, rounding=ROUND_HALF_UP)
 
 
+def _verificar_orden(empresa: Empresa, producto: Producto, fecha: date) -> None:
+    """Evita que un movimiento retroactivo cambie el PEPS de salidas existentes."""
+    Empresa.objects.select_for_update().get(pk=empresa.pk)
+    posterior = (
+        MovimientoStock.objects.filter(
+            empresa=empresa,
+            producto=producto,
+            tipo=MovimientoStock.Tipo.SALIDA,
+            fecha__gt=fecha,
+        )
+        .order_by("fecha", "id")
+        .first()
+    )
+    if posterior:
+        raise StockError(
+            f"No se puede registrar {producto.sku} con fecha {fecha:%d/%m/%Y}: "
+            f"ya hay una salida posterior del {posterior.fecha:%d/%m/%Y}. "
+            "Es necesario revisar el historial y el costo PEPS antes de continuar."
+        )
+
+
 @transaction.atomic
 def entrar(
     *,
@@ -39,6 +60,8 @@ def entrar(
     cantidad = Decimal(cantidad)
     if cantidad <= 0:
         raise StockError("La cantidad de entrada debe ser mayor que cero.")
+
+    _verificar_orden(empresa, producto, fecha)
 
     capa = CapaFIFO.objects.create(
         empresa=empresa,
@@ -80,9 +103,16 @@ def salir(
     if cantidad <= 0:
         raise StockError("La cantidad de salida debe ser mayor que cero.")
 
+    _verificar_orden(empresa, producto, fecha)
+
     capas = (
         CapaFIFO.objects.select_for_update()
-        .filter(empresa=empresa, producto=producto, cantidad_restante__gt=0)
+        .filter(
+            empresa=empresa,
+            producto=producto,
+            fecha__lte=fecha,
+            cantidad_restante__gt=0,
+        )
         .order_by("fecha", "id")
     )
 

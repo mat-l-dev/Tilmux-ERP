@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 import calendar
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.db import transaction
 from django.db.models import Sum
 
-from core.models import Empresa
+from core.models import Empresa, HistorialDocumento, Periodo
 
 from .models import Asiento, AsientoLinea
-from .servicios import ContabilidadError, Montos, postear
+from .servicios import ContabilidadError, Montos, periodo_de, postear
 
 CUENTA_RENTA = "40171"
 CUENTA_IGV = "40111"
@@ -124,3 +124,107 @@ def pagar_renta(empresa: Empresa, fecha: date, importe, medio):
         origen_tipo="PAGO_RENTA",
         origen_id=fecha.year * 100 + fecha.month,
     )
+
+
+def asiento_igv(empresa: Empresa, anio: int, mes: int) -> Asiento | None:
+    return Asiento.objects.filter(
+        empresa=empresa,
+        estado=Asiento.Estado.CONFIRMADO,
+        tipo_operacion="IGV_MENSUAL",
+        origen_id=anio * 100 + mes,
+    ).first()
+
+
+def monto_igv_pagado(empresa: Empresa, anio: int, mes: int) -> Decimal:
+    asientos = Asiento.objects.filter(
+        empresa=empresa,
+        estado=Asiento.Estado.CONFIRMADO,
+        tipo_operacion="IGV_MENSUAL",
+        origen_id=anio * 100 + mes,
+    )
+    filas = AsientoLinea.objects.filter(
+        asiento__in=asientos,
+        cuenta__codigo__startswith=CUENTA_IGV,
+    ).aggregate(d=Sum("debe"), h=Sum("haber"))
+    return (filas["d"] or CERO) - (filas["h"] or CERO)
+
+
+def _igv_del_periodo(empresa: Empresa, anio: int, mes: int) -> Decimal:
+    datos = calculo(empresa, anio, mes)
+    desde = date(anio, mes, 1)
+    saldo_anterior = saldo_cuenta(empresa, CUENTA_IGV, desde - timedelta(days=1))
+    saldo_a_favor_anterior = max(-saldo_anterior, CERO)
+    return datos["resultado"] - saldo_a_favor_anterior
+
+
+def igv_pendiente(empresa: Empresa, anio: int, mes: int) -> Decimal:
+    """IGV del periodo que aún no se ha pagado."""
+    c184 = _igv_del_periodo(empresa, anio, mes)
+    if c184 <= CERO:
+        return CERO
+    pagado = monto_igv_pagado(empresa, anio, mes)
+    return max(c184 - pagado, CERO)
+
+
+@transaction.atomic
+def pagar_igv(
+    empresa: Empresa,
+    fecha: date,
+    importe,
+    medio,
+    anio: int,
+    mes: int,
+    usuario=None,
+):
+    """Registra el pago del IGV de un periodo, con asiento y movimiento."""
+    from tesoreria.servicios import registrar
+
+    importe = Decimal(importe).quantize(Decimal("0.01"))
+    if importe <= CERO:
+        raise ContabilidadError("El importe debe ser mayor a cero.")
+    if medio is None or medio.cuenta_contable is None:
+        raise ContabilidadError("Elige una cuenta de tesorería con cuenta contable.")
+    if medio.empresa_id != empresa.pk:
+        raise ContabilidadError("La cuenta de tesorería pertenece a otra empresa.")
+
+    # Evita que dos pagos simultáneos calculen el mismo saldo pendiente.
+    Empresa.objects.select_for_update().get(pk=empresa.pk)
+
+    # El periodo del pago debe estar abierto.
+    periodo_de(empresa, fecha)
+    periodo = Periodo.objects.filter(empresa=empresa, anio=anio, mes=mes).first()
+    if periodo is None:
+        raise ContabilidadError(f"No existe el periodo {anio}-{mes:02d}.")
+    pendiente = igv_pendiente(empresa, anio, mes)
+    if pendiente <= CERO:
+        raise ContabilidadError(f"No hay IGV pendiente en {mes:02d}/{anio}.")
+    if importe > pendiente:
+        raise ContabilidadError(
+            f"El pago (S/ {importe}) supera el IGV pendiente (S/ {pendiente})."
+        )
+
+    movimiento = registrar(
+        empresa=empresa,
+        cuenta=medio,
+        fecha=fecha,
+        tipo="EGRESO",
+        importe=importe,
+        concepto=f"Pago IGV {mes:02d}/{anio}",
+        tipo_regla="IGV_MENSUAL",
+        origen_tipo="PAGO_IGV",
+        origen_id=anio * 100 + mes,
+    )
+    asiento = asiento_igv(empresa, anio, mes)
+    HistorialDocumento.objects.create(
+        empresa=empresa,
+        tipo=HistorialDocumento.Tipo.IMPUESTO,
+        documento_id=anio * 100 + mes,
+        usuario=usuario,
+        accion="PAGO",
+        detalle=(
+            f"IGV {mes:02d}/{anio}: S/ {importe} desde {medio.nombre}. "
+            f"Movimiento {movimiento.pk}"
+            + (f", asiento {asiento.numero}." if asiento else ".")
+        ),
+    )
+    return movimiento

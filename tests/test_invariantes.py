@@ -33,6 +33,7 @@ from contabilidad.servicios import ContabilidadError
 from core.contexto import usuario_actual
 from core.models import Empresa, Periodo, TipoCambio
 from inventario.models import CapaFIFO, ConsumoCapa, MovimientoStock
+from inventario.servicios import StockError
 from reportes.casillas import calcular
 from reportes.eeff import construir
 from ventas.models import Venta, VentaLinea
@@ -214,6 +215,16 @@ class InvarianteAsiento(BaseContable):
 
 
 class InvarianteCosto(BaseContable):
+    def test_venta_no_puede_consumir_una_compra_posterior(self):
+        self.comprar("1", "100", fecha=date(2026, 11, 20))
+
+        with self.assertRaises(StockError):
+            self.vender("1", "250", fecha=date(2026, 11, 10))
+
+        self.assertEqual(self.capas().get().cantidad_restante, Decimal("1"))
+        self.assertFalse(MovimientoStock.objects.filter(tipo="SALIDA").exists())
+        self.assertFalse(Asiento.objects.filter(origen_tipo="VENTA").exists())
+
     def test_el_costo_incluye_los_costos_de_internamiento(self):
         compra = self.comprar("10", "100", flete="100")
         linea = compra.lineas.get()
@@ -293,6 +304,48 @@ class InvarianteIgv(BaseContable):
 
 
 class InvarianteComprobantes(BaseContable):
+    def test_nota_sin_reingreso_no_aumenta_inventario_contable(self):
+        self.comprar("1", "100")
+        venta = self.vender("1", "250")
+        nota = emitir_nota_credito(
+            venta=venta, fecha=date(2026, 11, 25), serie="FC01", numero="10",
+            motivo_codigo="07", reingresa_stock=False,
+        )
+        asiento = Asiento.objects.get(origen_tipo="NOTA_CREDITO", origen_id=nota.pk)
+        self.assertFalse(asiento.lineas.filter(cuenta__codigo="20111").exists())
+        self.assertFalse(asiento.lineas.filter(cuenta__codigo="69121").exists())
+        self.assertEqual(nota.costo, Decimal("0"))
+        self.assertEqual(self.capas().aggregate(s=Sum("cantidad_restante"))["s"], Decimal("0"))
+
+    def test_notas_no_pueden_anteceder_a_la_venta(self):
+        self.comprar("1", "100")
+        venta = self.vender("1", "250")
+        with self.assertRaisesRegex(VentaError, "fecha"):
+            emitir_nota_credito(
+                venta=venta, fecha=date(2026, 11, 19), serie="FC01", numero="10",
+                motivo_codigo="07", reingresa_stock=False,
+            )
+        with self.assertRaisesRegex(VentaError, "fecha"):
+            emitir_nota_debito(
+                venta=venta, fecha=date(2026, 11, 19), serie="FD01", numero="10",
+                motivo_codigo="01", base=Decimal("10"), igv=Decimal("1.80"),
+            )
+
+    def test_motivos_no_implementados_no_registran_devolucion(self):
+        self.comprar("2", "100")
+        venta = self.vender("2", "250")
+        linea = venta.lineas.get()
+        with self.assertRaisesRegex(VentaError, "motivo"):
+            emitir_nota_credito(
+                venta=venta, fecha=date(2026, 11, 25), serie="FC01", numero="10",
+                motivo_codigo="03", cantidades={linea.pk: Decimal("1")},
+            )
+        with self.assertRaisesRegex(VentaError, "total"):
+            emitir_nota_credito(
+                venta=venta, fecha=date(2026, 11, 25), serie="FC01", numero="11",
+                motivo_codigo="06", cantidades={linea.pk: Decimal("1")},
+            )
+
     def test_la_nota_de_credito_parcial_prorratea_y_devuelve_stock(self):
         self.comprar("10", "100")
         venta = self.vender("2", "250")

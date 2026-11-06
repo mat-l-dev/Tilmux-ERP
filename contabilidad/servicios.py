@@ -11,7 +11,7 @@ from django.db import transaction
 from django.db.models import Max
 
 from core.contexto import usuario_actual
-from core.models import Empresa, Periodo
+from core.models import Empresa, HistorialDocumento, Periodo
 
 from .models import Asiento, AsientoLinea, Cuenta, Regla, ReglaLinea
 
@@ -197,4 +197,135 @@ def postear_lineas(
         raise ContabilidadError("El asiento quedó sin líneas.")
 
     AsientoLinea.objects.bulk_create(filas)
+    return asiento
+
+
+def _historial_asiento(asiento: Asiento, *, accion: str, detalle: str, usuario=None):
+    HistorialDocumento.objects.create(
+        empresa=asiento.empresa,
+        tipo=HistorialDocumento.Tipo.ASIENTO,
+        documento_id=asiento.pk,
+        usuario=usuario,
+        accion=accion,
+        detalle=detalle[:2000],
+    )
+
+
+@transaction.atomic
+def anular_asiento(asiento: Asiento, motivo: str, usuario=None) -> Asiento:
+    """Anula un asiento sin borrar sus líneas y deja rastro en el historial."""
+    if not motivo.strip():
+        raise ContabilidadError("La anulación de un asiento necesita un motivo.")
+
+    asiento = (
+        Asiento.objects.select_for_update()
+        .select_related("periodo")
+        .get(pk=asiento.pk)
+    )
+    if asiento.estado == Asiento.Estado.ANULADO:
+        return asiento
+    if asiento.periodo.estado == Periodo.Estado.CERRADO:
+        raise ContabilidadError(
+            f"El periodo {asiento.periodo.etiqueta} está cerrado; "
+            "no se puede anular el asiento."
+        )
+
+    anterior = asiento.estado
+    asiento.estado = Asiento.Estado.ANULADO
+    asiento.save(update_fields=["estado"])
+    _historial_asiento(
+        asiento,
+        accion="ANULACION",
+        detalle=f"Motivo: {motivo.strip()}. Estado anterior: {anterior}.",
+        usuario=usuario,
+    )
+    logger.warning("asiento %s anulado: %s", asiento.numero, motivo.strip())
+    return asiento
+
+
+@transaction.atomic
+def reclasificar_linea_asiento(
+    linea: AsientoLinea,
+    cuenta_nueva: Cuenta,
+    motivo: str,
+    *,
+    glosa: str | None = None,
+    usuario=None,
+) -> AsientoLinea:
+    """Cambia la cuenta de una línea confirmada, conservando el asiento y su historia."""
+    if not motivo.strip():
+        raise ContabilidadError("La reclasificación necesita un motivo.")
+
+    linea = (
+        AsientoLinea.objects.select_for_update()
+        .select_related("asiento", "asiento__periodo", "cuenta")
+        .get(pk=linea.pk)
+    )
+    asiento = linea.asiento
+    if asiento.estado != Asiento.Estado.CONFIRMADO:
+        raise ContabilidadError("Solo se reclasifica una línea de un asiento confirmado.")
+    if asiento.periodo.estado == Periodo.Estado.CERRADO:
+        raise ContabilidadError(
+            f"El periodo {asiento.periodo.etiqueta} está cerrado; "
+            "no se puede reclasificar la línea."
+        )
+
+    anterior = linea.cuenta
+    if anterior.pk == cuenta_nueva.pk:
+        return linea
+
+    linea.cuenta = cuenta_nueva
+    campos = ["cuenta"]
+    if glosa is not None:
+        linea.glosa = glosa[:255]
+        campos.append("glosa")
+    linea.save(update_fields=campos)
+    _historial_asiento(
+        asiento,
+        accion="RECLASIFICACION",
+        detalle=(
+            f"Línea {linea.orden}: {anterior.codigo} {anterior.nombre} → "
+            f"{cuenta_nueva.codigo} {cuenta_nueva.nombre}. Motivo: {motivo.strip()}."
+        ),
+        usuario=usuario,
+    )
+    logger.warning(
+        "línea %s del asiento %s reclasificada de %s a %s",
+        linea.orden,
+        asiento.numero,
+        anterior.codigo,
+        cuenta_nueva.codigo,
+    )
+    return linea
+
+
+@transaction.atomic
+def corregir_glosa_asiento(
+    asiento: Asiento,
+    glosa: str,
+    motivo: str,
+    usuario=None,
+) -> Asiento:
+    """Corrige la glosa de un asiento confirmado y registra el cambio."""
+    if not glosa.strip():
+        raise ContabilidadError("La glosa no puede quedar vacía.")
+    if not motivo.strip():
+        raise ContabilidadError("La corrección de glosa necesita un motivo.")
+
+    asiento = Asiento.objects.select_for_update().get(pk=asiento.pk)
+    if asiento.estado != Asiento.Estado.CONFIRMADO:
+        raise ContabilidadError("Solo se corrige la glosa de un asiento confirmado.")
+
+    anterior = asiento.glosa
+    if anterior == glosa.strip():
+        return asiento
+
+    asiento.glosa = glosa.strip()[:255]
+    asiento.save(update_fields=["glosa"])
+    _historial_asiento(
+        asiento,
+        accion="CORRECCION",
+        detalle=f"Glosa: «{anterior}» → «{asiento.glosa}». Motivo: {motivo.strip()}.",
+        usuario=usuario,
+    )
     return asiento

@@ -16,45 +16,63 @@
   </label>
   <label class="field" style="min-width:240px">
     <span>Buscar</span>
-    <input type="text" name="q" value="{{ q }}" placeholder="Proveedor, RUC o comprobante">
+    <input type="text" name="q" value="{{ q }}" placeholder="Proveedor, comprobante o concepto">
+  </label>
+  <label class="field" style="min-width:160px">
+    <span>Tipo</span>
+    <select name="tipo" data-autosubmit>
+      <option value="">Todos</option>
+      <option value="compra" {% if tipo == 'compra' %}selected{% endif %}>Mercadería</option>
+      <option value="gasto" {% if tipo == 'gasto' %}selected{% endif %}>Gastos</option>
+    </select>
   </label>
   <button class="btn btn-ghost" type="submit">Buscar</button>
 </form>
 
 <section class="card">
   <header class="card-head">
-    <h2>Comprobantes de proveedores</h2>
+    <h2>Compras y gastos</h2>
     <div class="acciones-head">
       <a class="btn btn-ghost" href="{% url 'compras:importar' %}">Importar XML</a>
+      <a class="btn btn-ghost" href="{% url 'compras:nuevo_gasto' %}">Registrar gasto pagado</a>
       <a class="btn btn-primary" href="{% url 'compras:nueva' %}">Nueva compra</a>
     </div>
   </header>
 
+  <p class="preview-note">Las provisiones se muestran como tales; no son facturas adicionales.</p>
   {% if compras %}
+  <div class="tabla-scroll">
   <table class="tabla-doc">
     <thead>
       <tr>
         <th>Fecha</th>
+        <th>Tipo</th>
         <th>Comprobante</th>
         <th>Proveedor</th>
+        <th>Concepto</th>
         <th class="der">Total</th>
         <th>Estado</th>
       </tr>
     </thead>
     <tbody>
-      {% for c in compras %}
+      {% for fila in compras %}
+      {% with c=fila.registro %}
       <tr>
         <td>{{ c.fecha|date:"d/m/Y" }}</td>
-        <td><a href="{% url 'compras:detalle' c.pk %}">{{ c.serie }}-{{ c.numero }}</a></td>
+        <td>{% if fila.clase == 'compra' %}Mercadería{% elif c.provision %}Provisión{% else %}Gasto{% endif %}</td>
+        <td>{% if fila.clase == 'compra' %}<a href="{% url 'compras:detalle' c.pk %}">{% if c.serie or c.numero %}{{ c.serie }}-{{ c.numero }}{% else %}Sin comprobante{% endif %}</a>{% else %}<a href="{% url 'compras:detalle_gasto' c.pk %}">{% if c.serie or c.numero %}{{ c.serie }}-{{ c.numero }}{% else %}Sin comprobante{% endif %}</a>{% endif %}</td>
         <td>{{ c.proveedor.nombre }}</td>
-        <td class="num der">{{ c.total }}</td>
-        <td><span class="chip {% if c.estado == 'CONFIRMADA' %}chip-ok{% elif c.estado == 'PENDIENTE' %}chip-warn{% endif %}">{{ c.get_estado_display }}</span></td>
+        <td>{{ c.glosa|default:"—" }}</td>
+        <td class="num der">{{ c.total|floatformat:2 }}</td>
+        <td><span class="chip {% if c.estado == 'CONFIRMADA' or c.estado == 'PAGADO' %}chip-ok{% elif c.estado == 'PENDIENTE' or c.provision %}chip-warn{% endif %}">{{ c.get_estado_display }}</span></td>
       </tr>
+      {% endwith %}
       {% endfor %}
     </tbody>
   </table>
+  </div>
   {% else %}
-  <p class="muted">Todavía no hay compras registradas.</p>
+  <p class="muted">No hay compras o gastos para los filtros elegidos.</p>
   {% endif %}
 
   {% if page_obj.has_other_pages %}

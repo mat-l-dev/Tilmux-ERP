@@ -20,9 +20,14 @@ from compras.models_gasto import Gasto
 from contabilidad.impuestos import (
     asentar_renta,
     asiento_renta,
+    igv_pendiente,
+    monto_igv_pagado,
     monto_renta_asentada,
     saldo_cuenta,
     saldo_renta,
+)
+from contabilidad.impuestos import (
+    pagar_igv as registrar_pago_igv,
 )
 from contabilidad.impuestos import (
     pagar_renta as registrar_pago_renta,
@@ -30,12 +35,13 @@ from contabilidad.impuestos import (
 from contabilidad.models import Cuenta
 from contabilidad.servicios import ContabilidadError
 from core.context import empresa_actual
+from core.models import Periodo
 from core.permisos import requiere_escritura
 from inventario.models import CapaFIFO, MovimientoStock
 from ventas.models import NotaCredito, NotaDebito, Venta
 
 from .casillas import calcular
-from .sire import ArchivoInvalido, leer_filas, sumar
+from .sire import ArchivoInvalido, leer_filas, sumar, validar_contexto
 from .utils import rango
 
 CERO = Decimal("0")
@@ -265,8 +271,10 @@ def registro_compras(request):
                 }
             )
         for gasto in Gasto.objects.filter(
-            empresa=empresa, fecha__range=(desde, hasta)
-        ).select_related("proveedor"):
+            empresa=empresa,
+            fecha__range=(desde, hasta),
+            provision=False,
+        ).exclude(estado=Gasto.Estado.ANULADO).select_related("proveedor"):
             usa_credito = (
                 gasto.con_credito
                 and gasto.tipo_doc != "OTRO"
@@ -351,6 +359,9 @@ def impuestos(request):
     igv_anterior = Decimal("0")
     igv_por_pagar = Decimal("0")
     ir_por_pagar = Decimal("0")
+    igv_pagado = Decimal("0")
+    igv_por_pagar_mes = Decimal("0")
+    periodo_cerrado = False
     asiento = None
     monto_asentado = Decimal("0")
     if empresa:
@@ -358,12 +369,26 @@ def impuestos(request):
         igv_por_pagar = saldo_cuenta(empresa, "40111", hasta)
         ir_por_pagar = saldo_renta(empresa, hasta)
         if es_mes:
+            igv_pagado = monto_igv_pagado(empresa, desde.year, desde.month)
+            igv_por_pagar_mes = igv_pendiente(empresa, desde.year, desde.month)
+            periodo = Periodo.objects.filter(
+                empresa=empresa, anio=desde.year, mes=desde.month
+            ).first()
+            periodo_cerrado = bool(
+                periodo is None or periodo.estado == Periodo.Estado.CERRADO
+            )
             asiento = asiento_renta(empresa, desde.year, desde.month)
             monto_asentado = monto_renta_asentada(asiento)
     igv_resultante = igv_anterior + igv
     c145 = max(-igv_anterior, Decimal("0"))
     c184 = igv - c145
     puede_asentar = bool(empresa and es_mes and renta > 0 and asiento is None)
+    puede_pagar_igv = bool(
+        empresa
+        and es_mes
+        and c184 > 0
+        and igv_por_pagar_mes > 0
+    )
 
     contexto = {
         "desde": desde,
@@ -384,6 +409,10 @@ def impuestos(request):
         "igv_resultante_abs": abs(igv_resultante),
         "igv_por_pagar": igv_por_pagar,
         "igv_por_pagar_abs": abs(igv_por_pagar),
+        "igv_pagado": igv_pagado,
+        "igv_pendiente": igv_por_pagar_mes,
+        "puede_pagar_igv": puede_pagar_igv,
+        "igv_periodo_cerrado": periodo_cerrado,
         "c140": igv,
         "c145": c145,
         "c184": c184,
@@ -467,6 +496,50 @@ def pagar_renta_mes(request):
             else:
                 messages.success(
                     request, f"Pago de renta registrado por S/ {importe}."
+                )
+    return redirect(f"{reverse('reportes:impuestos')}?periodo={anio}-{mes:02d}")
+
+
+@login_required
+@requiere_escritura
+@require_POST
+def pagar_igv_mes(request):
+    empresa = empresa_actual(request)
+    anio = min(max(_entero(request.POST.get("anio"), date.today().year), 2000), 2100)
+    mes = min(max(_entero(request.POST.get("mes"), date.today().month), 1), 12)
+
+    if empresa is None:
+        messages.error(request, "Configura una empresa antes de pagar el IGV.")
+    else:
+        try:
+            importe = Decimal(
+                (request.POST.get("importe") or "0").replace(",", ".")
+            )
+            fecha = date.fromisoformat(
+                request.POST.get("fecha") or date.today().isoformat()
+            )
+            medio = CuentaTesoreria.objects.get(
+                pk=request.POST.get("medio"), empresa=empresa, activa=True
+            )
+        except (InvalidOperation, TypeError, ValueError, CuentaTesoreria.DoesNotExist):
+            messages.error(request, "Revisa el importe, el medio de pago y la fecha.")
+        else:
+            try:
+                registrar_pago_igv(
+                    empresa,
+                    fecha,
+                    importe,
+                    medio,
+                    anio,
+                    mes,
+                    usuario=request.user,
+                )
+            except ContabilidadError as exc:
+                messages.error(request, str(exc))
+            else:
+                messages.success(
+                    request,
+                    f"Pago de IGV de {mes:02d}/{anio} registrado por S/ {importe}.",
                 )
     return redirect(f"{reverse('reportes:impuestos')}?periodo={anio}-{mes:02d}")
 
@@ -617,7 +690,9 @@ def conciliacion_archivo(request):
             error = "Configura una empresa antes de conciliar."
         else:
             try:
-                totales = sumar(leer_filas(archivo))
+                filas = leer_filas(archivo)
+                contexto_archivo = validar_contexto(filas, ruc=empresa.ruc, anio=anio, mes=mes)
+                totales = sumar(filas)
             except ArchivoInvalido as exc:
                 error = str(exc)
             else:
@@ -639,6 +714,7 @@ def conciliacion_archivo(request):
                     "etiqueta": etiqueta,
                     "filas": totales["filas"],
                     "columnas": totales["columnas"],
+                    "contexto_archivo": contexto_archivo,
                     "sunat_base": totales["base"],
                     "sunat_igv": totales["igv"],
                     "sunat_total": totales["total"],

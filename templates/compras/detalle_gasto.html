@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block titulo %}Gasto{% endblock %}
+{% block titulo_pagina %}{% if gasto.provision %}Provisión{% else %}Gasto{% endif %}{% if gasto.serie or gasto.numero %} {{ gasto.serie }}-{{ gasto.numero }}{% endif %}{% endblock %}
+
+{% block contenido %}
+<div class="doc">
+  <div class="doc-main">
+    <section class="card">
+      <header class="card-head"><h2>{% if gasto.provision %}Provisión{% else %}Comprobante{% endif %}</h2><span class="chip">{{ gasto.get_estado_display }}</span></header>
+      <dl class="datos">
+        <div><dt>Fecha del documento</dt><dd>{{ gasto.fecha|date:"d/m/Y" }}</dd></div>
+        {% if gasto.fecha_devengado %}<div><dt>Fecha de devengo</dt><dd>{{ gasto.fecha_devengado|date:"d/m/Y" }}</dd></div>{% endif %}
+        <div><dt>Proveedor</dt><dd>{{ gasto.proveedor.nombre }} · {{ gasto.proveedor.numero_doc|default:"Sin documento" }}</dd></div>
+        <div><dt>Tipo</dt><dd>{{ gasto.get_tipo_doc_display }}</dd></div>
+        <div><dt>Comprobante</dt><dd>{% if gasto.serie or gasto.numero %}{{ gasto.serie }}-{{ gasto.numero }}{% else %}Sin comprobante{% endif %}</dd></div>
+        <div><dt>Concepto</dt><dd>{{ gasto.glosa|default:"—" }}</dd></div>
+        <div><dt>Cuenta contable</dt><dd>{{ gasto.cuenta.codigo }} · {{ gasto.cuenta.nombre }}</dd></div>
+        <div><dt>Medio de pago</dt><dd>{% if gasto.medio %}{{ gasto.medio.nombre }}{% else %}No indicado{% endif %}</dd></div>
+      </dl>
+      <dl class="totales totales-inline">
+        <div><dt>Base</dt><dd class="num">{{ gasto.base|floatformat:2 }}</dd></div>
+        <div><dt>IGV</dt><dd class="num">{{ gasto.igv|floatformat:2 }}</dd></div>
+        <div class="total"><dt>Total</dt><dd class="num">{{ gasto.total|floatformat:2 }}</dd></div>
+      </dl>
+      {% if gasto.gasto_origen %}<p class="preview-note">Esta provisión está vinculada a <a href="{% url 'compras:detalle_gasto' gasto.gasto_origen.pk %}">la factura {{ gasto.gasto_origen.serie }}-{{ gasto.gasto_origen.numero }}</a>.</p>{% elif gasto.provision %}<p class="preview-note">Provisión sin factura vinculada.</p>{% endif %}
+      {% if provisiones %}<p class="preview-note">Provisiones vinculadas: {% for p in provisiones %}<a href="{% url 'compras:detalle_gasto' p.pk %}">{{ p.glosa|default:"Ver provisión" }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}.</p>{% endif %}
+    </section>
+    {% for asiento in asientos %}
+    <section class="card">
+      <header class="card-head"><h2>Asiento contable</h2><span class="chip">N.º {{ asiento.numero }} · {{ asiento.get_estado_display }}</span></header>
+      <div class="tabla-scroll"><table class="tabla-doc"><thead><tr><th>Cuenta</th><th>Glosa</th><th class="der">Debe</th><th class="der">Haber</th></tr></thead><tbody>
+        {% for linea in asiento.lineas.all %}<tr><td>{{ linea.cuenta.codigo }} · {{ linea.cuenta.nombre }}</td><td>{{ linea.glosa }}</td><td class="num der">{{ linea.debe|floatformat:2 }}</td><td class="num der">{{ linea.haber|floatformat:2 }}</td></tr>{% endfor %}
+      </tbody></table></div>
+    </section>
+    {% empty %}<p class="preview-note">No se encontró un asiento vinculado a este gasto.</p>{% endfor %}
+    {% if movimientos %}
+    <section class="card"><header class="card-head"><h2>Movimientos de tesorería vinculados</h2></header>
+      <div class="tabla-scroll"><table class="tabla-doc"><thead><tr><th>Fecha</th><th>Cuenta</th><th>Concepto</th><th class="der">Importe</th></tr></thead><tbody>
+      {% for m in movimientos %}<tr><td>{{ m.fecha|date:"d/m/Y" }}</td><td>{{ m.cuenta.nombre }}</td><td>{{ m.concepto }}</td><td class="num der">{{ m.importe|floatformat:2 }}</td></tr>{% endfor %}
+      </tbody></table></div>
+    </section>
+    {% endif %}
+    {% include "core/_historial.html" %}
+  </div>
+  <aside class="doc-side"><div class="card sticky"><a class="btn btn-ghost btn-block" href="{% url 'compras:lista' %}">Volver a compras y gastos</a></div></aside>
+</div>
+{% endblock %}
