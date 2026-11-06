@@ -70,8 +70,11 @@ def _numero(valor) -> Decimal | None:
     if not texto:
         return None
     if "," in texto and "." in texto:
-        # 1.234,56 (formato peruano)
-        texto = texto.replace(".", "").replace(",", ".")
+        # El último separador indica los decimales: 1.234,56 o 1,234.56.
+        if texto.rfind(",") > texto.rfind("."):
+            texto = texto.replace(".", "").replace(",", ".")
+        else:
+            texto = texto.replace(",", "")
     else:
         texto = texto.replace(",", ".")
     if texto in {"-", "—", ""}:
@@ -131,6 +134,10 @@ def sumar(filas: list[list]) -> dict:
         filas
     )
     titulos = [_limpio(celda) for celda in filas[cabecera]]
+    columnas_mixtas = [
+        indice for indice, titulo in enumerate(titulos)
+        if _normalizar(titulo).split() and _normalizar(titulo).split()[-1] in {"dgng", "dng"}
+    ]
     usadas = sorted(
         set(
             cols_base
@@ -151,6 +158,12 @@ def sumar(filas: list[list]) -> dict:
         primera = " ".join(_normalizar(celda) for celda in fila[:2])
         if "total" in primera:
             continue
+
+        if any(_numero(fila[i]) not in (None, Decimal("0")) for i in columnas_mixtas if i < len(fila)):
+            raise ArchivoInvalido(
+                "El archivo contiene compras destinadas a operaciones mixtas o no gravadas. "
+                "Esta conciliación aún no calcula esas casillas; revísalas en el RCE y el 621."
+            )
 
         base = _suma(fila, cols_base) + _suma(fila, cols_dscto_base)
         igv = _suma(fila, cols_igv) + _suma(fila, cols_dscto_igv)

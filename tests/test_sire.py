@@ -30,6 +30,38 @@ Total;;;;;;765,25;137,75;903,00
 
 
 class SireCsvTest(SimpleTestCase):
+    def test_no_confunde_credito_mixto_con_compra_gravada_ordinaria(self):
+        cabecera = (
+            "BI Gravado DG,IGV / IPM DG,BI Gravado DGNG,IGV / IPM DGNG,"
+            "BI Gravado DNG,IGV / IPM DNG,Total CP\n"
+        )
+        for fila in ("0,0,100,18,0,0,118\n", "0,0,0,0,100,18,118\n"):
+            with self.subTest(fila=fila), self.assertRaisesRegex(ArchivoInvalido, "mixtas"):
+                sumar(leer_filas(Archivo("rce.csv", (cabecera + fila).encode("utf-8"))))
+
+    def test_cabecera_propuesta_rce_con_adquisiciones_no_gravadas(self):
+        contenido = (
+            "Periodo,BI Gravado DG,IGV / IPM DG,BI Gravado DGNG,"
+            "IGV / IPM DGNG,BI Gravado DNG,IGV / IPM DNG,Valor Adq. NG,Total CP\n"
+            "202610,0.00,0.00,0.00,0.00,0.00,0.00,15.00,15.00\n"
+        )
+        totales = sumar(leer_filas(Archivo("rce.csv", contenido.encode("utf-8"))))
+        self.assertEqual(totales["filas"], 1)
+        self.assertEqual(totales["base"], Decimal("0.00"))
+        self.assertEqual(totales["igv"], Decimal("0.00"))
+        self.assertEqual(totales["total"], Decimal("15.00"))
+
+    def test_importes_con_ambos_formatos_de_miles(self):
+        contenido = (
+            'Nro;BI Gravada;IGV;Importe Total\n'
+            '1;1.234,56;222,22;1.456,78\n'
+            '2;1,234.56;222.22;1,456.78\n'
+        )
+        totales = sumar(leer_filas(Archivo("rce.csv", contenido.encode("utf-8"))))
+        self.assertEqual(totales["base"], Decimal("2469.12"))
+        self.assertEqual(totales["igv"], Decimal("444.44"))
+        self.assertEqual(totales["total"], Decimal("2913.56"))
+
     def test_detecta_columnas_y_suma(self):
         totales = sumar(leer_filas(Archivo("rce.csv", CSV.encode("utf-8-sig"))))
         self.assertEqual(totales["filas"], 2)
