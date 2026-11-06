@@ -670,6 +670,10 @@ for cod in ["1061", "1031", "40111", "40171", "4212"]:
   formulario de gasto pagado en soles, con comprobante y pago de igual fecha.
   El vínculo de una provisión con su factura no la liquida por sí solo; falta
   implementar la liquidación completa y auditada de provisiones.
+- Asientos, capas y movimientos de inventario y movimientos de tesorería
+  también se dejaron de solo consulta en administración para impedir cambios
+  directos sin sus efectos relacionados. La marca de conciliación bancaria
+  requiere un flujo de usuario auditado que aún no está implementado.
 - Notas de venta: una nota sin reingreso generaba un asiento de inventario pese
   a no crear stock; se elimina esa reversión de costo cuando no hay retorno.
   Se rechazan notas anteriores a su venta y se serializan notas de crédito de

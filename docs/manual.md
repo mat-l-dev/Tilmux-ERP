@@ -143,8 +143,10 @@ En **Configuración → Perfiles** se asigna a cada usuario un rol:
 | Solo lectura | Consultar reportes, sin registrar |
 
 Un usuario sin perfil se trata como administrador.
-En **Configuración**, compras, gastos, ventas y notas de crédito son de solo
-consulta; se registran desde sus módulos para mantener sus efectos contables.
+En **Configuración**, compras, gastos, ventas, notas de crédito, asientos y
+movimientos de inventario y tesorería son de solo consulta. Sus registros se
+gestionan desde los módulos correspondientes para mantener la contabilidad.
+La conciliación bancaria de movimientos todavía no tiene un flujo propio.
 
 ## Ventas
 

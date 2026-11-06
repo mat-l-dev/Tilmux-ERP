@@ -1,10 +1,12 @@
 from django.contrib import admin
 
+from core.admin_seguro import SoloConsultaContable
+
 from .models import CapaFIFO, ConsumoCapa, MovimientoStock
 
 
 @admin.register(CapaFIFO)
-class CapaFIFOAdmin(admin.ModelAdmin):
+class CapaFIFOAdmin(SoloConsultaContable, admin.ModelAdmin):
     list_display = (
         "producto",
         "fecha",
@@ -18,7 +20,7 @@ class CapaFIFOAdmin(admin.ModelAdmin):
 
 
 @admin.register(MovimientoStock)
-class MovimientoStockAdmin(admin.ModelAdmin):
+class MovimientoStockAdmin(SoloConsultaContable, admin.ModelAdmin):
     list_display = ("fecha", "producto", "tipo", "cantidad", "costo_total")
     list_filter = ("empresa", "tipo")
     search_fields = ("producto__sku", "glosa")
@@ -26,5 +28,5 @@ class MovimientoStockAdmin(admin.ModelAdmin):
 
 
 @admin.register(ConsumoCapa)
-class ConsumoCapaAdmin(admin.ModelAdmin):
+class ConsumoCapaAdmin(SoloConsultaContable, admin.ModelAdmin):
     list_display = ("movimiento", "capa", "cantidad", "costo_total")

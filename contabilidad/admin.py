@@ -1,5 +1,7 @@
 from django.contrib import admin
 
+from core.admin_seguro import SoloConsultaContable
+
 from .models import Asiento, AsientoLinea, Cuenta, Regla, ReglaLinea
 
 
@@ -41,12 +43,9 @@ class AsientoLineaInline(admin.TabularInline):
 
 
 @admin.register(Asiento)
-class AsientoAdmin(admin.ModelAdmin):
+class AsientoAdmin(SoloConsultaContable, admin.ModelAdmin):
     list_display = ("numero", "fecha", "tipo_operacion", "glosa", "estado", "creado_por")
     list_filter = ("empresa", "tipo_operacion", "estado")
     search_fields = ("glosa",)
     date_hierarchy = "fecha"
     inlines = [AsientoLineaInline]
-
-    def has_add_permission(self, request):
-        return False
