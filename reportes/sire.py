@@ -55,7 +55,19 @@ def leer_filas(archivo) -> list[list]:
     if nombre.endswith((".csv", ".txt")):
         texto = contenido.decode("utf-8-sig", errors="replace")
         muestra = texto[:5000]
-        delimitador = ";" if muestra.count(";") > muestra.count(",") else ","
+        delimitador = None
+        for linea in texto.splitlines()[:60]:
+            for candidato in (";", ","):
+                columnas = _columnas([
+                    _normalizar(celda) for celda in next(csv.reader([linea], delimiter=candidato))
+                ])
+                if any(base != igv for base in columnas[0] for igv in columnas[1]):
+                    delimitador = candidato
+                    break
+            if delimitador:
+                break
+        if delimitador is None:
+            delimitador = ";" if muestra.count(";") > muestra.count(",") else ","
         return [fila for fila in csv.reader(io.StringIO(texto), delimiter=delimitador)]
 
     raise ArchivoInvalido("Sube la propuesta en formato .xlsx o .csv.")
@@ -115,7 +127,7 @@ def _cabecera(
     for indice, fila in enumerate(filas[:60]):
         textos = [_normalizar(celda) for celda in fila]
         columnas = _columnas(textos)
-        if columnas[0] and columnas[1]:
+        if any(base != igv for base in columnas[0] for igv in columnas[1]):
             return indice, *columnas
     raise ArchivoInvalido(
         "No encontré las columnas de base imponible e IGV. "
@@ -123,8 +135,19 @@ def _cabecera(
     )
 
 
+def _numero_validado(valor) -> Decimal | None:
+    numero = _numero(valor)
+    if numero is None:
+        if valor is None or (not isinstance(valor, bool) and str(valor).strip() in {"", "-", "—"}):
+            return None
+        raise ArchivoInvalido("El archivo contiene un importe inválido. Revisa sus columnas numéricas.")
+    if not numero.is_finite():
+        raise ArchivoInvalido("El archivo contiene un importe inválido. Revisa sus columnas numéricas.")
+    return numero
+
+
 def _suma(fila: list, columnas: list[int]) -> Decimal:
-    valores = [_numero(fila[i]) for i in columnas if i < len(fila)]
+    valores = [_numero_validado(fila[i]) for i in columnas if i < len(fila)]
     return sum((v for v in valores if v is not None), Decimal("0"))
 
 
@@ -159,7 +182,7 @@ def sumar(filas: list[list]) -> dict:
         if "total" in primera:
             continue
 
-        if any(_numero(fila[i]) not in (None, Decimal("0")) for i in columnas_mixtas if i < len(fila)):
+        if any(_numero_validado(fila[i]) not in (None, Decimal("0")) for i in columnas_mixtas if i < len(fila)):
             raise ArchivoInvalido(
                 "El archivo contiene compras destinadas a operaciones mixtas o no gravadas. "
                 "Esta conciliación aún no calcula esas casillas; revísalas en el RCE y el 621."

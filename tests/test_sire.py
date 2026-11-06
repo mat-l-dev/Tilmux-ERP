@@ -30,6 +30,23 @@ Total;;;;;;765,25;137,75;903,00
 
 
 class SireCsvTest(SimpleTestCase):
+    def test_separador_no_depende_de_cantidad_de_comas_decimales(self):
+        contenido = (
+            "BI Gravada;IGV;Importe Total\n"
+            "10,00;1,80;11,80\n"
+            "20,00;3,60;23,60\n"
+            "30,00;5,40;35,40\n"
+        )
+        resultado = sumar(leer_filas(Archivo("rce.csv", contenido.encode("utf-8"))))
+        self.assertEqual(resultado["base"], Decimal("60.00"))
+        self.assertEqual(resultado["igv"], Decimal("10.80"))
+
+    def test_rechaza_importes_invalidos_en_lugar_de_silenciarlos(self):
+        for valor in ("incorrecto", "NaN", "Infinity"):
+            contenido = f"BI Gravada;IGV;Importe Total\n100,00;{valor};118,00\n"
+            with self.subTest(valor=valor), self.assertRaises(ArchivoInvalido):
+                sumar(leer_filas(Archivo("rce.csv", contenido.encode("utf-8"))))
+
     def test_no_confunde_credito_mixto_con_compra_gravada_ordinaria(self):
         cabecera = (
             "BI Gravado DG,IGV / IPM DG,BI Gravado DGNG,IGV / IPM DGNG,"
