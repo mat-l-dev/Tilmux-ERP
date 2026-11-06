@@ -93,7 +93,10 @@ def _decimal(valor: str) -> Decimal:
     if not valor:
         return Decimal("0.00")
     try:
-        return Decimal(valor).quantize(Decimal("0.01"))
+        cantidad = Decimal(valor).quantize(Decimal("0.01"))
+        if not cantidad.is_finite():
+            raise InvalidOperation
+        return cantidad
     except (InvalidOperation, ValueError) as exc:
         raise XMLInvalido(f"Importe inválido: {valor!r}") from exc
 

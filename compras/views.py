@@ -32,7 +32,7 @@ from ventas.models import Venta
 from ventas.models_guia import GuiaRemision
 
 from .anotacion import AnotacionError, cambiar_fecha_anotacion
-from .forms import CabeceraCompraForm, GastoPagadoForm
+from .forms import CabeceraCompraForm, GastoPagadoForm, ImportarGastoForm
 from .models import Compra, CompraLinea, CostoAdicional
 from .models_gasto import Gasto
 from .servicios import CompraError, confirmar, pagar, registrar_gasto, validar_comprobante
@@ -521,13 +521,28 @@ def importar(request):
                     )
 
                 try:
+                    if documento.tipo not in {"FACTURA", "BOLETA"}:
+                        raise XMLInvalido(
+                            "Este flujo solo registra facturas y boletas; las notas requieren otro tratamiento."
+                        )
+                    if not empresa or documento.receptor_ruc != empresa.ruc:
+                        raise XMLInvalido("El receptor del XML no coincide con el RUC de la empresa seleccionada.")
+                    if len(documento.emisor_ruc) != 11 or not documento.emisor_ruc.isdigit():
+                        raise XMLInvalido("El XML no contiene un RUC de emisor válido.")
+                    if (not documento.serie or not documento.numero or documento.total <= 0
+                            or documento.base < 0 or documento.igv < 0):
+                        raise XMLInvalido("El XML necesita serie, número e importe total válido.")
+                    if documento.base + documento.igv != documento.total:
+                        raise XMLInvalido(
+                            "El comprobante contiene importes adicionales o ajustes que requieren revisión."
+                        )
                     total_soles, tipo_cambio = a_soles(
                         documento.total, documento.moneda, documento.fecha, lado="venta"
                     )
                     igv_soles, _ = a_soles(
                         documento.igv, documento.moneda, documento.fecha, lado="venta"
                     )
-                except SinTipoCambio as exc:
+                except (SinTipoCambio, XMLInvalido) as exc:
                     messages.error(request, str(exc))
                     return render(request, "compras/importar.html", {"empresa": empresa})
 
@@ -544,6 +559,8 @@ def importar(request):
                     "total_original": str(documento.total),
                     "emisor_ruc": documento.emisor_ruc,
                     "emisor_nombre": documento.emisor_nombre,
+                    "receptor_ruc": documento.receptor_ruc,
+                    "empresa_id": empresa.pk,
                     "base": str(base_soles),
                     "igv": str(igv_soles),
                     "total": str(total_soles),
@@ -569,49 +586,46 @@ def importar_preview(request):
     if not datos:
         messages.info(request, "Primero sube un comprobante.")
         return redirect("compras:importar")
+    if not empresa or datos.get("empresa_id") != empresa.pk or datos.get("receptor_ruc") != empresa.ruc:
+        messages.error(request, "El comprobante no corresponde a la empresa seleccionada. Vuelve a subir el XML.")
+        return redirect("compras:importar")
 
-    cuentas = list(
-        Cuenta.objects.filter(
-            version="2026", activa=True, elemento=6, admite_movimiento=True
-        ).order_by("codigo")
-    )
-    medios = list(CuentaTesoreria.objects.filter(empresa=empresa, activa=True))
     sugerida = _cuenta_sugerida(datos["emisor_nombre"])
+    formulario = ImportarGastoForm(
+        request.POST or None, empresa=empresa, tipo=datos["tipo"], initial={"cuenta": sugerida},
+    )
 
-    if request.method == "POST":
-        cuenta = Cuenta.objects.filter(pk=request.POST.get("cuenta")).first()
-        medio = CuentaTesoreria.objects.filter(
-            pk=request.POST.get("medio"), empresa=empresa
-        ).first()
-        if cuenta is None or medio is None:
-            messages.error(request, "Elige la cuenta del gasto y el medio de pago.")
+    if request.method == "POST" and formulario.is_valid():
+        if datos.get("moneda_original", datos.get("moneda")) != "PEN":
+            formulario.add_error(None, "El registro de gastos en moneda extranjera aún no está disponible.")
         else:
-            proveedor, _ = Tercero.objects.get_or_create(
-                tipo_doc="RUC",
-                numero_doc=datos["emisor_ruc"],
-                defaults={
-                    "nombre": datos["emisor_nombre"] or "Proveedor",
-                    "rol": "PROVEEDOR",
-                },
-            )
             try:
-                registrar_gasto(
-                    empresa=empresa,
-                    proveedor=proveedor,
-                    fecha=date.fromisoformat(datos["fecha"]),
-                    tipo_doc=datos["tipo"],
-                    serie=datos["serie"],
-                    numero=datos["numero"],
-                    base=Decimal(datos["base"]),
-                    igv=Decimal(datos["igv"]),
-                    total=Decimal(datos["total"]),
-                    cuenta=cuenta,
-                    medio=medio,
-                    glosa=f"{datos['tipo']} {datos['serie']}-{datos['numero']}",
-                    con_credito=datos["tipo"] == "FACTURA",
-                    deducible=datos["tipo"] == "FACTURA",
-                )
-            except (CompraError, IntegrityError) as exc:
+                with transaction.atomic():
+                    proveedor, _ = Tercero.objects.get_or_create(
+                        tipo_doc="RUC", numero_doc=datos["emisor_ruc"],
+                        defaults={"nombre": datos["emisor_nombre"] or "Proveedor", "rol": "PROVEEDOR"},
+                    )
+                    gasto = registrar_gasto(
+                        empresa=empresa,
+                        proveedor=proveedor,
+                        fecha=date.fromisoformat(datos["fecha"]),
+                        tipo_doc=datos["tipo"],
+                        serie=datos["serie"],
+                        numero=datos["numero"],
+                        base=Decimal(datos["base"]),
+                        igv=Decimal(datos["igv"]),
+                        total=Decimal(datos["total"]),
+                        cuenta=formulario.cleaned_data["cuenta"],
+                        medio=formulario.cleaned_data["medio"],
+                        glosa=f"{datos['tipo']} {datos['serie']}-{datos['numero']}",
+                        con_credito=formulario.cleaned_data["con_credito"],
+                        deducible=formulario.cleaned_data["deducible"],
+                    )
+                    HistorialDocumento.objects.create(
+                        empresa=empresa, tipo=HistorialDocumento.Tipo.GASTO, documento_id=gasto.pk,
+                        usuario=request.user, accion="REGISTRO", detalle="Gasto pagado registrado desde XML.",
+                    )
+            except (CompraError, ContabilidadError, IntegrityError) as exc:
                 messages.error(request, f"No se pudo registrar: {exc}")
             else:
                 request.session.pop("xml_pendiente", None)
@@ -625,7 +639,7 @@ def importar_preview(request):
     return render(
         request,
         "compras/importar_preview.html",
-        {"datos": datos, "cuentas": cuentas, "medios": medios, "sugerida": sugerida},
+        {"datos": datos, "formulario": formulario},
     )
 
 
@@ -681,6 +695,9 @@ def importar_compra(request):
     datos = request.session.get("xml_pendiente")
     if not datos:
         messages.info(request, "Primero sube un comprobante.")
+        return redirect("compras:importar")
+    if not empresa or datos.get("empresa_id") != empresa.pk or datos.get("receptor_ruc") != empresa.ruc:
+        messages.error(request, "El comprobante no corresponde a la empresa seleccionada. Vuelve a subir el XML.")
         return redirect("compras:importar")
 
     if datos.get("moneda_original", datos.get("moneda")) != "PEN":

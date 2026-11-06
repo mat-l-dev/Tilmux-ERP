@@ -762,3 +762,13 @@ for cod in ["1061", "1031", "40111", "40171", "4212"]:
   comprobante. [SUNAT distingue comprobantes dados de baja en el RCE](https://cpe.sunat.gob.pe/node/131)
   y [notas de crédito para devoluciones y otras modificaciones](https://cpe.sunat.gob.pe/tipos_de_comprobantes/nota_de_credito).
   Es necesario distinguir esos casos antes de habilitar la reversión.
+
+### Importación de gastos por XML (06/11/2026)
+
+- La vista ya no muestra un RUC receptor fijo ni considera automáticamente
+  que toda factura da crédito fiscal y sustenta gasto. Contrasta el receptor
+  extraído con la empresa seleccionada y exige confirmar el pago completo.
+- La creación del proveedor, gasto, asiento, tesorería e historial es atómica.
+  Se rechazan notas, moneda extranjera e importes adicionales que el flujo no
+  sabe representar; las opciones tributarias quedan a cargo de quien revisa.
+  La lectura no verifica aceptación ni anotación del documento en SUNAT.

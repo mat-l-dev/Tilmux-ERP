@@ -68,6 +68,13 @@ anterior eliminaba movimientos de inventario. Queda pendiente implementar una
 reversión que conserve el historial y compruebe stock, pagos y períodos. La
 corrección de datos tampoco se permite si afecta un período cerrado.
 
+Al importar un XML, se comprueba el RUC receptor frente a la empresa elegida.
+La importación de gastos registra un pago completo en soles en la fecha del
+comprobante solo si lo confirmas; la inclusión tributaria y la deducibilidad
+se marcan tras revisar el caso. No se procesan notas, ajustes de totales ni
+gastos en moneda extranjera por este flujo. El XML no se conserva y su lectura
+no verifica su validez ante SUNAT.
+
 **Registrar gasto pagado.** Desde la lista de compras puedes registrar comisiones
 y otros gastos pagados en soles cuando la fecha del documento y la del pago
 coinciden. El registro crea el gasto, el asiento y la salida de tesorería en una

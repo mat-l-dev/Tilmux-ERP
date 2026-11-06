@@ -90,7 +90,9 @@ class ProteccionesPagoTest(TestCase):
         self.client.force_login(self.usuario)
         sesion = self.client.session
         sesion["empresa_id"] = self.empresa.pk
-        sesion["xml_pendiente"] = {"moneda_original": "USD"}
+        sesion["xml_pendiente"] = {
+            "moneda_original": "USD", "empresa_id": self.empresa.pk, "receptor_ruc": self.empresa.ruc,
+        }
         sesion.save()
         self.client.post(reverse("compras:importar_compra"), {"producto": "1"})
         self.assertEqual(Compra.objects.count(), 1)

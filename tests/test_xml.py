@@ -64,6 +64,11 @@ class LecturaDeGuia(SimpleTestCase):
 
 
 class ArchivosInvalidos(SimpleTestCase):
+    def test_importe_no_finito_es_invalido(self):
+        xml = (FIXTURES / "boleta_ml.xml").read_bytes().replace(b"198.04", b"NaN")
+        with self.assertRaises(XMLInvalido):
+            leer(xml)
+
     def test_un_archivo_que_no_es_xml_falla_claramente(self):
         with self.assertRaises(XMLInvalido):
             leer(b"esto no es un xml")

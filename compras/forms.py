@@ -70,7 +70,7 @@ class GastoPagadoForm(forms.Form):
             version="2026", activa=True, elemento=6, admite_movimiento=True
         )
         self.fields["medio"].queryset = CuentaTesoreria.objects.filter(
-            empresa=empresa, activa=True, cuenta_contable__isnull=False
+            empresa=empresa, activa=True, moneda="PEN", cuenta_contable__isnull=False
         )
         self.fields["provisiones"].queryset = Gasto.objects.filter(
             empresa=empresa, provision=True, estado=Gasto.Estado.PROVISION, gasto_origen__isnull=True,
@@ -95,3 +95,29 @@ class GastoPagadoForm(forms.Form):
         if base is not None and igv is not None and base + igv <= 0:
             self.add_error("base", "El total del gasto debe ser mayor que cero.")
         return datos
+
+
+class ImportarGastoForm(forms.Form):
+    cuenta = forms.ModelChoiceField(queryset=Cuenta.objects.none(), label="Cuenta del gasto")
+    medio = forms.ModelChoiceField(queryset=CuentaTesoreria.objects.none(), label="Cuenta desde la que se pagó")
+    con_credito = forms.BooleanField(required=False, label="Incluir en la estimación tributaria de compras")
+    deducible = forms.BooleanField(required=False, label="Sustenta costo o gasto tributario")
+    pago_confirmado = forms.BooleanField(
+        label="Confirmo que se pagó el total en la fecha del comprobante desde la cuenta seleccionada"
+    )
+
+    def __init__(self, *args, empresa, tipo, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.tipo = tipo
+        self.fields["cuenta"].queryset = Cuenta.objects.filter(
+            version="2026", activa=True, elemento=6, admite_movimiento=True,
+        ).order_by("codigo")
+        self.fields["medio"].queryset = CuentaTesoreria.objects.filter(
+            empresa=empresa, activa=True, moneda="PEN", cuenta_contable__isnull=False,
+        )
+
+    def clean_con_credito(self):
+        valor = self.cleaned_data["con_credito"]
+        if valor and self.tipo != Gasto.TipoDoc.FACTURA:
+            raise forms.ValidationError("Solo se permite marcar crédito en una factura.")
+        return valor
