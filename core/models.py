@@ -137,6 +137,7 @@ class HistorialDocumento(models.Model):
         GASTO = "GASTO", "Gasto"
         ASIENTO = "ASIENTO", "Asiento"
         IMPUESTO = "IMPUESTO", "Impuesto"
+        PERIODO = "PERIODO", "Período"
 
     empresa = models.ForeignKey(
         Empresa, on_delete=models.CASCADE, related_name="historial"

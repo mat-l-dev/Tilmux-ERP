@@ -31,6 +31,12 @@
           <span class="chip {% if p.estado == 'CERRADO' %}chip-warn{% else %}chip-ok{% endif %}">
             {{ p.get_estado_display }}
           </span>
+          {% if p.historial_reciente %}
+          <details>
+            <summary>Ver historial</summary>
+            {% for h in p.historial_reciente %}<p class="preview-note">{{ h.fecha|date:"d/m/Y H:i" }} · {{ h.usuario.username|default:"Sistema" }} · {{ h.detalle }}</p>{% endfor %}
+          </details>
+          {% endif %}
         </td>
         <td class="num der">{{ p.n_asientos }}</td>
         <td class="num der">{{ p.ventas|floatformat:2 }}</td>
@@ -47,9 +53,10 @@
               <button class="btn btn-ghost" type="submit">Cerrar</button>
             </form>
           </div>
-          {% else %}
+          {% elif request.user.is_superuser %}
           <form method="post" action="{% url 'core:reabrir_periodo' p.pk %}">
             {% csrf_token %}
+            <label class="field"><span>Motivo de reapertura</span><input name="motivo" maxlength="1000" required></label>
             <button class="btn btn-ghost" type="submit">Reabrir</button>
           </form>
           {% endif %}
@@ -65,7 +72,7 @@
 
   <p class="preview-note">
     Para cerrar un mes no deben quedar compras ni ventas en borrador. Reabrir un
-    periodo requiere ser administrador y deja rastro en el asiento.
+    periodo requiere ser administrador, un motivo y deja rastro en el historial.
   </p>
 </section>
 

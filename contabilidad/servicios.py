@@ -39,6 +39,8 @@ def q(valor) -> Decimal:
 
 
 def periodo_de(empresa: Empresa, fecha: date) -> Periodo:
+    # Serializa la comprobación del período con su cierre y con otros asientos.
+    Empresa.objects.select_for_update().get(pk=empresa.pk)
     periodo, _ = Periodo.objects.get_or_create(
         empresa=empresa,
         anio=fecha.year,

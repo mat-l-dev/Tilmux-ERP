@@ -69,6 +69,7 @@ def asentar_renta(
     usuario=None,
 ) -> Asiento | None:
     """Asienta la renta del mes si aún no está asentada. Idempotente."""
+    Empresa.objects.select_for_update().get(pk=empresa.pk)
     datos = calculo(empresa, anio, mes)
     renta = datos["renta"]
     existente = asiento_renta(empresa, anio, mes)

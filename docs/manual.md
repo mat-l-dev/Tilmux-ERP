@@ -287,7 +287,10 @@ los meses anteriores sigue visible.
 1. **Revaluar**: ajusta los saldos en dólares al tipo de cambio de fin de mes.
 2. **Cerrar**: bloquea el mes. No deben quedar borradores.
 
-Un periodo cerrado rechaza asientos nuevos. Reabrirlo exige ser administrador.
+Un periodo cerrado rechaza asientos nuevos. Reabrirlo exige ser administrador
+y escribir un motivo; el cierre y la reapertura dejan un registro con usuario y
+fecha. Si el cierre anual está vigente, primero debe revertirse antes de
+reabrir un mes de ese ejercicio.
 
 Si en **Periodos** aparecen meses que no tienen ningún movimiento, se pueden
 eliminar sin tocar la contabilidad:

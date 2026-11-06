@@ -22,7 +22,7 @@ from contabilidad.moneda import SinTipoCambio, a_soles
 from contabilidad.servicios import ContabilidadError
 from core.context import empresa_actual
 from core.contexto import usuario_actual
-from core.models import HistorialDocumento, Periodo
+from core.models import Empresa, HistorialDocumento, Periodo
 from core.permisos import requiere_escritura
 from documentos.xml_cpe import Guia, XMLInvalido, leer
 from inventario.servicios import StockError
@@ -876,6 +876,7 @@ def corregir(request, pk: int):
 
     if request.method == "POST":
         compra = get_object_or_404(Compra.objects.select_for_update(), pk=pk, empresa=empresa)
+        Empresa.objects.select_for_update().get(pk=empresa.pk)
         fechas = {compra.fecha, compra.fecha_anotacion or compra.fecha}
         periodos = Q()
         for fecha in fechas:

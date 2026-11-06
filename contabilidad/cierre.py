@@ -228,6 +228,7 @@ def _crear_asiento(
 @transaction.atomic
 def cerrar(empresa: Empresa, anio: int, usuario=None) -> list[Asiento]:
     """Genera los asientos de cierre del ejercicio. Devuelve los creados."""
+    Empresa.objects.select_for_update().get(pk=empresa.pk)
     _validar(empresa, anio)
     datos = calcular(empresa, anio)
     if not datos["filas"]:
@@ -308,6 +309,7 @@ def cerrar(empresa: Empresa, anio: int, usuario=None) -> list[Asiento]:
 @transaction.atomic
 def revertir(empresa: Empresa, anio: int) -> int:
     """Anula los asientos de cierre del ejercicio. Devuelve cuántos anuló."""
+    Empresa.objects.select_for_update().get(pk=empresa.pk)
     asientos = Asiento.objects.filter(
         empresa=empresa,
         origen_tipo=CIERRE,

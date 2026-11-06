@@ -18,7 +18,6 @@ from compras.models import Compra
 from contabilidad.cierre import cerrar, revertir
 from contabilidad.cierre import estado as estado_cierre
 from contabilidad.impuestos import (
-    asentar_renta,
     asiento_renta,
     saldo_cuenta,
     saldo_renta,
@@ -28,7 +27,8 @@ from contabilidad.servicios import ContabilidadError
 from ventas.models import Venta
 
 from .context import empresa_actual
-from .models import Empresa, Periodo
+from .models import Empresa, HistorialDocumento, Periodo
+from .periodos import cerrar_mes, reabrir_mes
 from .permisos import requiere_escritura
 from .resumen_ventas import ventas_netas_por_mes
 
@@ -269,7 +269,15 @@ def periodos(request: HttpRequest) -> HttpResponse:
         if empresa
         else Periodo.objects.none()
     )
+    historiales = {}
+    for registro in HistorialDocumento.objects.filter(
+        empresa=empresa, tipo=HistorialDocumento.Tipo.PERIODO, documento_id__in=[p.pk for p in lista],
+    ).select_related("usuario").order_by("-fecha", "-pk"):
+        items = historiales.setdefault(registro.documento_id, [])
+        if len(items) < 5:
+            items.append(registro)
     for periodo in lista:
+        periodo.historial_reciente = historiales.get(periodo.pk, [])
         periodo.n_asientos = Asiento.objects.filter(
             empresa=empresa, fecha__year=periodo.anio, fecha__month=periodo.mes
         ).count()
@@ -306,38 +314,13 @@ def periodos(request: HttpRequest) -> HttpResponse:
 @requiere_escritura
 @require_POST
 def cerrar_periodo(request: HttpRequest, pk: int) -> HttpResponse:
-    periodo = get_object_or_404(Periodo, pk=pk)
-    borradores = Compra.objects.filter(
-        empresa=periodo.empresa,
-        estado=Compra.Estado.BORRADOR,
-        fecha__year=periodo.anio,
-        fecha__month=periodo.mes,
-    ).count()
-    borradores += Venta.objects.filter(
-        empresa=periodo.empresa,
-        estado=Venta.Estado.BORRADOR,
-        fecha__year=periodo.anio,
-        fecha__month=periodo.mes,
-    ).count()
-
-    if borradores:
-        messages.error(
-            request,
-            f"No se puede cerrar: hay {borradores} borrador(es) sin confirmar en ese mes.",
-        )
+    empresa = empresa_actual(request)
+    get_object_or_404(Periodo, pk=pk, empresa=empresa)
+    try:
+        periodo = cerrar_mes(empresa=empresa, pk=pk, usuario=request.user)
+    except ContabilidadError as exc:
+        messages.error(request, f"No se pudo cerrar: {exc}")
     else:
-        try:
-            asentar_renta(
-                periodo.empresa,
-                periodo.anio,
-                periodo.mes,
-                usuario=request.user,
-            )
-        except ContabilidadError as exc:
-            messages.error(request, f"No se pudo cerrar: {exc}")
-            return redirect("core:periodos")
-        periodo.estado = Periodo.Estado.CERRADO
-        periodo.save(update_fields=["estado"])
         messages.success(request, f"Periodo {periodo.etiqueta} cerrado.")
     return redirect("core:periodos")
 
@@ -348,10 +331,13 @@ def cerrar_periodo(request: HttpRequest, pk: int) -> HttpResponse:
 def revaluar_periodo(request: HttpRequest, pk: int) -> HttpResponse:
     from compras.servicios import CompraError, revaluar
 
-    periodo = get_object_or_404(Periodo, pk=pk)
+    periodo = get_object_or_404(Periodo, pk=pk, empresa=empresa_actual(request))
+    if periodo.estado != Periodo.Estado.ABIERTO:
+        messages.error(request, "No se puede revaluar un período cerrado.")
+        return redirect("core:periodos")
     try:
         ajustadas, total = revaluar(periodo.empresa, periodo.anio, periodo.mes)
-    except (CompraError, ValueError) as exc:
+    except (CompraError, ContabilidadError, ValueError) as exc:
         messages.error(request, str(exc))
     else:
         messages.success(
@@ -368,10 +354,14 @@ def reabrir_periodo(request: HttpRequest, pk: int) -> HttpResponse:
         messages.error(request, "Solo el administrador puede reabrir un periodo.")
         return redirect("core:periodos")
 
-    periodo = get_object_or_404(Periodo, pk=pk)
-    periodo.estado = Periodo.Estado.ABIERTO
-    periodo.save(update_fields=["estado"])
-    messages.success(request, f"Periodo {periodo.etiqueta} reabierto.")
+    empresa = empresa_actual(request)
+    get_object_or_404(Periodo, pk=pk, empresa=empresa)
+    try:
+        periodo = reabrir_mes(empresa=empresa, pk=pk, usuario=request.user, motivo=request.POST.get("motivo", ""))
+    except ContabilidadError as exc:
+        messages.error(request, str(exc))
+    else:
+        messages.success(request, f"Periodo {periodo.etiqueta} reabierto.")
     return redirect("core:periodos")
 
 
