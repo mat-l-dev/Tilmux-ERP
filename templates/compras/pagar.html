@@ -14,9 +14,9 @@
 
       <dl class="datos">
         <div><dt>Moneda</dt><dd>{{ compra.moneda }}</dd></div>
-        <div><dt>Registrado</dt><dd class="num">{{ compra.total }}</dd></div>
-        <div><dt>Pagado</dt><dd class="num">{{ compra.monto_pagado }}</dd></div>
-        <div><dt>Saldo</dt><dd class="num">{{ saldo }}</dd></div>
+        <div><dt>Registrado (S/)</dt><dd class="num">{{ compra.total }}</dd></div>
+        <div><dt>Pagado contable (S/)</dt><dd class="num">{{ compra.monto_pagado }}</dd></div>
+        <div><dt>Saldo contable (S/)</dt><dd class="num">{{ saldo }}</dd></div>
       </dl>
 
       <form method="post" class="form">
@@ -50,7 +50,7 @@
           </label>
           {% endif %}
           <label class="field">
-            <span>Importe a pagar</span>
+            <span>Importe contable a cancelar (S/)</span>
             <input type="text" name="importe" inputmode="decimal" placeholder="{{ saldo }}" value="{{ saldo }}">
           </label>
         </div>
@@ -62,12 +62,11 @@
   <aside class="doc-side">
     <div class="card sticky">
       <header class="card-head"><h2>Qué se registra</h2></header>
-      <div class="preview-row"><span>4212 · Por pagar</span><b class="num">{{ compra.total }}</b></div>
-      <div class="preview-row"><span>10xx · Salida de dinero</span><b class="num">{{ compra.total }}</b></div>
+      <p class="preview-note">El pago reduce la cuenta por pagar y registra una salida de la cuenta elegida.</p>
       {% if compra.moneda != "PEN" %}
       <p class="preview-note">
-        Si pagas con otro tipo de cambio, la diferencia se reconoce en la 6761
-        (pérdida) o 7761 (ganancia).
+        Solo se admite el pago completo desde una cuenta en soles. La salida de
+        dinero puede variar por el tipo de cambio; el saldo mostrado es contable.
       </p>
       {% endif %}
       <a class="btn btn-ghost btn-block" href="{% url 'compras:detalle' compra.pk %}">Volver</a>

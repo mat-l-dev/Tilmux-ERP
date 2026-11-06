@@ -358,12 +358,12 @@ def cerrar_periodo(request: HttpRequest, pk: int) -> HttpResponse:
 @requiere_escritura
 @require_POST
 def revaluar_periodo(request: HttpRequest, pk: int) -> HttpResponse:
-    from compras.servicios import revaluar
+    from compras.servicios import CompraError, revaluar
 
     periodo = get_object_or_404(Periodo, pk=pk)
     try:
         ajustadas, total = revaluar(periodo.empresa, periodo.anio, periodo.mes)
-    except ValueError as exc:
+    except (CompraError, ValueError) as exc:
         messages.error(request, str(exc))
     else:
         messages.success(

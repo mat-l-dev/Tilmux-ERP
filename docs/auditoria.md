@@ -748,3 +748,17 @@ for cod in ["1061", "1031", "40111", "40171", "4212"]:
 - Se deshabilitó la anulación anterior porque eliminaba capas y movimientos de
   stock. Falta implementar una reversión auditable que conserve el historial y
   valide la disponibilidad de inventario y las obligaciones y pagos asociados.
+
+### Moneda extranjera y comprobantes (06/11/2026)
+
+- La importación de mercadería mezclaba bases originales con IGV convertido a
+  soles y descartaba la moneda original. Se bloquea esa importación, así como
+  la confirmación de nuevas compras en moneda extranjera, hasta implementar una
+  conversión y registro completos. No se modificaron compras históricas.
+- Los pagos parciales de compras extranjeras y la revaluación de compras que
+  ya los tienen se bloquean: el modelo no guarda el saldo en moneda de origen.
+  La fecha de pago, cuenta, importe y tipo de cambio también se validan.
+- Una anulación interna no demuestra que el proveedor haya dado de baja el
+  comprobante. [SUNAT distingue comprobantes dados de baja en el RCE](https://cpe.sunat.gob.pe/node/131)
+  y [notas de crédito para devoluciones y otras modificaciones](https://cpe.sunat.gob.pe/tipos_de_comprobantes/nota_de_credito).
+  Es necesario distinguir esos casos antes de habilitar la reversión.

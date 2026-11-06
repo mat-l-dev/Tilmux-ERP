@@ -5,17 +5,18 @@ from __future__ import annotations
 import calendar
 import logging
 from datetime import date
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 from django.db import transaction
 from django.utils import timezone
 
-from contabilidad.models import Cuenta
+from contabilidad.models import Asiento, Cuenta
 from contabilidad.moneda import tipo_cambio_de
 from contabilidad.servicios import Montos, postear, postear_lineas
 from core.contexto import usuario_actual
 from core.models import Empresa, TipoCambio
 from inventario.servicios import entrar
+from tesoreria.models import MovimientoTesoreria
 from tesoreria.servicios import anotar
 
 from .comprobantes import buscar_comprobante
@@ -57,6 +58,8 @@ def confirmar(compra: Compra) -> Compra:
         )
     if compra.estado != Compra.Estado.BORRADOR:
         raise CompraError("Solo se confirma una compra en borrador.")
+    if compra.moneda != "PEN":
+        raise CompraError("La confirmación de mercadería en moneda extranjera aún requiere revisión de costos.")
     validar_comprobante(
         empresa=compra.empresa, proveedor=compra.proveedor, tipo_doc=compra.tipo_doc,
         serie=compra.serie, numero=compra.numero, compra_id=compra.pk,
@@ -327,8 +330,21 @@ def pagar(
     compra = Compra.objects.select_for_update().get(pk=compra.pk)
     if compra.estado != Compra.Estado.CONFIRMADA:
         raise CompraError("Solo se paga una compra confirmada.")
+    if cuenta.empresa_id != compra.empresa_id or not cuenta.activa:
+        raise CompraError("La cuenta debe estar activa y pertenecer a la empresa de la compra.")
+    if cuenta.moneda != "PEN":
+        raise CompraError("Este pago solo admite cuentas en soles; el pago desde otra moneda aún no está disponible.")
     if cuenta.cuenta_contable is None:
         raise CompraError("La cuenta de tesorería no tiene cuenta contable.")
+    if fecha < compra.fecha:
+        raise CompraError("El pago no puede ser anterior a la compra; los anticipos requieren otro tratamiento.")
+    if MovimientoTesoreria.objects.filter(
+        empresa=compra.empresa, origen_tipo="COMPRA_PAGO", origen_id=compra.pk, fecha__gt=fecha,
+    ).exists() or Asiento.objects.filter(
+        empresa=compra.empresa, origen_tipo="REVALUACION", origen_id=compra.pk,
+        estado=Asiento.Estado.CONFIRMADO, fecha__gt=fecha,
+    ).exists():
+        raise CompraError("Ya existe un pago o revaluación posterior; revisa el orden de las operaciones.")
 
     total_pen = _cent(Decimal(compra.total) + Decimal(compra.revaluacion))
     pagado_previo = _cent(compra.monto_pagado)
@@ -336,22 +352,38 @@ def pagar(
     if saldo <= 0:
         raise CompraError("La compra ya está pagada.")
 
-    monto = saldo if importe is None else _cent(importe)
+    try:
+        valor = Decimal(str(importe)) if importe is not None else saldo
+        if not valor.is_finite():
+            raise InvalidOperation
+        monto = _cent(valor)
+    except (InvalidOperation, ValueError):
+        raise CompraError("Indica un importe válido.") from None
     if monto <= 0:
         raise CompraError("El importe debe ser mayor a cero.")
     if monto > saldo:
         raise CompraError(f"El saldo pendiente es {saldo}.")
+
+    if compra.moneda != "PEN" and (pagado_previo > 0 or monto != saldo):
+        raise CompraError("Los pagos parciales en moneda extranjera requieren revisión; aún no están disponibles.")
+    if compra.moneda != "PEN" and compra.total_moneda_origen <= 0:
+        raise CompraError("La compra no tiene un importe válido en moneda de origen; revisa el documento.")
 
     if compra.moneda == "PEN":
         llevado = monto
         pagado = monto
         diferencia = Decimal("0.00")
     else:
-        tasa = (
-            Decimal(tipo_cambio_pago)
-            if tipo_cambio_pago
-            else tipo_cambio_de(fecha).venta
-        )
+        try:
+            tasa = (
+                Decimal(str(tipo_cambio_pago))
+                if tipo_cambio_pago is not None and tipo_cambio_pago != ""
+                else tipo_cambio_de(fecha).venta
+            )
+            if not tasa.is_finite() or tasa <= 0:
+                raise InvalidOperation
+        except (InvalidOperation, ValueError):
+            raise CompraError("Indica un tipo de cambio válido y mayor que cero.") from None
         porcion = (
             Decimal(compra.total_moneda_origen) * monto / total_pen
         ).quantize(Decimal("0.0001"))
@@ -435,6 +467,19 @@ def revaluar(empresa, anio: int, mes: int):
         )
         .exclude(moneda="PEN")
     )
+    if compras.filter(monto_pagado__gt=0).exists():
+        raise CompraError(
+            "Hay compras en moneda extranjera con pagos parciales; revisa sus saldos antes de revaluar."
+        )
+    if compras.filter(total_moneda_origen__lte=0).exists():
+        raise CompraError(
+            "Hay compras sin importe válido en moneda de origen; revisa los documentos antes de revaluar."
+        )
+    if Asiento.objects.filter(
+        empresa=empresa, origen_tipo="REVALUACION", origen_id__in=compras.values("pk"),
+        estado=Asiento.Estado.CONFIRMADO, fecha__gt=ultimo_dia,
+    ).exists():
+        raise CompraError("Existe una revaluación posterior; revisa los períodos antes de continuar.")
 
     cuentas = {
         c.codigo: c

@@ -683,6 +683,13 @@ def importar_compra(request):
         messages.info(request, "Primero sube un comprobante.")
         return redirect("compras:importar")
 
+    if datos.get("moneda_original", datos.get("moneda")) != "PEN":
+        messages.error(
+            request,
+            "La importación de mercadería en moneda extranjera aún no está disponible: requiere validar sus costos.",
+        )
+        return redirect("compras:importar")
+
     lineas = datos.get("lineas") or []
     productos = list(Producto.objects.filter(activo=True))
     con_credito = datos["tipo"] == "FACTURA"
@@ -762,13 +769,14 @@ def importar_compra(request):
 def pagar_compra(request, pk: int):
     compra = get_object_or_404(Compra, pk=pk, empresa=empresa_actual(request))
     cuentas = list(
-        CuentaTesoreria.objects.filter(empresa=compra.empresa, activa=True)
+        CuentaTesoreria.objects.filter(empresa=compra.empresa, activa=True, moneda="PEN", cuenta_contable__isnull=False)
     )
     hoy = date.today()
 
     if request.method == "POST":
         cuenta = CuentaTesoreria.objects.filter(
-            pk=request.POST.get("cuenta"), empresa=compra.empresa
+            pk=request.POST.get("cuenta"), empresa=compra.empresa, activa=True,
+            moneda="PEN", cuenta_contable__isnull=False,
         ).first()
         if cuenta is None:
             messages.error(request, "Elige la cuenta de donde sale el dinero.")
@@ -784,7 +792,7 @@ def pagar_compra(request, pk: int):
                     tipo_cambio_pago=request.POST.get("tipo_cambio") or None,
                     importe=request.POST.get("importe") or None,
                 )
-            except (CompraError, SinTipoCambio) as exc:
+            except (CompraError, SinTipoCambio, ContabilidadError, ValueError) as exc:
                 messages.error(request, str(exc))
             else:
                 mensaje = f"Pago registrado por S/ {pagado}."

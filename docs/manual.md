@@ -112,8 +112,14 @@ En el detalle de la compra confirmada, **Pagar compra**. Puedes pagar todo o una
 parte: el sistema muestra el saldo y lo descuenta con cada pago. La compra queda
 como pagada cuando el saldo llega a cero.
 
-Si la compra es en dólares y pagas con otro tipo de cambio, la diferencia se
-reconoce en la 6761 o 7761, proporcional a la parte pagada.
+Si la compra es en moneda extranjera, solo se permite el pago completo desde
+una cuenta en soles; la diferencia de cambio se reconoce en la 6761 o 7761.
+Los pagos parciales y la revaluación de una deuda con pagos parciales existentes
+requieren revisión: el sistema aún no conserva el saldo pendiente en moneda de
+origen con el detalle necesario. El importe del formulario es el saldo contable
+en soles, que puede diferir de la salida de dinero por el tipo de cambio.
+La confirmación o importación de nuevas compras de mercadería en moneda
+extranjera está deshabilitada hasta corregir la conversión de sus líneas.
 
 ## Provisión de gastos
 

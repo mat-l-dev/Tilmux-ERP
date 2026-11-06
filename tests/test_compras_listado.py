@@ -109,7 +109,7 @@ class ListadoComprasTest(TestCase):
         producto = Producto.objects.create(sku="TEST-XML", nombre="Producto", unidad=unidad)
         session = self.client.session
         session["xml_pendiente"] = {
-            "tipo": "FACTURA", "serie": "F010", "numero": "123", "fecha": "2026-10-01",
+            "tipo": "FACTURA", "serie": "F010", "numero": "123", "fecha": "2026-10-01", "moneda": "PEN",
             "emisor_ruc": "20100000099", "emisor_nombre": "Nuevo proveedor", "igv": "1.80",
             "base": "10.00", "total": "11.80", "lineas": [
                 {"descripcion": "Producto", "cantidad": "1", "valor_unitario": "10", "base": "10"}
