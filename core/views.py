@@ -30,6 +30,7 @@ from ventas.models import Venta
 from .context import empresa_actual
 from .models import Empresa, Periodo
 from .permisos import requiere_escritura
+from .resumen_ventas import ventas_netas_por_mes
 
 MESES_CORTOS = ("Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Set", "Oct", "Nov", "Dic")
 
@@ -117,17 +118,23 @@ def panel(request: HttpRequest) -> HttpResponse:
     periodo_pedido = request.GET.get("periodo", "")
     if periodo_pedido:
         partes = periodo_pedido.split("-")
-        if len(partes) == 2 and partes[0].isdigit() and partes[1].isdigit():
+        if (len(partes) == 2 and len(partes[0]) == 4 and len(partes[1]) == 2
+                and partes[0].isascii() and partes[0].isdigit()
+                and partes[1].isascii() and partes[1].isdigit()
+                and 2000 <= int(partes[0]) <= 9998 and 1 <= int(partes[1]) <= 12):
             anio, mes = int(partes[0]), int(partes[1])
+        else:
+            periodo_pedido = ""
+            messages.warning(request, "El período indicado no es válido; se muestra el último período con actividad.")
 
     # Si el mes actual no tiene movimiento, abrir el último mes con actividad.
     if empresa and not periodo_pedido:
         hay_movimiento = Asiento.objects.filter(
-            empresa=empresa, fecha__year=anio, fecha__month=mes
+            empresa=empresa, estado=Asiento.Estado.CONFIRMADO, fecha__year=anio, fecha__month=mes
         ).exists()
         if not hay_movimiento:
             ultimo = (
-                Asiento.objects.filter(empresa=empresa)
+                Asiento.objects.filter(empresa=empresa, estado=Asiento.Estado.CONFIRMADO)
                 .order_by("-fecha")
                 .values_list("fecha", flat=True)
                 .first()
@@ -143,11 +150,13 @@ def panel(request: HttpRequest) -> HttpResponse:
     asiento = None
     renta_asentada = False
     renta_pendiente = False
+    fin_mes = date(anio, mes, calendar.monthrange(anio, mes)[1])
 
     if empresa:
         saldos = AsientoLinea.objects.filter(
             asiento__empresa=empresa,
             asiento__estado="CONFIRMADO",
+            asiento__fecha__lte=fin_mes,
             cuenta__codigo__in=["101", "1031", "1061"],
         ).aggregate(d=Sum("debe"), h=Sum("haber"))
         saldo = Decimal(saldos["d"] or 0) - Decimal(saldos["h"] or 0)
@@ -155,10 +164,9 @@ def panel(request: HttpRequest) -> HttpResponse:
         from reportes.casillas import calcular
 
         datos_mes = calcular(empresa, anio, mes)
-        ventas_base = datos_mes["ventas_base"]
+        ventas_base = datos_mes["base_renta"]
         renta = datos_mes["renta"]
 
-        fin_mes = date(anio, mes, calendar.monthrange(anio, mes)[1])
         igv = saldo_cuenta(empresa, "40111", fin_mes)
         ir_por_pagar = saldo_renta(empresa, fin_mes)
         asiento = asiento_renta(empresa, anio, mes)
@@ -168,20 +176,12 @@ def panel(request: HttpRequest) -> HttpResponse:
     ventas_acumulado = Decimal("0")
     ventas_anterior = Decimal("0")
     variacion = None
+    acumulado = {}
     if empresa:
-        ventas_acumulado = Venta.objects.filter(
-            empresa=empresa,
-            estado=Venta.Estado.CONFIRMADA,
-            fecha__year=anio,
-            fecha__month__lte=mes,
-        ).aggregate(s=Sum("subtotal"))["s"] or 0
-        ventas_anterior = Venta.objects.filter(
-            empresa=empresa,
-            estado=Venta.Estado.CONFIRMADA,
-            fecha__year=anio - 1,
-            fecha__month=mes,
-        ).aggregate(s=Sum("subtotal"))["s"] or 0
-        if ventas_anterior:
+        acumulado = ventas_netas_por_mes(empresa, date(anio - 1, mes, 1), fin_mes)
+        ventas_acumulado = sum((acumulado.get((anio, indice), 0) for indice in range(1, mes + 1)), Decimal("0"))
+        ventas_anterior = acumulado.get((anio - 1, mes), Decimal("0"))
+        if ventas_anterior > 0:
             variacion = (
                 (Decimal(ventas_base) - Decimal(ventas_anterior))
                 / Decimal(ventas_anterior)
@@ -191,31 +191,19 @@ def panel(request: HttpRequest) -> HttpResponse:
     serie_meses = []
     maximo = Decimal("0")
     if empresa:
-        inicio_anio, inicio_mes = _meses_atras(anio, mes, 11)
-        acumulado = {
-            (fila["fecha__year"], fila["fecha__month"]): fila["total"]
-            for fila in Venta.objects.filter(
-                empresa=empresa,
-                estado=Venta.Estado.CONFIRMADA,
-                fecha__gte=date(inicio_anio, inicio_mes, 1),
-                fecha__lte=date(anio, mes, 28),
-            )
-            .values("fecha__year", "fecha__month")
-            .annotate(total=Sum("total"))
-        }
         for paso in range(11, -1, -1):
             anio_punto, mes_punto = _meses_atras(anio, mes, paso)
             valor = Decimal(acumulado.get((anio_punto, mes_punto), 0))
             maximo = max(maximo, valor)
             serie_meses.append(
                 {
-                    "etiqueta": MESES_CORTOS[mes_punto - 1],
+                    "etiqueta": f"{MESES_CORTOS[mes_punto - 1]} {anio_punto % 100:02d}",
                     "valor": valor,
                     "actual": paso == 0,
                 }
             )
     for punto in serie_meses:
-        punto["altura"] = int(punto["valor"] * 100 / maximo) if maximo > 0 else 0
+        punto["altura"] = max(0, int(punto["valor"] * 100 / maximo)) if maximo > 0 else 0
         punto["texto"] = soles(punto["valor"])
 
     contexto = {

@@ -31,6 +31,12 @@ si la escritura de constitución es anterior al inicio de actividades, la
 suscripción se registra al activar el RUC. Los aportes en efectivo se registran
 cuando entran al banco y cancelan la cuenta 1421.
 
+En el **Panel**, el saldo contable de las cuentas 101, 1031 y 1061 se calcula
+hasta el último día del mes elegido; no es un saldo bancario conciliado. Las
+ventas del mes, el gráfico y el comparativo muestran bases sin IGV y consideran
+las notas de crédito y débito en el mes de emisión. Son cifras calculadas con
+los registros del ERP y deben contrastarse con los comprobantes y el SIRE.
+
 ## Catálogos
 
 En **Configuración** (el admin) se cargan productos, proveedores, clientes,

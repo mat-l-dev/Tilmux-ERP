@@ -8,8 +8,9 @@
   <label class="field" style="min-width:190px">
     <span>Mes de trabajo</span>
     <select name="periodo" data-autosubmit>
+      <option value="{{ periodo_valor }}" selected>{{ periodo_etiqueta }}</option>
       {% for p in periodos_disponibles %}
-      <option value="{{ p.valor }}" {% if p.valor == periodo_valor %}selected{% endif %}>{{ p.etiqueta }}</option>
+      {% if p.valor != periodo_valor %}<option value="{{ p.valor }}">{{ p.etiqueta }}</option>{% endif %}
       {% endfor %}
     </select>
   </label>
@@ -17,14 +18,14 @@
 
 <section class="kpis rise" style="--i:0">
   <article class="kpi">
-    <span class="kpi-label">Dinero disponible</span>
+    <span class="kpi-label">Saldo contable de caja y bancos</span>
     <span class="kpi-value num">S/ {{ saldo_tesoreria }}</span>
-    <span class="kpi-note">Bancos, billeteras y caja</span>
+    <span class="kpi-note">Cuentas 101, 1031 y 1061 al cierre de {{ periodo_etiqueta }}; no es saldo bancario conciliado</span>
   </article>
   <article class="kpi">
     <span class="kpi-label">Ventas del mes</span>
     <span class="kpi-value num">S/ {{ ventas_mes }}</span>
-    <span class="kpi-note">Base imponible, sin IGV</span>
+    <span class="kpi-note">Neto de notas del período, sin IGV</span>
   </article>
   <article class="kpi">
     <span class="kpi-label">{{ igv_etiqueta }}</span>
@@ -46,6 +47,7 @@
     <h2>Ventas por mes</h2>
     <span class="chip">12 meses hasta {{ periodo_etiqueta }} · máximo S/ {{ maximo_mes }}</span>
   </header>
+  <p class="preview-note">Importes sin IGV, con notas de crédito y débito en el mes de emisión. Una cifra negativa se muestra sin barra.</p>
   <div class="chart">
     {% for p in serie_meses %}
     <div class="chart-col">
