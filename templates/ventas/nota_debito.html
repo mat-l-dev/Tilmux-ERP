@@ -20,12 +20,12 @@
             <input type="date" name="fecha" value="{{ hoy|date:'Y-m-d' }}" required>
           </label>
           <label class="field">
-            <span>Serie</span>
-            <input type="text" name="serie" value="FD01" maxlength="4" required>
+            <span>Serie de la nota</span>
+            <input type="text" name="serie" value="{{ request.POST.serie|default:'' }}" maxlength="4" required>
           </label>
           <label class="field">
             <span>Número</span>
-            <input type="text" name="numero" maxlength="20" required>
+            <input type="text" name="numero" value="{{ request.POST.numero|default:'' }}" maxlength="20" required>
           </label>
           <label class="field field-wide">
             <span>Motivo (catálogo 10)</span>
@@ -57,6 +57,7 @@
         Aumenta el importe del comprobante original: intereses por mora, penalidades
         o aumento del valor. El IGV se calcula al 18 %.
       </p>
+      <p class="preview-note">Indica la serie y el número de la nota real. Este registro es local y no envía documentos a SUNAT.</p>
       <div class="preview-row"><span>1212 · Por cobrar</span><b>aumenta</b></div>
       <div class="preview-row"><span>7599 · Otros ingresos</span><b>base</b></div>
       <div class="preview-row"><span>40111 · IGV</span><b>18 %</b></div>

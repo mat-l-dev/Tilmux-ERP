@@ -355,7 +355,7 @@ def nota_credito(request, pk: int):
                     fecha=date.fromisoformat(
                         request.POST.get("fecha") or date.today().isoformat()
                     ),
-                    serie=request.POST.get("serie", "FC01").upper()[:4],
+                    serie=request.POST.get("serie", "").strip().upper()[:4],
                     numero=request.POST.get("numero", "")[:20],
                     motivo_codigo=request.POST.get("motivo", "07"),
                     cantidades=cantidades,
@@ -398,7 +398,7 @@ def nota_debito(request, pk: int):
                 fecha=date.fromisoformat(
                     request.POST.get("fecha") or date.today().isoformat()
                 ),
-                serie=request.POST.get("serie", "FD01").upper()[:4],
+                serie=request.POST.get("serie", "").strip().upper()[:4],
                 numero=request.POST.get("numero", "")[:20],
                 motivo_codigo=request.POST.get("motivo", "01"),
                 base=base,

@@ -84,6 +84,16 @@ class NumeracionNotasTest(TestCase):
                 igv=Decimal("1.80"),
             )
 
+    def test_formularios_no_inventan_la_serie_de_la_nota(self):
+        usuario = get_user_model().objects.create_user(username="registro")
+        self.client.force_login(usuario)
+        for nombre in ("nota_credito", "nota_debito"):
+            with self.subTest(tipo=nombre):
+                respuesta = self.client.get(reverse(f"ventas:{nombre}", args=[self.primera.pk]))
+                self.assertEqual(respuesta.status_code, 200)
+                self.assertNotContains(respuesta, 'value="FC01"')
+                self.assertNotContains(respuesta, 'value="FD01"')
+
     def test_admin_es_solo_consulta_para_ventas_y_notas(self):
         nota = NotaCredito.objects.create(
             venta=self.primera, fecha=date(2026, 10, 2), serie="FC01", numero="1", motivo="Devolución"

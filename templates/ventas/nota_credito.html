@@ -20,12 +20,12 @@
             <input type="date" name="fecha" value="{{ hoy|date:'Y-m-d' }}" required>
           </label>
           <label class="field">
-            <span>Serie</span>
-            <input type="text" name="serie" value="FC01" maxlength="4" required>
+            <span>Serie de la nota</span>
+            <input type="text" name="serie" value="{{ request.POST.serie|default:'' }}" maxlength="4" required>
           </label>
           <label class="field">
             <span>Número</span>
-            <input type="text" name="numero" maxlength="20" required>
+            <input type="text" name="numero" value="{{ request.POST.numero|default:'' }}" maxlength="20" required>
           </label>
           <label class="field field-wide">
             <span>Motivo (catálogo 09)</span>
@@ -86,7 +86,7 @@
       </p>
       <p class="preview-note">
         Una nota de crédito modifica un solo comprobante. Si necesitas ajustar dos,
-        registras dos notas. Este registro es local y no envía documentos a SUNAT.
+        registras dos notas. Indica la serie y el número de la nota real. Este registro es local y no envía documentos a SUNAT.
       </p>
       <p class="preview-note">Por ahora se admiten anulación y devoluciones. Otros motivos, como descuentos o corrección de descripción, aún no están implementados.</p>
       <a class="btn btn-ghost btn-block" href="{% url 'ventas:detalle' venta.pk %}">Volver</a>
