@@ -39,6 +39,7 @@ from .anotacion import AnotacionError, cambiar_fecha_anotacion
 from .forms import CabeceraCompraForm, GastoPagadoForm, ImportarGastoForm
 from .models import Compra, CompraLinea, CostoAdicional
 from .models_gasto import Gasto
+from .reversion import revertir_registro
 from .servicios import CompraError, confirmar, pagar, registrar_gasto, validar_comprobante
 
 
@@ -1013,5 +1014,14 @@ def corregir(request, pk: int):
 @require_POST
 def anular(request, pk: int):
     compra = get_object_or_404(Compra, pk=pk, empresa=empresa_actual(request))
-    messages.error(request, "La anulación está temporalmente deshabilitada hasta contar con una reversión auditable.")
+    if request.POST.get("confirmo_error") != "on":
+        messages.error(request, "Confirma que se trata de un registro interno erróneo, no de una devolución.")
+        return redirect("compras:detalle", compra.pk)
+    try:
+        revertir_registro(empresa=compra.empresa, compra_id=compra.pk, motivo=request.POST.get("motivo", ""),
+                          usuario=request.user)
+    except (CompraError, ContabilidadError) as exc:
+        messages.error(request, str(exc))
+    else:
+        messages.success(request, "Registro revertido con asiento inverso e historial. Revisa el RCE correspondiente.")
     return redirect("compras:detalle", compra.pk)

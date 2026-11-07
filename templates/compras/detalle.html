@@ -113,10 +113,10 @@
       {% else %}
       <p class="preview-note">Pendiente de factura: completa serie, número y RUC, desmarca la pendiente y confirma.</p>
       {% endif %}
-      {% elif not compra.pagada %}
+      {% elif compra.estado == "CONFIRMADA" and not compra.pagada %}
       <a class="btn btn-primary btn-block" href="{% url 'compras:pagar' compra.pk %}">Pagar compra</a>
       <p class="preview-note">Registra la salida de dinero y la diferencia de cambio si la hay.</p>
-      {% else %}
+      {% elif compra.estado == "CONFIRMADA" %}
       <p class="muted">Compra pagada el {{ compra.fecha_pago|date:"d/m/Y" }}.</p>
       {% endif %}
       {% if compra.estado == "CONFIRMADA" %}
@@ -124,7 +124,14 @@
       {% if compra.pagada or compra.monto_pagado > 0 %}
       <p class="preview-note">Para cambiar importes, usa una nota de crédito del proveedor: la compra ya tiene pagos.</p>
       {% else %}
-      <p class="preview-note">La anulación está temporalmente deshabilitada mientras se implementa una reversión auditable.</p>
+      <details><summary>Revertir registro interno erróneo</summary>
+        <p class="preview-note">Solo si esta compra se registró por error y no debe figurar en el ERP. No registra una devolución ni una nota de crédito del proveedor; revisa el RCE. Se comprobarán pagos, inventario y períodos.</p>
+        <form method="post" action="{% url 'compras:anular' compra.pk %}">{% csrf_token %}
+          <label class="field"><span>Motivo del error</span><textarea name="motivo" minlength="10" maxlength="1000" required></textarea></label>
+          <label><input type="checkbox" name="confirmo_error" required> Confirmo que es un registro interno erróneo, no una devolución.</label>
+          <button class="btn btn-ghost btn-block" type="submit">Revertir registro</button>
+        </form>
+      </details>
       {% endif %}
       {% endif %}
       <a class="btn btn-ghost btn-block" href="{% url 'compras:lista' %}">Volver a la lista</a>

@@ -85,9 +85,12 @@ número. Mientras esté pendiente no entra al PDT 621.
 Al confirmar: se crean las capas de stock y el asiento por pagar. Una compra con
 crédito fiscal no se confirma sin RUC, serie y número.
 
-La anulación de compras confirmadas está temporalmente deshabilitada: el flujo
-anterior eliminaba movimientos de inventario. Queda pendiente implementar una
-reversión que conserve el historial y compruebe stock, pagos y períodos. La
+Una compra confirmada registrada por error puede revertirse desde su detalle,
+con motivo y confirmación explícita, solo si no tiene pagos, revaluaciones,
+stock consumido ni períodos cerrados posteriores, y si sus capas y asiento
+coinciden. Se conserva el historial y se genera un asiento inverso. Esta acción
+es una corrección interna: no acredita una baja ante SUNAT ni registra una nota
+de crédito o una devolución del proveedor; esos casos requieren otro flujo. La
 corrección de datos tampoco se permite si afecta un período cerrado.
 
 Al importar un XML, se comprueba el RUC receptor frente a la empresa elegida.
@@ -122,7 +125,8 @@ una compra de mercadería y un gasto separado; ese caso requiere revisión.
 **Corregir datos.** En una compra confirmada puedes completar serie, número,
 tipo, glosa y descripciones desde **Corregir datos**. Los importes, la fecha y el
 RUC no se editan en una compra confirmada: si están mal, revisa el comprobante
-con el proveedor. La anulación de compras confirmadas aún está deshabilitada.
+con el proveedor y determina si corresponde corregir un registro interno o
+registrar una nota del proveedor; este último flujo aún no está implementado.
 Al corregir serie, número o glosa, el sistema actualiza también la glosa del
 asiento y del movimiento de tesorería vinculados.
 
