@@ -69,9 +69,14 @@ def comparar_banco(request):
     cantidad = 0
     datos_bancarios = None
     if request.method == "POST" and formulario.is_valid():
-        consulta = buscar_candidatos(empresa=empresa, **formulario.cleaned_data)
+        consulta = buscar_candidatos(empresa=empresa, **formulario.cleaned_data).annotate(
+            conciliacion_activa=Exists(ConciliacionBancaria.objects.filter(
+                empresa=empresa, movimiento_id=OuterRef("pk"), activa=True,
+            )),
+        )
         cantidad = consulta.count()
         candidatos = list(consulta[:100])
+        enlazar_documentos(empresa=empresa, movimientos=candidatos)
         datos_bancarios = formulario.cleaned_data
     perfil = getattr(request.user, "perfil", None)
     return render(request, "tesoreria/comparar_banco.html", {

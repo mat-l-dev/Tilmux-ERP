@@ -26,10 +26,10 @@
     <p class="preview-note">Que coincidan el importe y la fecha no demuestra que sea la misma operación. Para confirmar, revisa el extracto y usa su referencia única. Solo se permite vincular una operación del banco con un movimiento del ERP; no se crean pagos.</p>
     {% if candidatos %}
     <table class="tabla-doc">
-      <thead><tr><th>Fecha ERP</th><th>Tipo</th><th>Concepto</th><th>Referencia interna</th><th class="der">Importe</th>{% if puede_escribir %}<th>Confirmar</th>{% endif %}</tr></thead>
+      <thead><tr><th>Fecha ERP</th><th>Tipo</th><th>Concepto</th><th>Documento</th><th class="der">Importe</th>{% if puede_escribir %}<th>Confirmar</th>{% endif %}</tr></thead>
       <tbody>{% for m in candidatos %}
-      <tr><td>{{ m.fecha|date:"d/m/Y" }}</td><td>{{ m.get_tipo_display }}</td><td>{{ m.concepto }}{% if m.conciliado %} <span class="chip">Marcado previamente</span>{% endif %}</td><td>{{ m.origen_tipo|default:"—" }}{% if m.origen_id %} #{{ m.origen_id }}{% endif %}</td><td class="num der">{{ m.importe|floatformat:2 }}</td>
-      {% if puede_escribir %}<td>{% if not m.conciliado %}
+      <tr><td>{{ m.fecha|date:"d/m/Y" }}</td><td>{{ m.get_tipo_display }}</td><td>{{ m.concepto }}{% if m.conciliacion_activa and m.conciliado %} <span class="chip">Conciliado</span>{% elif m.conciliado or m.conciliacion_activa %} <span class="chip">Revisar marca</span>{% endif %}</td><td>{% if m.documento_url %}<a href="{{ m.documento_url }}">Ver {{ m.documento_etiqueta|lower }}</a>{% else %}Sin enlace disponible{% endif %}</td><td class="num der">{{ m.importe|floatformat:2 }}</td>
+      {% if puede_escribir %}<td>{% if not m.conciliado and not m.conciliacion_activa %}
         <form method="post" action="{% url 'tesoreria:confirmar_conciliacion' %}" class="form">
           {% csrf_token %}
           <input type="hidden" name="cuenta" value="{{ datos_bancarios.cuenta.pk }}">

@@ -144,6 +144,18 @@ class TesoreriaVistaTest(TestCase):
         self.assertFalse(primero.conciliado)
         self.assertFalse(segundo.conciliado)
 
+    def test_comparacion_no_ofrece_confirmar_si_hay_conciliacion_activa_sin_marca(self):
+        movimiento = MovimientoTesoreria.objects.get(cuenta=self.cuenta, concepto="Pago propio")
+        ConciliacionBancaria.objects.create(
+            empresa=self.empresa, cuenta=self.cuenta, movimiento=movimiento, fecha_banco=movimiento.fecha,
+            tipo=movimiento.tipo, importe=movimiento.importe, referencia="EXTRACTO", creado_por=self.usuario,
+        )
+        respuesta = self.client.post(reverse("tesoreria:comparar_banco"), {
+            "cuenta": self.cuenta.pk, "fecha": "2026-11-01", "tipo": "EGRESO", "importe": "25.00",
+        })
+        self.assertContains(respuesta, "Revisar marca")
+        self.assertNotContains(respuesta, "Confirmar conciliación")
+
     def test_comparacion_rechaza_cuenta_ajena_moneda_distinta_y_valores_invalidos(self):
         for cuenta, fecha, importe in [
             (self.cuenta_otra.pk, "2026-11-01", "25"),
