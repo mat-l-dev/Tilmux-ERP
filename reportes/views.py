@@ -45,7 +45,7 @@ from ventas.models import NotaCredito, NotaDebito, Venta
 
 from .casillas import calcular
 from .conciliacion_documentos import totales_documentales
-from .sire import ArchivoInvalido, leer_filas, sumar, validar_contexto
+from .sire import ArchivoInvalido, leer_filas, moneda_verificada_soles, sumar, validar_contexto
 from .utils import FiltroReporteError, filtros_seguros, rango
 
 CERO = Decimal("0")
@@ -702,6 +702,7 @@ def conciliacion_archivo(request):
                 filas = leer_filas(archivo)
                 contexto_archivo = validar_contexto(filas, ruc=empresa.ruc, anio=anio, mes=mes)
                 totales = sumar(filas)
+                archivo_en_soles = moneda_verificada_soles(filas)
             except ArchivoInvalido as exc:
                 error = str(exc)
             else:
@@ -737,26 +738,34 @@ def conciliacion_archivo(request):
                     "documentos_sin_credito": documentales["sin_credito"],
                     "documentos_incompletos": documentales["incompletos"],
                     "otras_monedas": documentales["otras_monedas"],
-                    "total_comparable": totales["tiene_total"] and not documentales["otras_monedas"],
+                    "moneda_verificada": archivo_en_soles,
+                    "total_comparable": (
+                        totales["tiene_total"] and archivo_en_soles and not documentales["otras_monedas"]
+                    ),
                 }
                 resultado["dif_base"] = (
                     (resultado["sistema_base"] - resultado["sunat_base"]).quantize(Decimal("0.01"))
-                    if not documentales["otras_monedas"] else None
+                    if archivo_en_soles and not documentales["otras_monedas"] else None
                 )
                 resultado["dif_igv"] = (
                     (resultado["sistema_igv"] - resultado["sunat_igv"]).quantize(Decimal("0.01"))
-                    if not documentales["otras_monedas"] else None
+                    if archivo_en_soles and not documentales["otras_monedas"] else None
                 )
                 resultado["dif_total"] = (
                     (resultado["sistema_total"] - resultado["sunat_total"]).quantize(Decimal("0.01"))
                     if resultado["total_comparable"] else None
                 )
-                resultado["cuadra"] = resultado["total_comparable"] and not documentales["incompletos"] and all(
-                    valor == 0
-                    for valor in (
-                        resultado["dif_base"],
-                        resultado["dif_igv"],
-                        resultado["dif_total"],
+                resultado["cuadra"] = (
+                    resultado["total_comparable"]
+                    and all(contexto_archivo.values())
+                    and not documentales["incompletos"]
+                    and all(
+                        valor == 0
+                        for valor in (
+                            resultado["dif_base"],
+                            resultado["dif_igv"],
+                            resultado["dif_total"],
+                        )
                     )
                 )
 

@@ -63,9 +63,7 @@ def leer_filas(archivo) -> list[list]:
         delimitador = None
         for linea in texto.splitlines()[:60]:
             for candidato in (";", ","):
-                columnas = _columnas([
-                    _normalizar(celda) for celda in next(csv.reader([linea], delimiter=candidato))
-                ])
+                columnas = _columnas([_normalizar(celda) for celda in next(csv.reader([linea], delimiter=candidato))])
                 if any(base != igv for base in columnas[0] for igv in columnas[1]):
                     delimitador = candidato
                     break
@@ -151,7 +149,7 @@ def validar_contexto(filas: list[list], *, ruc: str, anio: int, mes: int) -> dic
     verificado = {"ruc": indices["ruc"] is not None, "periodo": indices["periodo"] is not None}
     filas_datos = 0
     esperado = f"{anio:04d}{mes:02d}"
-    for fila in filas[cabecera + 1:]:
+    for fila in filas[cabecera + 1 :]:
         if not any(celda not in (None, "") for celda in fila):
             continue
         if _es_fila_total(fila):
@@ -176,6 +174,23 @@ def validar_contexto(filas: list[list], *, ruc: str, anio: int, mes: int) -> dic
     return verificado
 
 
+def moneda_verificada_soles(filas: list[list]) -> bool:
+    """Solo confirma soles si todas las filas identifican explícitamente PEN."""
+    cabecera, *_ = _cabecera(filas)
+    titulos = [_normalizar(celda) for celda in filas[cabecera]]
+    nombres = {"moneda", "tipo de moneda", "tipo moneda", "código moneda", "codigo moneda"}
+    indices = [indice for indice, titulo in enumerate(titulos) if titulo in nombres]
+    if len(indices) != 1:
+        return False
+    indice = indices[0]
+    datos = [
+        fila
+        for fila in filas[cabecera + 1 :]
+        if any(celda not in (None, "") for celda in fila) and not _es_fila_total(fila)
+    ]
+    return bool(datos) and all(indice < len(fila) and str(fila[indice]).strip().upper() == "PEN" for fila in datos)
+
+
 def _numero_validado(valor) -> Decimal | None:
     numero = _numero(valor)
     if numero is None:
@@ -194,23 +209,14 @@ def _suma(fila: list, columnas: list[int]) -> Decimal:
 
 def sumar(filas: list[list]) -> dict:
     """Suma las columnas de base, IGV y total de la propuesta."""
-    cabecera, cols_base, cols_igv, cols_total, cols_dscto_base, cols_dscto_igv = _cabecera(
-        filas
-    )
+    cabecera, cols_base, cols_igv, cols_total, cols_dscto_base, cols_dscto_igv = _cabecera(filas)
     titulos = [_limpio(celda) for celda in filas[cabecera]]
     columnas_mixtas = [
-        indice for indice, titulo in enumerate(titulos)
+        indice
+        for indice, titulo in enumerate(titulos)
         if _normalizar(titulo).split() and _normalizar(titulo).split()[-1] in {"dgng", "dng"}
     ]
-    usadas = sorted(
-        set(
-            cols_base
-            + cols_igv
-            + cols_total
-            + cols_dscto_base
-            + cols_dscto_igv
-        )
-    )
+    usadas = sorted(set(cols_base + cols_igv + cols_total + cols_dscto_base + cols_dscto_igv))
     nombres = [titulos[i] for i in usadas if i < len(titulos)]
 
     totales = {"base": Decimal("0"), "igv": Decimal("0"), "total": Decimal("0")}
@@ -237,9 +243,7 @@ def sumar(filas: list[list]) -> dict:
         base = _suma(fila, cols_base) + _suma(fila, cols_dscto_base)
         igv = _suma(fila, cols_igv) + _suma(fila, cols_dscto_igv)
         total = _suma(fila, cols_total)
-        if cols_total and (base != 0 or igv != 0) and all(
-            _numero_validado(fila[i]) is None for i in cols_total
-        ):
+        if cols_total and (base != 0 or igv != 0) and all(_numero_validado(fila[i]) is None for i in cols_total):
             raise ArchivoInvalido(f"La fila {numero_fila} tiene base o IGV, pero no tiene importe total.")
         if not cols_total:
             total = base + igv

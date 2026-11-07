@@ -67,9 +67,9 @@ class ConciliacionBoletasTest(TestCase):
         )
 
     def test_boleta_en_documentos_no_aumenta_credito_igv(self):
-        cabecera = "RUC,Periodo,BI Gravada,IGV,Importe Total\n"
-        factura = "20123456789,202610,0,0,43.00\n"
-        boleta = "20123456789,202610,0,0,198.04\n"
+        cabecera = "RUC,Periodo,Moneda,BI Gravada,IGV,Importe Total\n"
+        factura = "20123456789,202610,PEN,0,0,43.00\n"
+        boleta = "20123456789,202610,PEN,0,0,198.04\n"
         respuesta = self.conciliar(cabecera + factura)
         resultado = respuesta.context["resultado"]
         self.assertEqual(resultado["sistema_total"], Decimal("241.04"))
@@ -103,7 +103,7 @@ class ConciliacionBoletasTest(TestCase):
             igv=9,
             total=59,
         )
-        contenido = "RUC,Periodo,BI Gravada,IGV,Importe Total\n20123456789,202610,0,0,241.04\n"
+        contenido = "RUC,Periodo,Moneda,BI Gravada,IGV,Importe Total\n20123456789,202610,PEN,0,0,241.04\n"
         respuesta = self.conciliar(contenido)
         resultado = respuesta.context["resultado"]
         self.assertEqual(resultado["otras_monedas"], 1)
@@ -133,10 +133,21 @@ class ConciliacionBoletasTest(TestCase):
             igv=Decimal("1.80"),
             total=Decimal("11.80"),
         )
-        contenido = "RUC,Periodo,BI Gravada,IGV,Importe Total\n20123456789,202610,-10,-1.80,-11.80\n"
+        contenido = "RUC,Periodo,Moneda,BI Gravada,IGV,Importe Total\n20123456789,202610,PEN,-10,-1.80,-11.80\n"
         respuesta = self.conciliar(contenido, registro="ventas")
         resultado = respuesta.context["resultado"]
         self.assertEqual(resultado["dif_base"], 0)
         self.assertEqual(resultado["dif_igv"], 0)
         self.assertEqual(resultado["dif_total"], 0)
         self.assertTrue(resultado["cuadra"])
+
+    def test_moneda_ausente_o_dolar_no_se_presenta_como_conciliada(self):
+        for contenido in (
+            "RUC,Periodo,BI Gravada,IGV,Importe Total\n20123456789,202610,0,0,241.04\n",
+            "RUC,Periodo,Moneda,BI Gravada,IGV,Importe Total\n20123456789,202610,USD,0,0,241.04\n",
+        ):
+            with self.subTest(contenido=contenido):
+                respuesta = self.conciliar(contenido)
+                self.assertFalse(respuesta.context["resultado"]["cuadra"])
+                self.assertIsNone(respuesta.context["resultado"]["dif_total"])
+                self.assertContains(respuesta, "No se pudo verificar")
