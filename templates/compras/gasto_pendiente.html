@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block titulo %}Registrar gasto por pagar{% endblock %}
+{% block titulo_pagina %}Registrar gasto por pagar{% endblock %}
+{% block contenido %}
+<div class="doc"><div class="doc-main"><form method="post" class="card form">{% csrf_token %}
+  <header class="card-head"><h2>Comprobante pendiente de pago</h2></header>
+  <p class="preview-note">Registra un gasto en soles cuya fecha de devengo coincide con la del comprobante. El pago se registra por separado. Este formulario no liquida provisiones anteriores.</p>
+  {% if formulario.non_field_errors %}<div class="message error">{{ formulario.non_field_errors }}</div>{% endif %}
+  <div class="grid-fields">{% for campo in formulario %}<label class="field"><span>{{ campo.label }}</span>{{ campo }}{% if campo.errors %}<span class="message error">{{ campo.errors|join:", " }}</span>{% endif %}</label>{% endfor %}</div>
+  <p class="preview-note">Marca la estimación de crédito fiscal solo si el comprobante cumple los requisitos aplicables. El registro no envía información a SUNAT.</p>
+  <button class="btn btn-primary" type="submit">Registrar gasto por pagar</button> <a class="btn btn-ghost" href="{% url 'compras:lista' %}">Cancelar</a>
+</form></div></div>{% endblock %}

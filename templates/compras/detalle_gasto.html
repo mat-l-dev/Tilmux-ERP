@@ -26,7 +26,12 @@
       </dl>
       {% if gasto.gasto_origen %}<p class="preview-note">Esta provisión está vinculada a <a href="{% url 'compras:detalle_gasto' gasto.gasto_origen.pk %}">la factura {{ gasto.gasto_origen.serie }}-{{ gasto.gasto_origen.numero }}</a>.</p>{% elif gasto.provision %}<p class="preview-note">Provisión sin factura vinculada.</p>{% endif %}
       {% if provisiones %}<p class="preview-note">Provisiones vinculadas: {% for p in provisiones %}<a href="{% url 'compras:detalle_gasto' p.pk %}">{{ p.glosa|default:"Ver provisión" }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}.</p>{% endif %}
+      {% if es_pendiente %}<p>Saldo pendiente: <strong>S/ {{ saldo_pendiente|floatformat:2 }}</strong></p>{% endif %}
     </section>
+    {% if pagos_gasto %}<section class="card"><header class="card-head"><h2>Pagos registrados</h2></header>
+      <table class="tabla-doc"><thead><tr><th>Fecha</th><th>Cuenta</th><th>Importe</th></tr></thead><tbody>
+      {% for pago in pagos_gasto %}<tr><td>{{ pago.fecha|date:"d/m/Y" }}</td><td>{{ pago.cuenta.nombre }}</td><td>S/ {{ pago.importe|floatformat:2 }}</td></tr>{% endfor %}
+      </tbody></table></section>{% endif %}
     {% for asiento in asientos %}
     <section class="card">
       <header class="card-head"><h2>Asiento contable</h2><span class="chip">N.º {{ asiento.numero }} · {{ asiento.get_estado_display }}</span></header>
@@ -45,6 +50,7 @@
     {% include "core/_historial.html" %}
   </div>
   <aside class="doc-side"><div class="card sticky">
+    {% if es_pendiente and gasto.estado == 'REGISTRADO' %}<a class="btn btn-primary btn-block" href="{% url 'compras:pagar_gasto' gasto.pk %}">Registrar pago</a>{% endif %}
     {% if not gasto.provision and gasto.estado != 'ANULADO' %}
     <form method="post" action="{% url 'compras:anotacion' 'gasto' gasto.pk %}">
       {% csrf_token %}

@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block titulo %}Registrar pago{% endblock %}
+{% block titulo_pagina %}Registrar pago{% endblock %}
+{% block contenido %}
+<div class="doc"><div class="doc-main"><form method="post" class="card form">{% csrf_token %}
+  <header class="card-head"><h2>Pago de {{ gasto.serie }}-{{ gasto.numero }}</h2></header>
+  <p class="preview-note">Puedes registrar un pago parcial. Indica la fecha real y la cuenta desde la que salió el dinero.</p>
+  {% if formulario.non_field_errors %}<div class="message error">{{ formulario.non_field_errors }}</div>{% endif %}
+  <div class="grid-fields">{% for campo in formulario %}{% if campo.is_hidden %}{{ campo }}{% else %}<label class="field"><span>{{ campo.label }}</span>{{ campo }}{% if campo.errors %}<span class="message error">{{ campo.errors|join:", " }}</span>{% endif %}</label>{% endif %}{% endfor %}</div>
+  <button class="btn btn-primary" type="submit">Registrar pago</button> <a class="btn btn-ghost" href="{% url 'compras:detalle_gasto' gasto.pk %}">Cancelar</a>
+</form></div></div>{% endblock %}

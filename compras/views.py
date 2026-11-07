@@ -37,7 +37,15 @@ from ventas.models import Venta
 from ventas.models_guia import GuiaRemision
 
 from .anotacion import AnotacionError, cambiar_fecha_anotacion
-from .forms import CabeceraCompraForm, GastoPagadoForm, ImportarGastoForm, ProvisionGastoForm
+from .forms import (
+    CabeceraCompraForm,
+    GastoPagadoForm,
+    GastoPendienteForm,
+    ImportarGastoForm,
+    PagoGastoForm,
+    ProvisionGastoForm,
+)
+from .gastos_pendientes import pagar_gasto, registrar_pendiente
 from .models import Compra, CompraLinea, CostoAdicional
 from .models_gasto import Gasto
 from .provisiones import registrar_provision
@@ -211,25 +219,72 @@ def nuevo_gasto(request):
 
 
 @login_required
+@requiere_escritura
+def nuevo_gasto_pendiente(request):
+    empresa = empresa_actual(request)
+    if empresa is None:
+        messages.error(request, "Primero configura una empresa.")
+        return redirect("core:panel")
+    formulario = GastoPendienteForm(request.POST or None, empresa=empresa, initial={"fecha": date.today(), "igv": 0})
+    if request.method == "POST" and formulario.is_valid():
+        try:
+            gasto = registrar_pendiente(empresa=empresa, usuario=request.user, **formulario.cleaned_data)
+        except (CompraError, ContabilidadError) as exc:
+            formulario.add_error(None, str(exc))
+        except IntegrityError:
+            formulario.add_error(None, "El comprobante ya está registrado.")
+        else:
+            messages.success(request, "Gasto registrado como pendiente de pago.")
+            return redirect("compras:detalle_gasto", gasto.pk)
+    return render(request, "compras/gasto_pendiente.html", {"formulario": formulario})
+
+
+@login_required
+@requiere_escritura
+def pagar_gasto_pendiente(request, pk):
+    empresa = empresa_actual(request)
+    gasto = get_object_or_404(Gasto, pk=pk, empresa=empresa)
+    formulario = PagoGastoForm(request.POST or None, empresa=empresa,
+                               initial={"fecha": date.today(), "operacion": uuid4()})
+    if request.method == "POST" and formulario.is_valid():
+        try:
+            _, creado = pagar_gasto(empresa=empresa, gasto_id=gasto.pk, usuario=request.user,
+                                    **formulario.cleaned_data)
+        except (CompraError, ContabilidadError) as exc:
+            formulario.add_error(None, str(exc))
+        else:
+            messages.success(request, "Pago registrado." if creado else "Este pago ya estaba registrado.")
+            return redirect("compras:detalle_gasto", gasto.pk)
+    return render(request, "compras/pagar_gasto.html", {"formulario": formulario, "gasto": gasto})
+
+
+@login_required
 def detalle_gasto(request, pk: int):
     empresa = empresa_actual(request)
     gasto = get_object_or_404(
         Gasto.objects.select_related("proveedor", "cuenta", "medio", "gasto_origen"),
         pk=pk, empresa=empresa,
     )
-    asientos = Asiento.objects.filter(
-        empresa=empresa, origen_tipo="GASTO", origen_id=gasto.pk
-    ).prefetch_related("lineas__cuenta")
+    pagos = list(gasto.pagos.select_related("cuenta"))
+    pago_ids = [p.pk for p in pagos]
+    origenes = (Q(origen_tipo__in=["GASTO", "GASTO_PENDIENTE"], origen_id=gasto.pk)
+                | Q(origen_tipo="PAGO_GASTO", origen_id__in=pago_ids))
+    asientos = Asiento.objects.filter(origenes, empresa=empresa).prefetch_related("lineas__cuenta")
     movimientos = MovimientoTesoreria.objects.filter(
-        empresa=empresa, origen_tipo="GASTO", origen_id=gasto.pk
+        Q(origen_tipo="GASTO", origen_id=gasto.pk) | Q(origen_tipo="PAGO_GASTO", origen_id__in=pago_ids),
+        empresa=empresa,
     ).select_related("cuenta")
+    es_pendiente = Asiento.objects.filter(empresa=empresa, origen_tipo="GASTO_PENDIENTE", origen_id=gasto.pk,
+                                          estado=Asiento.Estado.CONFIRMADO).exists()
     historial = HistorialDocumento.objects.filter(
         empresa=empresa, tipo="GASTO", documento_id=gasto.pk
     ).order_by("-fecha")[:10]
     provisiones = gasto.provisiones.filter(empresa=empresa).select_related("proveedor")
     return render(request, "compras/detalle_gasto.html", {
         "gasto": gasto, "asientos": asientos, "movimientos": movimientos,
-        "historial": historial, "provisiones": provisiones,
+        "historial": historial, "provisiones": provisiones, "pagos_gasto": pagos,
+        "es_pendiente": es_pendiente,
+        "saldo_pendiente": gasto.total - sum((p.importe for p in pagos), Decimal("0")),
     })
 
 

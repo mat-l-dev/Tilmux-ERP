@@ -122,3 +122,17 @@ class Gasto(models.Model):
     def __str__(self) -> str:
         documento = f"{self.serie}-{self.numero}".strip(" -") or "sin comprobante"
         return f"{self.fecha} · {self.proveedor.nombre} · {documento} · {self.total}"
+
+
+class PagoGasto(models.Model):
+    gasto = models.ForeignKey(Gasto, on_delete=models.PROTECT, related_name="pagos")
+    fecha = models.DateField()
+    importe = models.DecimalField(max_digits=18, decimal_places=2)
+    cuenta = models.ForeignKey("catalogo.CuentaTesoreria", on_delete=models.PROTECT)
+    operacion = models.UUIDField(unique=True)
+    creado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
+    creado = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["fecha", "id"]
+        constraints = [models.CheckConstraint(condition=models.Q(importe__gt=0), name="pago_gasto_positivo")]

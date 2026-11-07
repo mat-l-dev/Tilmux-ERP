@@ -114,6 +114,28 @@ class ProvisionGastoForm(forms.Form):
         )
 
 
+class GastoPendienteForm(GastoPagadoForm):
+    def __init__(self, *args, empresa, **kwargs):
+        super().__init__(*args, empresa=empresa, **kwargs)
+        self.fields.pop("medio")
+        self.fields.pop("provisiones")
+        self.fields["fecha"].label = "Fecha del comprobante y del gasto"
+        self.fields["tipo_doc"].choices = [c for c in Gasto.TipoDoc.choices if c[0] != Gasto.TipoDoc.OTRO]
+
+
+class PagoGastoForm(forms.Form):
+    fecha = forms.DateField(label="Fecha del pago", widget=forms.DateInput(attrs={"type": "date"}))
+    importe = forms.DecimalField(max_digits=18, decimal_places=2, min_value=Decimal("0.01"), label="Importe en soles")
+    cuenta = forms.ModelChoiceField(queryset=CuentaTesoreria.objects.none(), label="Cuenta de pago")
+    operacion = forms.UUIDField(widget=forms.HiddenInput)
+
+    def __init__(self, *args, empresa, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["cuenta"].queryset = CuentaTesoreria.objects.filter(
+            empresa=empresa, activa=True, moneda="PEN", cuenta_contable__isnull=False
+        )
+
+
 class ImportarGastoForm(forms.Form):
     cuenta = forms.ModelChoiceField(queryset=Cuenta.objects.none(), label="Cuenta del gasto")
     medio = forms.ModelChoiceField(queryset=CuentaTesoreria.objects.none(), label="Cuenta desde la que se pagó")
