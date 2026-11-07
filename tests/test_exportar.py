@@ -18,7 +18,7 @@ class ExportacionComprasTest(SimpleTestCase):
         request.user = SimpleNamespace(is_authenticated=True)
         factura = SimpleNamespace(
             fecha=date(2026, 10, 1), fecha_anotacion=None, tipo_doc="FACTURA", serie="F001", numero="1",
-            proveedor=SimpleNamespace(numero_doc="20100000001", nombre="Proveedor"),
+            proveedor=SimpleNamespace(tipo_doc="RUC", numero_doc="20100000001", nombre="Proveedor"),
             con_credito=True, subtotal=Decimal("28"), igv=Decimal("0"), total=Decimal("28"),
         )
         with (
