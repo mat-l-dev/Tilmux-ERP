@@ -6,6 +6,7 @@ from uuid import UUID
 from django.db import transaction
 from django.db.models import Sum
 
+from catalogo.models import CuentaTesoreria
 from contabilidad.models import Asiento, Cuenta
 from contabilidad.servicios import periodo_de, postear_lineas
 from core.models import Empresa, HistorialDocumento
@@ -92,7 +93,7 @@ def registrar_pendiente(*, empresa, proveedor, fecha, tipo_doc, serie, numero, b
 
 
 @transaction.atomic
-def pagar_gasto(*, empresa, gasto_id, fecha, importe, cuenta, operacion, usuario):
+def pagar_gasto(*, empresa, gasto_id, fecha, importe, cuenta, canal, operacion, usuario):
     if not isinstance(operacion, UUID):
         raise CompraError("Identificador de operación inválido.")
     Empresa.objects.select_for_update().get(pk=empresa.pk)
@@ -132,6 +133,8 @@ def pagar_gasto(*, empresa, gasto_id, fecha, importe, cuenta, operacion, usuario
         raise CompraError("La fecha no puede ser anterior al comprobante ni al último pago.")
     if cuenta.empresa_id != empresa.pk or not cuenta.activa or cuenta.moneda != "PEN" or not cuenta.cuenta_contable_id:
         raise CompraError("Selecciona una cuenta activa en soles de la empresa.")
+    if canal not in CuentaTesoreria.Canal.values:
+        raise CompraError("Selecciona un canal de pago válido.")
     importe = importe_valido(importe)
     saldo = gasto.total - (pagos.aggregate(total=Sum("importe"))["total"] or Decimal("0"))
     if importe > saldo:
@@ -144,7 +147,7 @@ def pagar_gasto(*, empresa, gasto_id, fecha, importe, cuenta, operacion, usuario
                            (cuenta.cuenta_contable, Decimal("0"), importe, "Salida de fondos")],
                    origen_tipo="PAGO_GASTO", origen_id=pago.pk, usuario=usuario)
     anotar(empresa=empresa, cuenta=cuenta, fecha=fecha, tipo="EGRESO", importe=importe,
-           concepto=f"Pago {gasto.serie}-{gasto.numero}", origen_tipo="PAGO_GASTO", origen_id=pago.pk)
+           concepto=f"Pago {gasto.serie}-{gasto.numero}", canal=canal, origen_tipo="PAGO_GASTO", origen_id=pago.pk)
     if importe == saldo:
         gasto.estado = Gasto.Estado.PAGADO
         gasto.save(update_fields=["estado"])

@@ -48,8 +48,8 @@
     {% empty %}{% if not deuda_provision %}<p class="preview-note">No se encontró un asiento vinculado a este gasto.</p>{% endif %}{% endfor %}
     {% if movimientos %}
     <section class="card"><header class="card-head"><h2>Movimientos de tesorería vinculados</h2></header>
-      <div class="tabla-scroll"><table class="tabla-doc"><thead><tr><th>Fecha</th><th>Cuenta</th><th>Concepto</th><th class="der">Importe</th></tr></thead><tbody>
-      {% for m in movimientos %}<tr><td>{{ m.fecha|date:"d/m/Y" }}</td><td>{{ m.cuenta.nombre }}</td><td>{{ m.concepto }}</td><td class="num der">{{ m.importe|floatformat:2 }}</td></tr>{% endfor %}
+      <div class="tabla-scroll"><table class="tabla-doc"><thead><tr><th>Fecha</th><th>Cuenta</th><th>Concepto</th><th>Canal</th><th class="der">Importe</th></tr></thead><tbody>
+      {% for m in movimientos %}<tr><td>{{ m.fecha|date:"d/m/Y" }}</td><td>{{ m.cuenta.nombre }}</td><td>{{ m.concepto }}</td><td>{{ m.get_canal_display }}</td><td class="num der">{{ m.importe|floatformat:2 }}</td></tr>{% endfor %}
       </tbody></table></div>
     </section>
     {% endif %}

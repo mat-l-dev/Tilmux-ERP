@@ -131,7 +131,8 @@ class NuevaProvisionTest(BaseContable):
         self.assertContains(listado, "F001-20")
         for importe in ("10", "18"):
             respuesta = self.client.post(reverse("compras:pagar_gasto", args=[factura.pk]), {
-                "fecha": "2026-11-12", "importe": importe, "cuenta": self.bbva.pk, "operacion": str(uuid4()),
+                "fecha": "2026-11-12", "importe": importe, "cuenta": self.bbva.pk, "canal": "TRANSFERENCIA",
+                "operacion": str(uuid4()),
             })
             self.assertEqual(respuesta.status_code, 302)
         factura.refresh_from_db()
@@ -177,7 +178,8 @@ class NuevaProvisionTest(BaseContable):
         factura = Gasto.objects.get(serie="F001", numero="22")
         Asiento.objects.filter(origen_tipo="GASTO", origen_id=provision.pk).update(estado="ANULADO")
         respuesta = self.client.post(reverse("compras:pagar_gasto", args=[factura.pk]), {
-            "fecha": "2026-11-12", "importe": "10", "cuenta": self.bbva.pk, "operacion": str(uuid4()),
+            "fecha": "2026-11-12", "importe": "10", "cuenta": self.bbva.pk, "canal": "TRANSFERENCIA",
+            "operacion": str(uuid4()),
         })
         self.assertContains(respuesta, "necesita revisión")
         self.assertFalse(factura.pagos.exists())

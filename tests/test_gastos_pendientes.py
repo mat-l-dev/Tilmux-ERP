@@ -33,7 +33,7 @@ class GastosPendientesTests(BaseContable):
 
     def pagar(self, gasto, importe, operacion=None, fecha=date(2026, 11, 11)):
         return pagar_gasto(empresa=self.empresa, gasto_id=gasto.pk, fecha=fecha, importe=Decimal(importe),
-                           cuenta=self.bbva, operacion=operacion or uuid4(), usuario=self.usuario)
+                           cuenta=self.bbva, canal="EFECTIVO", operacion=operacion or uuid4(), usuario=self.usuario)
 
     def test_deuda_y_pagos_parciales_no_duplican_gasto(self):
         gasto = self.crear()
@@ -53,6 +53,7 @@ class GastosPendientesTests(BaseContable):
         self.assertEqual(gasto.estado, Gasto.Estado.PAGADO)
         self.assertEqual(PagoGasto.objects.count(), 2)
         self.assertEqual(MovimientoTesoreria.objects.filter(origen_tipo="PAGO_GASTO").count(), 2)
+        self.assertEqual(MovimientoTesoreria.objects.filter(origen_tipo="PAGO_GASTO", canal="EFECTIVO").count(), 2)
         self.assertEqual(Asiento.objects.filter(origen_tipo="PAGO_GASTO").count(), 2)
         with self.assertRaises(CompraError):
             self.pagar(gasto, "1")
@@ -73,6 +74,14 @@ class GastosPendientesTests(BaseContable):
         with self.assertRaises(ContabilidadError):
             self.pagar(gasto, "10")
         self.assertFalse(PagoGasto.objects.exists())
+        self.assertFalse(MovimientoTesoreria.objects.filter(origen_tipo="PAGO_GASTO").exists())
+
+    def test_canal_invalido_no_registra_pago(self):
+        gasto = self.crear()
+        with self.assertRaisesMessage(CompraError, "canal de pago válido"):
+            pagar_gasto(empresa=self.empresa, gasto_id=gasto.pk, fecha=date(2026, 11, 11), importe="10",
+                        cuenta=self.bbva, canal="INVALIDO", operacion=uuid4(), usuario=self.usuario)
+        self.assertFalse(gasto.pagos.exists())
         self.assertFalse(MovimientoTesoreria.objects.filter(origen_tipo="PAGO_GASTO").exists())
 
     def test_pantallas_muestran_saldo_y_ultimo_pago(self):

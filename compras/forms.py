@@ -131,6 +131,8 @@ class PagoGastoForm(forms.Form):
     fecha = forms.DateField(label="Fecha del pago", widget=forms.DateInput(attrs={"type": "date"}))
     importe = forms.DecimalField(max_digits=18, decimal_places=2, min_value=Decimal("0.01"), label="Importe en soles")
     cuenta = forms.ModelChoiceField(queryset=CuentaTesoreria.objects.none(), label="Cuenta de pago")
+    canal = forms.ChoiceField(choices=[("", "Selecciona un canal"), *CuentaTesoreria.Canal.choices],
+                              label="Cómo se pagó")
     operacion = forms.UUIDField(widget=forms.HiddenInput)
 
     def __init__(self, *args, empresa, **kwargs):
