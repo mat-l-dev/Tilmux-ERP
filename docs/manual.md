@@ -184,6 +184,12 @@ movimientos pendientes de registrar. No mezcla cuentas ni monedas y conviene
 verificar la moneda de los registros anteriores. La conciliación bancaria de
 movimientos todavía no tiene un flujo propio.
 
+**Comparar con el banco** busca posibles movimientos por cuenta en soles, tipo,
+importe y una ventana de tres días antes o después de la fecha del extracto.
+Puede devolver varias coincidencias: revisa el concepto y el sustento. Esta
+búsqueda no importa el extracto, no marca movimientos como conciliados y no
+registra pagos; la conciliación completa sigue pendiente.
+
 ## Ventas
 
 **Ventas → Nueva venta.** Eliges boleta o factura, el cliente y las líneas. El

@@ -10,6 +10,8 @@ from django.shortcuts import render
 from catalogo.models import CuentaTesoreria
 from core.context import empresa_actual
 
+from .conciliacion import buscar_candidatos
+from .forms import BuscarOperacionBancariaForm
 from .models import MovimientoTesoreria
 
 
@@ -42,4 +44,22 @@ def movimientos(request):
     pagina = Paginator(movimientos, 30).get_page(request.GET.get("pagina"))
     return render(request, "tesoreria/movimientos.html", {
         "filas": filas, "pagina": pagina, "cuenta_id": cuenta_id,
+    })
+
+
+@login_required
+def comparar_banco(request):
+    empresa = empresa_actual(request)
+    formulario = BuscarOperacionBancariaForm(
+        request.POST if request.method == "POST" else None,
+        empresa=empresa, initial={"cuenta": request.GET.get("cuenta")},
+    )
+    candidatos = None
+    cantidad = 0
+    if request.method == "POST" and formulario.is_valid():
+        consulta = buscar_candidatos(empresa=empresa, **formulario.cleaned_data)
+        cantidad = consulta.count()
+        candidatos = list(consulta[:100])
+    return render(request, "tesoreria/comparar_banco.html", {
+        "formulario": formulario, "candidatos": candidatos, "cantidad": cantidad,
     })

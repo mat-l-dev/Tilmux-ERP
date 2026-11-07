@@ -772,3 +772,13 @@ for cod in ["1061", "1031", "40111", "40171", "4212"]:
   Se rechazan notas, moneda extranjera e importes adicionales que el flujo no
   sabe representar; las opciones tributarias quedan a cargo de quien revisa.
   La lectura no verifica aceptación ni anotación del documento en SUNAT.
+
+### Comparación bancaria manual
+
+- Tesorería permite buscar, sin grabar cambios, posibles movimientos en una
+  cuenta en soles por fecha cercana (tres días), tipo e importe exacto. Se
+  muestran todas las alternativas hasta el límite visible de 100; las marcas
+  previas se informan, pero no se modifican.
+- Coincidir en importe y fecha no acredita identidad. No se importa el
+  extracto ni se crean asociaciones o movimientos: la conciliación persistente,
+  con referencias bancarias y control de duplicados, sigue pendiente.

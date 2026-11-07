@@ -74,3 +74,53 @@ class TesoreriaVistaTest(TestCase):
         self.assertEqual(respuesta.context["pagina"].number, 2)
         filas = {fila["cuenta"].pk: fila for fila in respuesta.context["filas"]}
         self.assertEqual(filas[self.cuenta.pk]["neto"], Decimal("110"))
+
+    def test_comparacion_muestra_candidatos_sin_conciliar_ni_crear_pagos(self):
+        primero = MovimientoTesoreria.objects.get(cuenta=self.cuenta, concepto="Pago propio")
+        segundo = MovimientoTesoreria.objects.create(
+            empresa=self.empresa, cuenta=self.cuenta, fecha=date(2026, 11, 4),
+            tipo="EGRESO", importe=25, concepto="Segundo cargo",
+        )
+        MovimientoTesoreria.objects.create(
+            empresa=self.empresa, cuenta=self.cuenta, fecha=date(2026, 11, 5),
+            tipo="EGRESO", importe=25, concepto="Fuera del rango",
+        )
+        MovimientoTesoreria.objects.create(
+            empresa=self.otra, cuenta=self.cuenta_otra, fecha=date(2026, 11, 1),
+            tipo="EGRESO", importe=25, concepto="Cargo de otra empresa",
+        )
+        antes = MovimientoTesoreria.objects.count()
+        respuesta = self.client.post(reverse("tesoreria:comparar_banco"), {
+            "cuenta": self.cuenta.pk, "fecha": "2026-11-01", "tipo": "EGRESO", "importe": "25.00",
+        })
+        self.assertContains(respuesta, "Pago propio")
+        self.assertContains(respuesta, "Segundo cargo")
+        self.assertNotContains(respuesta, "Fuera del rango")
+        self.assertNotContains(respuesta, "Cargo de otra empresa")
+        self.assertEqual(respuesta.context["cantidad"], 2)
+        self.assertEqual(MovimientoTesoreria.objects.count(), antes)
+        primero.refresh_from_db()
+        segundo.refresh_from_db()
+        self.assertFalse(primero.conciliado)
+        self.assertFalse(segundo.conciliado)
+
+    def test_comparacion_rechaza_cuenta_ajena_moneda_distinta_y_valores_invalidos(self):
+        for cuenta, fecha, importe in [
+            (self.cuenta_otra.pk, "2026-11-01", "25"),
+            (self.cuenta_usd.pk, "2026-11-01", "25"),
+            (self.cuenta.pk, "2026-11-01", "-25"),
+            (self.cuenta.pk, "0001-01-01", "25"),
+        ]:
+            with self.subTest(cuenta=cuenta, fecha=fecha, importe=importe):
+                respuesta = self.client.post(reverse("tesoreria:comparar_banco"), {
+                    "cuenta": cuenta, "fecha": fecha, "tipo": "EGRESO", "importe": importe,
+                })
+                self.assertEqual(respuesta.status_code, 200)
+                self.assertIsNone(respuesta.context["candidatos"])
+
+    def test_comparacion_sin_resultados_no_declara_ausencia(self):
+        respuesta = self.client.post(reverse("tesoreria:comparar_banco"), {
+            "cuenta": self.cuenta.pk, "fecha": "2026-11-01", "tipo": "EGRESO", "importe": "10",
+        })
+        self.assertEqual(respuesta.context["cantidad"], 0)
+        self.assertContains(respuesta, "Esto no demuestra que el cargo o abono no exista")

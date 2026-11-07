@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block titulo %}Comparar operación bancaria{% endblock %}
+{% block titulo_pagina %}Comparar operación bancaria{% endblock %}
+
+{% block contenido %}
+<div class="doc"><div class="doc-main">
+  <form method="post" class="card form">
+    {% csrf_token %}
+    <header class="card-head"><h2>Datos del movimiento del banco</h2></header>
+    <p class="preview-note">Busca una operación a la vez en cuentas en soles. Se muestran importes y tipos iguales dentro de tres días antes o después de la fecha indicada.</p>
+    <div class="grid-fields">
+      {% for campo in formulario %}
+      <label class="field"><span>{{ campo.label }}</span>{{ campo }}{% if campo.errors %}<span class="message error">{{ campo.errors|join:", " }}</span>{% endif %}</label>
+      {% endfor %}
+    </div>
+    <button class="btn btn-primary" type="submit">Buscar posibles coincidencias</button>
+    <a class="btn btn-ghost" href="{% url 'tesoreria:movimientos' %}">Volver a tesorería</a>
+  </form>
+
+  {% if candidatos is not None %}
+  <section class="card" style="margin-top:12px">
+    <header class="card-head"><h2>Posibles coincidencias</h2><span class="chip">{{ cantidad }} encontrada{{ cantidad|pluralize }}</span></header>
+    <p class="preview-note">Que coincidan el importe y la fecha no demuestra que sea la misma operación. Revisa concepto, fecha y sustento; esta búsqueda no marca ni modifica movimientos y no crea pagos.</p>
+    {% if candidatos %}
+    <table class="tabla-doc">
+      <thead><tr><th>Fecha ERP</th><th>Tipo</th><th>Concepto</th><th>Referencia interna</th><th class="der">Importe</th></tr></thead>
+      <tbody>{% for m in candidatos %}
+      <tr><td>{{ m.fecha|date:"d/m/Y" }}</td><td>{{ m.get_tipo_display }}</td><td>{{ m.concepto }}{% if m.conciliado %} <span class="chip">Marcado previamente</span>{% endif %}</td><td>{{ m.origen_tipo|default:"—" }}{% if m.origen_id %} #{{ m.origen_id }}{% endif %}</td><td class="num der">{{ m.importe|floatformat:2 }}</td></tr>
+      {% endfor %}</tbody>
+    </table>
+    {% if cantidad > 100 %}<p class="preview-note">Se muestran las primeras 100 coincidencias; revisa la cuenta y los datos de búsqueda.</p>{% endif %}
+    {% else %}<p class="muted">No se encontraron movimientos con esos criterios. Esto no demuestra que el cargo o abono no exista.</p>{% endif %}
+  </section>
+  {% endif %}
+</div></div>
+{% endblock %}
