@@ -43,6 +43,13 @@ En **Configuración** (el admin) se cargan productos, proveedores, clientes,
 unidades, series y cuentas de tesorería. Las cuentas contables ya están cargadas:
 1 636 del PCGE 2026, con 44 activas.
 
+Un usuario con un perfil asignado a una empresa solo puede seleccionarla en el
+ERP; si está inactiva, no se cambia a otra automáticamente. Los superusuarios
+pueden seleccionar cualquier empresa activa. Los usuarios sin perfil o con
+perfil sin empresa conservan acceso heredado a las empresas activas: hay que
+asignarles una empresa antes de usar el sistema con varias empresas. Este
+control no sustituye una revisión completa de permisos del administrador.
+
 ## Compras
 
 La lista de **Compras** reúne mercadería, gastos y provisiones. Usa **Tipo**

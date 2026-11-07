@@ -1,5 +1,6 @@
 from django.contrib import admin
 
+from .admin_seguro import SoloConsultaContable
 from .models import Empresa, Periodo, TipoCambio
 
 
@@ -11,7 +12,7 @@ class EmpresaAdmin(admin.ModelAdmin):
 
 
 @admin.register(Periodo)
-class PeriodoAdmin(admin.ModelAdmin):
+class PeriodoAdmin(SoloConsultaContable, admin.ModelAdmin):
     list_display = ("empresa", "anio", "mes", "estado", "version_pcge")
     list_filter = ("estado", "anio", "empresa")
     ordering = ("-anio", "-mes")

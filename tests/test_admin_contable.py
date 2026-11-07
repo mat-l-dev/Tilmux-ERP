@@ -54,6 +54,7 @@ class AdminContableTest(TestCase):
             empresa=empresa, cuenta=cuenta, fecha=date(2026, 10, 1), tipo="EGRESO", importe=Decimal("10")
         )
         cls.documentos = [
+            ("core", "periodo", periodo),
             ("contabilidad", "asiento", asiento),
             ("inventario", "capafifo", capa),
             ("inventario", "movimientostock", movimiento),

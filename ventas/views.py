@@ -326,7 +326,7 @@ def nueva(request):
 @login_required
 @requiere_escritura
 def nota_credito(request, pk: int):
-    venta = get_object_or_404(Venta, pk=pk)
+    venta = get_object_or_404(Venta, pk=pk, empresa=empresa_actual(request))
     lineas = list(venta.lineas.select_related("producto"))
     acreditado = {
         fila["venta_linea_id"]: fila["total"]
@@ -386,7 +386,7 @@ def nota_credito(request, pk: int):
 @login_required
 @requiere_escritura
 def nota_debito(request, pk: int):
-    venta = get_object_or_404(Venta, pk=pk)
+    venta = get_object_or_404(Venta, pk=pk, empresa=empresa_actual(request))
 
     if request.method == "POST":
         try:
@@ -424,7 +424,7 @@ def nota_debito(request, pk: int):
 
 @login_required
 def detalle(request, pk: int):
-    venta = get_object_or_404(Venta, pk=pk)
+    venta = get_object_or_404(Venta, pk=pk, empresa=empresa_actual(request))
     asiento = Asiento.objects.filter(
         origen_tipo="VENTA", origen_id=venta.pk, tipo_operacion="VENTA"
     ).first()
@@ -446,7 +446,7 @@ def detalle(request, pk: int):
 @requiere_escritura
 @require_POST
 def confirmar_venta(request, pk: int):
-    venta = get_object_or_404(Venta, pk=pk)
+    venta = get_object_or_404(Venta, pk=pk, empresa=empresa_actual(request))
     try:
         confirmar(venta)
     except (VentaError, StockError) as exc:

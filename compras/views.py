@@ -501,6 +501,7 @@ def importar(request):
                             empresa=empresa, serie=serie_ref, numero=numero_ref
                         ).first()
                     request.session["guia_pendiente"] = {
+                        "empresa_id": empresa.pk if empresa else None,
                         "tipo": documento.tipo,
                         "serie": documento.serie,
                         "numero": documento.numero,
@@ -652,10 +653,13 @@ def vincular_guia(request):
     if not datos:
         messages.info(request, "Primero sube una guía.")
         return redirect("compras:importar")
+    if not empresa or datos.get("empresa_id") != empresa.pk:
+        messages.error(request, "La guía no corresponde a la empresa seleccionada. Vuelve a subir el XML.")
+        return redirect("compras:importar")
 
     venta = None
     if datos.get("venta_id"):
-        venta = Venta.objects.filter(pk=datos["venta_id"]).first()
+        venta = Venta.objects.filter(pk=datos["venta_id"], empresa=empresa).first()
 
     guia, creada = GuiaRemision.objects.update_or_create(
         empresa=empresa,

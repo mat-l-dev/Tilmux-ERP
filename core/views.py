@@ -12,6 +12,7 @@ from django.db.models import Sum
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from compras.models import Compra
@@ -26,8 +27,8 @@ from contabilidad.models import Asiento, AsientoLinea, Cuenta
 from contabilidad.servicios import ContabilidadError
 from ventas.models import Venta
 
-from .context import empresa_actual
-from .models import Empresa, HistorialDocumento, Periodo
+from .context import empresa_actual, empresas_disponibles
+from .models import HistorialDocumento, Periodo
 from .periodos import cerrar_mes, reabrir_mes
 from .permisos import requiere_escritura
 from .resumen_ventas import ventas_netas_por_mes
@@ -255,10 +256,18 @@ def pendientes(request: HttpRequest) -> HttpResponse:
 @login_required
 @require_POST
 def cambiar_empresa(request: HttpRequest) -> HttpResponse:
-    empresa_id = request.POST.get("empresa_id")
-    if Empresa.objects.filter(pk=empresa_id, activa=True).exists():
+    empresa_id = request.POST.get("empresa_id", "")
+    if (empresa_id.isascii() and empresa_id.isdecimal() and len(empresa_id) <= 18
+            and empresas_disponibles(request.user).filter(pk=int(empresa_id)).exists()):
         request.session["empresa_id"] = int(empresa_id)
-    return redirect(request.POST.get("siguiente") or "core:panel")
+    else:
+        messages.error(request, "No tienes acceso a la empresa seleccionada.")
+    siguiente = request.POST.get("siguiente", "")
+    if not url_has_allowed_host_and_scheme(
+        siguiente, allowed_hosts={request.get_host()}, require_https=request.is_secure(),
+    ):
+        siguiente = reverse("core:panel")
+    return redirect(siguiente)
 
 
 @login_required

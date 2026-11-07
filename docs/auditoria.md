@@ -784,3 +784,14 @@ for cod in ["1061", "1031", "40111", "40171", "4212"]:
   conserva el usuario y la reversión exige motivo. No se importan extractos ni
   se crean pagos. Solo se admite un movimiento del ERP por operación bancaria;
   las marcas históricas sin referencia no se interpretan automáticamente.
+
+### Perfiles y ventas entre empresas
+
+- Los perfiles que tienen empresa asignada solo pueden seleccionar esa empresa;
+  si está inactiva, no se asigna otra. Las vistas de venta y sus notas comprueban
+  la empresa activa; el cambio de empresa acepta solo destinos internos seguros.
+- Los usuarios sin perfil o con perfil sin empresa conservan acceso heredado a
+  empresas activas; los superusuarios pueden acceder a todas. El aislamiento
+  completo, incluidos permisos del administrador y catálogos, sigue pendiente.
+- La administración de períodos es de solo consulta para evitar cambiar un
+  cierre por fuera del servicio que guarda su historial.

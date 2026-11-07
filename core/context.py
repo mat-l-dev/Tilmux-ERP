@@ -9,11 +9,22 @@ from django.http import HttpRequest
 from .models import Empresa
 
 
+def empresas_disponibles(usuario):
+    """Restringe los perfiles asignados; conserva acceso heredado sin asignación."""
+    empresas = Empresa.objects.filter(activa=True)
+    if not usuario.is_authenticated:
+        return empresas.none()
+    perfil = getattr(usuario, "perfil", None)
+    if not usuario.is_superuser and perfil is not None and perfil.empresa_id is not None:
+        return empresas.filter(pk=perfil.empresa_id)
+    return empresas
+
+
 def empresa_actual(request: HttpRequest) -> Empresa | None:
     """Devuelve la empresa de la sesión, fijando la primera si no hay elección."""
     if not request.user.is_authenticated:
         return None
-    empresas = list(Empresa.objects.filter(activa=True))
+    empresas = list(empresas_disponibles(request.user))
     if not empresas:
         return None
     elegida = request.session.get("empresa_id")
@@ -26,7 +37,7 @@ def empresa_actual(request: HttpRequest) -> Empresa | None:
 def empresas_context(request: HttpRequest) -> dict:
     activa = empresa_actual(request)
     return {
-        "empresas": list(Empresa.objects.filter(activa=True)) if activa else [],
+        "empresas": list(empresas_disponibles(request.user)) if activa else [],
         "empresa_activa": activa,
     }
 
