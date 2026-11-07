@@ -296,6 +296,11 @@ que aporta ese comprobante. Una compra sin RUC, serie o número no suma en
 107/108. Una boleta de compra no otorga crédito. Una compra pendiente de factura
 no entra al 621 hasta completarse.
 
+El registro de compras distingue los documentos sin crédito de los que tienen
+datos incompletos o una clasificación incompatible; estos últimos se marcan para
+revisión. Esta estimación no verifica el comprobante ni todos los requisitos del
+crédito fiscal ante SUNAT.
+
 Cuando hay renta y todavía no está asentada, el botón **Asentar renta de
 MM/AAAA** crea el asiento 881 contra 40171. Al cerrar el mes se hace solo. Para
 pagarla, usa **Registrar pago**: debita la 40171 y registra la salida del banco.

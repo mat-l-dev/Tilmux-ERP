@@ -16,6 +16,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from catalogo.models import CuentaTesoreria, Producto
+from compras.comprobantes import evaluar_tributacion
 from compras.models import Compra
 from compras.models_gasto import Gasto
 from contabilidad.impuestos import (
@@ -241,14 +242,9 @@ def registro_compras(request):
             estado=Compra.Estado.CONFIRMADA,
             fecha_tributaria__range=(desde, hasta),
         ).select_related("proveedor").prefetch_related("lineas"):
-            usa_credito = (
-                compra.con_credito
-                and compra.estado == Compra.Estado.CONFIRMADA
-                and bool(compra.serie.strip())
-                and bool(compra.numero.strip())
-                and len(compra.proveedor.numero_doc) == 11
-            )
-            pendiente = compra.estado != Compra.Estado.CONFIRMADA or not usa_credito
+            estado_tributario = evaluar_tributacion(compra)
+            usa_credito = estado_tributario.incluido
+            pendiente = estado_tributario.requiere_revision
             detalle = compra.glosa or " · ".join(
                 linea.descripcion
                 for linea in compra.lineas.all()[:2]
@@ -277,13 +273,8 @@ def registro_compras(request):
             fecha_tributaria__range=(desde, hasta),
             provision=False,
         ).exclude(estado=Gasto.Estado.ANULADO).select_related("proveedor"):
-            usa_credito = (
-                gasto.con_credito
-                and gasto.tipo_doc != "OTRO"
-                and bool(gasto.serie.strip())
-                and bool(gasto.numero.strip())
-                and len(gasto.proveedor.numero_doc) == 11
-            )
+            estado_tributario = evaluar_tributacion(gasto)
+            usa_credito = estado_tributario.incluido
             filas.append(
                 {
                     "fecha": gasto.fecha,
@@ -300,6 +291,7 @@ def registro_compras(request):
                     "igv": gasto.igv if usa_credito and gasto.igv > 0 else 0,
                     "total": gasto.total,
                     "credito": usa_credito,
+                    "pendiente": estado_tributario.requiere_revision,
                     "clase": "Gasto",
                 }
             )

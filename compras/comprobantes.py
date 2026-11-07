@@ -1,9 +1,35 @@
 """Identificación compartida de comprobantes de compras y gastos."""
 
+from dataclasses import dataclass
+
 from django.db.models.functions import Trim, Upper
 
 from .models import Compra
 from .models_gasto import Gasto
+
+
+@dataclass(frozen=True)
+class EstadoTributario:
+    incluido: bool
+    requiere_revision: bool
+
+
+def ruc_valido(proveedor):
+    numero = proveedor.numero_doc or ""
+    return proveedor.tipo_doc == "RUC" and len(numero) == 11 and numero.isascii() and numero.isdecimal()
+
+
+def evaluar_tributacion(documento):
+    """Clasifica la estimación local sin comprobar la validez del comprobante en SUNAT."""
+    tipo = documento.tipo_doc
+    incompleto = tipo in {"FACTURA", "BOLETA"} and not (documento.serie.strip() and documento.numero.strip())
+    if tipo == "FACTURA" and not ruc_valido(documento.proveedor):
+        incompleto = True
+    incompatible = documento.con_credito and tipo != "FACTURA"
+    return EstadoTributario(
+        incluido=documento.con_credito and tipo == "FACTURA" and not incompleto,
+        requiere_revision=incompleto or incompatible,
+    )
 
 
 def _numero_normalizado(numero: str) -> str:

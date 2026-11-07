@@ -42,7 +42,7 @@
         <td>{% if f.fecha_anotacion %}{{ f.fecha_anotacion|date:"d/m/Y" }}{% else %}Estimada por emisión{% endif %}</td>
         <td>
           {{ f.tipo }}
-          {% if f.pendiente %}<span class="chip chip-warn">Pendiente</span>{% endif %}
+          {% if f.pendiente %}<span class="chip chip-warn">Revisar datos</span>{% endif %}
         </td>
         <td>{{ f.documento|default:"—" }}</td>
         <td class="num">{{ f.ruc|default:"—" }}</td>
@@ -80,8 +80,9 @@
     El filtro usa la fecha de anotación indicada; si no se conoce, estima el período por la fecha de emisión.
     Solo las filas con crédito «Sí» alimentan las casillas 107 y 108. En esta
     estimación, las boletas no suman base ni IGV como crédito fiscal.
-    Las compras no gravadas van a la casilla 120. Las filas con chip «Pendiente»
-    no entran al PDT 621 hasta completar RUC, serie y número.
+    Las compras no gravadas incluidas se estiman en la casilla 120. «Revisar datos» indica información
+    incompleta o una clasificación incompatible. La inclusión aquí no verifica la validez del comprobante
+    ni todos los requisitos del crédito fiscal ante SUNAT.
   </p>
   {% else %}
   <p class="muted">No hay comprobantes en el rango.</p>

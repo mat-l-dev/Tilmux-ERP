@@ -9,6 +9,7 @@ from decimal import Decimal
 from django.db.models import Sum
 from django.db.models.functions import Coalesce
 
+from compras.comprobantes import evaluar_tributacion
 from compras.models import Compra
 from compras.models_gasto import Gasto
 from ventas.models import NotaCredito, NotaDebito, Venta
@@ -57,9 +58,7 @@ def calcular(empresa, anio: int, mes: int) -> dict:
     compras = [
         c
         for c in compras
-        if c.serie.strip()
-        and c.numero.strip()
-        and len(c.proveedor.numero_doc) == 11
+        if evaluar_tributacion(c).incluido
     ]
     compras_gravadas = [c for c in compras if c.igv > 0]
     base_compras = sum((c.subtotal for c in compras_gravadas), CERO)
@@ -82,9 +81,7 @@ def calcular(empresa, anio: int, mes: int) -> dict:
     gastos = [
         g
         for g in gastos
-        if g.serie.strip()
-        and g.numero.strip()
-        and len(g.proveedor.numero_doc) == 11
+        if evaluar_tributacion(g).incluido
     ]
     gastos_gravados = [g for g in gastos if g.igv > 0]
     base_compras += sum((g.base for g in gastos_gravados), CERO)
@@ -126,19 +123,15 @@ def casillas_documento(documento) -> list[dict]:
             return [
                 {
                     "casilla": "—",
-                    "concepto": "No otorga crédito fiscal (boleta u otro)",
+                    "concepto": "No incluido en la estimación tributaria",
                     "importe": None,
                 }
             ]
-        if not (
-            documento.serie.strip()
-            and documento.numero.strip()
-            and len(documento.proveedor.numero_doc) == 11
-        ):
+        if not evaluar_tributacion(documento).incluido:
             return [
                 {
                     "casilla": "—",
-                    "concepto": "Pendiente de RUC, serie o número: no va al 621",
+                    "concepto": "Revisar tipo de comprobante, RUC, serie y número: no va al 621",
                     "importe": None,
                 }
             ]

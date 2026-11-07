@@ -17,6 +17,7 @@ from django.http import HttpResponse
 from openpyxl import Workbook
 from openpyxl.styles import Font
 
+from compras.comprobantes import evaluar_tributacion
 from compras.models import Compra
 from compras.models_gasto import Gasto
 from core.context import empresa_actual
@@ -172,12 +173,8 @@ def compras(request):
             estado=Compra.Estado.CONFIRMADA,
             fecha_tributaria__range=(desde, hasta),
         ).select_related("proveedor").order_by("fecha", "serie", "numero"):
-            usa_credito = (
-                compra.con_credito
-                and bool(compra.serie.strip())
-                and bool(compra.numero.strip())
-                and len(compra.proveedor.numero_doc) == 11
-            )
+            estado_tributario = evaluar_tributacion(compra)
+            usa_credito = estado_tributario.incluido
             filas.append(
                 [
                     _periodo(compra.fecha_anotacion or compra.fecha),
@@ -197,7 +194,7 @@ def compras(request):
                     _importe(compra.total),
                     "Mercadería",
                     "Sí" if usa_credito else "No",
-                    "Sí" if not usa_credito else "No",
+                    "Sí" if estado_tributario.requiere_revision else "No",
                 ]
             )
 
@@ -206,13 +203,8 @@ def compras(request):
             fecha_tributaria__range=(desde, hasta),
             provision=False,
         ).exclude(estado=Gasto.Estado.ANULADO).select_related("proveedor").order_by("fecha", "serie", "numero"):
-            usa_credito = (
-                gasto.con_credito
-                and gasto.tipo_doc != "OTRO"
-                and bool(gasto.serie.strip())
-                and bool(gasto.numero.strip())
-                and len(gasto.proveedor.numero_doc) == 11
-            )
+            estado_tributario = evaluar_tributacion(gasto)
+            usa_credito = estado_tributario.incluido
             filas.append(
                 [
                     _periodo(gasto.fecha_anotacion or gasto.fecha),
@@ -228,7 +220,7 @@ def compras(request):
                     _importe(gasto.total),
                     "Gasto",
                     "Sí" if usa_credito else "No",
-                    "No",
+                    "Sí" if estado_tributario.requiere_revision else "No",
                 ]
             )
 

@@ -19,7 +19,7 @@ from inventario.servicios import entrar
 from tesoreria.models import MovimientoTesoreria
 from tesoreria.servicios import anotar
 
-from .comprobantes import buscar_comprobante
+from .comprobantes import buscar_comprobante, ruc_valido
 from .models import Compra
 from .models_gasto import Gasto
 
@@ -60,6 +60,8 @@ def confirmar(compra: Compra) -> Compra:
         raise CompraError("Solo se confirma una compra en borrador.")
     if compra.moneda != "PEN":
         raise CompraError("La confirmación de mercadería en moneda extranjera aún requiere revisión de costos.")
+    if compra.con_credito and compra.tipo_doc != Compra.TipoDoc.FACTURA:
+        raise CompraError("Este flujo solo admite crédito fiscal en facturas.")
     validar_comprobante(
         empresa=compra.empresa, proveedor=compra.proveedor, tipo_doc=compra.tipo_doc,
         serie=compra.serie, numero=compra.numero, compra_id=compra.pk,
@@ -69,7 +71,7 @@ def confirmar(compra: Compra) -> Compra:
             raise CompraError(
                 "Completa la serie y el número del comprobante antes de confirmar."
             )
-        if len(compra.proveedor.numero_doc) != 11:
+        if not ruc_valido(compra.proveedor):
             raise CompraError(
                 "Una compra con crédito fiscal exige el RUC de 11 dígitos del proveedor."
             )
@@ -199,6 +201,12 @@ def registrar_gasto(
         raise CompraError("Solo una provisión puede tener un gasto de origen.")
     if gasto_origen is not None and gasto_origen.empresa_id != empresa.pk:
         raise CompraError("La factura de origen pertenece a otra empresa.")
+
+    if not provision and con_credito:
+        if tipo_doc != Gasto.TipoDoc.FACTURA:
+            raise CompraError("Este flujo solo admite crédito fiscal en facturas.")
+        if not serie.strip() or not numero.strip() or not ruc_valido(proveedor):
+            raise CompraError("Para marcar crédito, indica serie, número y RUC de 11 dígitos del proveedor.")
 
     if not provision:
         validar_comprobante(
