@@ -95,6 +95,15 @@ def lista(request):
     tipo = request.GET.get("tipo", "")
     if tipo not in {"compra", "gasto"}:
         tipo = ""
+    estado_pago = request.GET.get("estado_pago", "")
+    if estado_pago != "por_pagar":
+        estado_pago = ""
+    if estado_pago:
+        comprobantes_pendientes = Asiento.objects.filter(
+            empresa=empresa, origen_tipo="GASTO_PENDIENTE", estado=Asiento.Estado.CONFIRMADO,
+        ).values("origen_id")
+        gastos = gastos.filter(pk__in=comprobantes_pendientes, estado=Gasto.Estado.REGISTRADO, provision=False)
+        compras = compras.none()
 
     def indices(queryset, clase):
         return queryset.order_by().annotate(
@@ -143,7 +152,7 @@ def lista(request):
         request,
         "compras/lista.html",
         {"compras": pagina, "page_obj": pagina, "q": busqueda, "tipo": tipo,
-         "fecha_por": criterio_fecha, "error_filtro": error_filtro},
+         "fecha_por": criterio_fecha, "error_filtro": error_filtro, "estado_pago": estado_pago},
     )
 
 

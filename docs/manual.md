@@ -209,7 +209,7 @@ En **Configuración → Perfiles** se asigna a cada usuario un rol:
 | Registrador | Registrar y confirmar documentos |
 | Solo lectura | Consultar reportes, sin registrar |
 
-Un usuario sin perfil se trata como administrador.
+Un usuario sin perfil o sin empresa activa asignada no puede consultar ni registrar operaciones de una empresa; los superusuarios pueden seleccionar empresas activas.
 En **Configuración**, compras, gastos, ventas, notas de crédito, asientos y
 movimientos de inventario y tesorería son de solo consulta. Sus registros se
 gestionan desde los módulos correspondientes para mantener la contabilidad.

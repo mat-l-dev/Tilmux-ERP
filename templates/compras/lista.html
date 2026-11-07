@@ -34,6 +34,13 @@
       <option value="gasto" {% if tipo == 'gasto' %}selected{% endif %}>Gastos</option>
     </select>
   </label>
+  <label class="field" style="min-width:180px">
+    <span>Pago de gastos</span>
+    <select name="estado_pago" data-autosubmit>
+      <option value="">Todos</option>
+      <option value="por_pagar" {% if estado_pago == 'por_pagar' %}selected{% endif %}>Gastos por pagar</option>
+    </select>
+  </label>
   <button class="btn btn-ghost" type="submit">Buscar</button>
 </form>
 {% if error_filtro %}<div class="message error">{{ error_filtro }}</div>{% endif %}
@@ -51,6 +58,7 @@
   </header>
 
   <p class="preview-note">Las provisiones se muestran como tales; no son facturas adicionales.</p>
+  {% if estado_pago %}<p class="preview-note">Este filtro muestra gastos con comprobante registrados en el flujo de pagos parciales. Las provisiones y compras de mercadería se consultan por separado.</p>{% endif %}
   {% if fecha_por == 'anotacion' %}<p class="preview-note">Si no se registró la anotación, se usa la emisión como estimación. Contrasta el período con el RCE.</p>{% elif fecha_por == 'devengo' %}<p class="preview-note">Si el gasto no tiene fecha de devengo, se usa la emisión. Para mercadería se muestra la fecha del comprobante.</p>{% endif %}
   {% if compras %}
   <div class="tabla-scroll">
