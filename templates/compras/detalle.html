@@ -68,6 +68,22 @@
       </dl>
     </section>
 
+    {% if compra.estado == 'CONFIRMADA' %}
+    <section class="card">
+      <header class="card-head"><h2>Pagos de la compra</h2><span class="chip">{% if compra.pagada %}Pagada{% else %}Por pagar{% endif %}</span></header>
+      <dl class="datos">
+        <div><dt>Total registrado</dt><dd>S/ {{ compra.total|floatformat:2 }}</dd></div>
+        {% if compra.revaluacion %}<div><dt>Revaluación contable</dt><dd>S/ {{ compra.revaluacion|floatformat:2 }}</dd></div>{% endif %}
+        <div><dt>Importe contable cancelado</dt><dd>S/ {{ compra.monto_pagado|floatformat:2 }}</dd></div>
+        <div><dt>Saldo contable pendiente</dt><dd><strong>S/ {{ saldo_compra|floatformat:2 }}</strong></dd></div>
+      </dl>
+      {% if pagos %}<div class="tabla-scroll"><table class="tabla-doc"><thead><tr><th>Fecha</th><th>Cuenta</th><th>Canal</th><th class="der">Salida de dinero</th></tr></thead><tbody>
+        {% for pago in pagos %}<tr><td>{{ pago.fecha|date:"d/m/Y" }}</td><td>{{ pago.cuenta.nombre }}</td><td>{{ pago.get_canal_display }}</td><td class="num der">S/ {{ pago.importe|floatformat:2 }}</td></tr>{% endfor %}
+      </tbody></table></div>{% else %}<p class="muted">No hay movimientos de pago vinculados a esta compra.</p>{% endif %}
+      {% if compra.moneda != 'PEN' %}<p class="preview-note">La salida de dinero puede diferir del importe contable por el tipo de cambio.</p>{% endif %}
+    </section>
+    {% endif %}
+
     {% include "reportes/_casillas_documento.html" %}
 
     {% if asiento %}
@@ -122,7 +138,7 @@
       {% if compra.estado == "CONFIRMADA" %}
       <a class="btn btn-ghost btn-block" href="{% url 'compras:corregir' compra.pk %}">Corregir datos</a>
       {% if compra.pagada or compra.monto_pagado > 0 %}
-      <p class="preview-note">Para cambiar importes, usa una nota de crédito del proveedor: la compra ya tiene pagos.</p>
+      <p class="preview-note">La compra ya tiene pagos y no se puede revertir aquí. Para corregir importes, revisa el comprobante correspondiente con tu contador.</p>
       {% else %}
       <details><summary>Revertir registro interno erróneo</summary>
         <p class="preview-note">Solo si esta compra se registró por error y no debe figurar en el ERP. No registra una devolución ni una nota de crédito del proveedor; revisa el RCE. Se comprobarán pagos, inventario y períodos.</p>

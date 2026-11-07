@@ -369,6 +369,9 @@ def pagar(
         raise CompraError("Este pago solo admite cuentas en soles; el pago desde otra moneda aún no está disponible.")
     if cuenta.cuenta_contable is None:
         raise CompraError("La cuenta de tesorería no tiene cuenta contable.")
+    canales = {opcion[0] for opcion in MovimientoTesoreria._meta.get_field("canal").choices}
+    if canal not in canales:
+        raise CompraError("Selecciona un canal de pago válido.")
     if fecha < compra.fecha:
         raise CompraError("El pago no puede ser anterior a la compra; los anticipos requieren otro tratamiento.")
     if MovimientoTesoreria.objects.filter(

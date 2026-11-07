@@ -48,9 +48,10 @@ from .forms import (
 from .gastos_pendientes import pagar_gasto, registrar_pendiente
 from .models import Compra, CompraLinea, CostoAdicional
 from .models_gasto import Gasto, PagoGasto
+from .pagos_compra import registrar_pago
 from .provisiones import registrar_provision
 from .reversion import revertir_registro
-from .servicios import CompraError, confirmar, pagar, registrar_gasto, validar_comprobante
+from .servicios import CompraError, confirmar, registrar_gasto, validar_comprobante
 
 
 @login_required
@@ -941,7 +942,8 @@ def pagar_compra(request, pk: int):
     cuentas = list(
         CuentaTesoreria.objects.filter(empresa=compra.empresa, activa=True, moneda="PEN", cuenta_contable__isnull=False)
     )
-    hoy = date.today()
+    hoy = timezone.localdate()
+    operacion = request.POST.get("operacion", "") if request.method == "POST" else str(uuid4())
 
     if request.method == "POST":
         cuenta = CuentaTesoreria.objects.filter(
@@ -952,22 +954,27 @@ def pagar_compra(request, pk: int):
             messages.error(request, "Elige la cuenta de donde sale el dinero.")
         else:
             try:
-                pagado, diferencia = pagar(
-                    compra,
+                resultado, creado = registrar_pago(
+                    compra=compra,
                     cuenta=cuenta,
                     fecha=date.fromisoformat(
-                        request.POST.get("fecha") or hoy.isoformat()
+                        request.POST.get("fecha", "")
                     ),
                     canal=request.POST.get("canal", "TRANSFERENCIA"),
                     tipo_cambio_pago=request.POST.get("tipo_cambio") or None,
-                    importe=request.POST.get("importe") or None,
+                    importe=request.POST.get("importe", ""), operacion=operacion, usuario=request.user,
                 )
-            except (CompraError, SinTipoCambio, ContabilidadError, ValueError) as exc:
+            except ValueError:
+                messages.error(request, "Indica una fecha válida para el pago.")
+            except (CompraError, SinTipoCambio, ContabilidadError) as exc:
                 messages.error(request, str(exc))
             else:
-                mensaje = f"Pago registrado por S/ {pagado}."
-                if diferencia:
-                    mensaje += f" Diferencia de cambio: S/ {diferencia}."
+                mensaje = "Este pago ya estaba registrado."
+                if creado:
+                    pagado, diferencia = resultado
+                    mensaje = f"Pago registrado por S/ {pagado}."
+                    if diferencia:
+                        mensaje += f" Diferencia de cambio: S/ {diferencia}."
                 messages.success(request, mensaje)
                 return redirect("compras:detalle", compra.pk)
 
@@ -978,6 +985,7 @@ def pagar_compra(request, pk: int):
             "compra": compra,
             "cuentas": cuentas,
             "hoy": hoy,
+            "operacion": operacion,
             "saldo": (compra.total + compra.revaluacion) - compra.monto_pagado,
         },
     )
@@ -995,6 +1003,10 @@ def detalle(request, pk: int):
         {
             "compra": compra,
             "asiento": asiento,
+            "pagos": MovimientoTesoreria.objects.filter(
+                empresa=compra.empresa, origen_tipo="COMPRA_PAGO", origen_id=compra.pk,
+            ).select_related("cuenta").order_by("fecha", "id"),
+            "saldo_compra": (compra.total + compra.revaluacion) - compra.monto_pagado,
             "casillas_621": casillas_documento(compra),
             "historial": HistorialDocumento.objects.filter(
                 empresa=compra.empresa, tipo="COMPRA", documento_id=compra.pk

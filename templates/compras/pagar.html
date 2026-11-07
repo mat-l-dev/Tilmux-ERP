@@ -21,37 +21,38 @@
 
       <form method="post" class="form">
         {% csrf_token %}
+        <input type="hidden" name="operacion" value="{{ operacion }}">
         <div class="grid-fields">
           <label class="field">
             <span>Fecha del pago</span>
-            <input type="date" name="fecha" value="{{ hoy|date:'Y-m-d' }}" required>
+            <input type="date" name="fecha" value="{% if request.method == 'POST' %}{{ request.POST.fecha }}{% else %}{{ hoy|date:'Y-m-d' }}{% endif %}" required>
           </label>
           <label class="field">
             <span>Cuenta</span>
             <select name="cuenta" required>
               {% for c in cuentas %}
-              <option value="{{ c.pk }}">{{ c.nombre }}</option>
+              <option value="{{ c.pk }}" {% if request.POST.cuenta == c.pk|stringformat:'s' %}selected{% endif %}>{{ c.nombre }}</option>
               {% endfor %}
             </select>
           </label>
           <label class="field">
             <span>Canal</span>
             <select name="canal">
-              <option value="TRANSFERENCIA">Transferencia</option>
-              <option value="YAPE">Yape</option>
-              <option value="PLIN">Plin</option>
-              <option value="EFECTIVO">Efectivo</option>
+              <option value="TRANSFERENCIA" {% if request.POST.canal == 'TRANSFERENCIA' %}selected{% endif %}>Transferencia</option>
+              <option value="YAPE" {% if request.POST.canal == 'YAPE' %}selected{% endif %}>Yape</option>
+              <option value="PLIN" {% if request.POST.canal == 'PLIN' %}selected{% endif %}>Plin</option>
+              <option value="EFECTIVO" {% if request.POST.canal == 'EFECTIVO' %}selected{% endif %}>Efectivo</option>
             </select>
           </label>
           {% if compra.moneda != "PEN" %}
           <label class="field">
             <span>Tipo de cambio del pago</span>
-            <input type="text" name="tipo_cambio" inputmode="decimal" placeholder="3.500">
+            <input type="text" name="tipo_cambio" inputmode="decimal" placeholder="3.500" value="{{ request.POST.tipo_cambio }}">
           </label>
           {% endif %}
           <label class="field">
             <span>Importe contable a cancelar (S/)</span>
-            <input type="text" name="importe" inputmode="decimal" placeholder="{{ saldo }}" value="{{ saldo }}">
+            <input type="text" name="importe" inputmode="decimal" placeholder="{{ saldo }}" value="{% if request.method == 'POST' %}{{ request.POST.importe }}{% else %}{{ saldo }}{% endif %}" required>
           </label>
         </div>
         <button class="btn btn-primary" type="submit">Registrar pago</button>
