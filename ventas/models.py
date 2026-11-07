@@ -163,6 +163,20 @@ class Venta(models.Model):
         return f"{self.serie}-{self.numero} · {self.total}"
 
 
+class CobroVenta(models.Model):
+    venta = models.ForeignKey(Venta, on_delete=models.PROTECT, related_name="cobros")
+    fecha = models.DateField()
+    importe = models.DecimalField(max_digits=18, decimal_places=2)
+    cuenta = models.ForeignKey("catalogo.CuentaTesoreria", on_delete=models.PROTECT)
+    canal = models.CharField(max_length=15)
+    creado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    creado = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["fecha", "pk"]
+        constraints = [models.CheckConstraint(condition=models.Q(importe__gt=0), name="cobro_venta_importe_positivo")]
+
+
 class VentaLinea(models.Model):
     venta = models.ForeignKey(Venta, on_delete=models.CASCADE, related_name="lineas")
     orden = models.PositiveSmallIntegerField(default=1)

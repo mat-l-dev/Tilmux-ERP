@@ -17,6 +17,7 @@ from django.views.decorators.http import require_POST
 from catalogo.models import CuentaTesoreria, Producto, Serie, Tercero
 from contabilidad.calculos import calcular_linea
 from contabilidad.models import Asiento
+from contabilidad.servicios import ContabilidadError
 from core.context import empresa_actual
 from core.contexto import usuario_actual
 from core.models import HistorialDocumento
@@ -24,7 +25,7 @@ from core.permisos import requiere_escritura
 from inventario.servicios import StockError
 from reportes.casillas import casillas_documento
 
-from .forms import CabeceraVentaForm
+from .forms import CabeceraVentaForm, CobroVentaForm
 from .models import NotaCredito, NotaCreditoLinea, NotaDebito, Venta, VentaLinea
 from .servicios import (
     MOTIVOS_CREDITO_IMPLEMENTADOS,
@@ -33,6 +34,7 @@ from .servicios import (
     emitir_nota_credito,
     emitir_nota_debito,
 )
+from .servicios_cobro import cobrar_venta, saldo_pendiente
 
 
 def _numero_siguiente(empresa, tipo_doc: str, serie: str) -> str:
@@ -425,6 +427,11 @@ def nota_debito(request, pk: int):
 @login_required
 def detalle(request, pk: int):
     venta = get_object_or_404(Venta, pk=pk, empresa=empresa_actual(request))
+    saldo_credito = (
+        saldo_pendiente(venta)
+        if venta.estado == Venta.Estado.CONFIRMADA and venta.condicion == Venta.Condicion.CREDITO
+        else None
+    )
     asiento = Asiento.objects.filter(
         origen_tipo="VENTA", origen_id=venta.pk, tipo_operacion="VENTA"
     ).first()
@@ -434,6 +441,8 @@ def detalle(request, pk: int):
         {
             "venta": venta,
             "asiento": asiento,
+            "saldo_credito": saldo_credito,
+            "saldo_favor": abs(saldo_credito) if saldo_credito is not None and saldo_credito < 0 else None,
             "casillas_621": casillas_documento(venta),
             "historial": HistorialDocumento.objects.filter(
                 empresa=venta.empresa, tipo="VENTA", documento_id=venta.pk
@@ -452,5 +461,29 @@ def confirmar_venta(request, pk: int):
     except (VentaError, StockError) as exc:
         messages.error(request, str(exc))
     else:
-        messages.success(request, "Venta confirmada: stock, asiento y cobro listos.")
+        if venta.condicion == Venta.Condicion.CREDITO:
+            messages.success(request, "Venta confirmada: stock y asiento registrados. El cobro queda pendiente.")
+        else:
+            messages.success(request, "Venta confirmada: stock, asiento y cobro registrados.")
     return redirect("ventas:detalle", venta.pk)
+
+
+@login_required
+@requiere_escritura
+def cobrar(request, pk: int):
+    venta = get_object_or_404(Venta, pk=pk, empresa=empresa_actual(request))
+    if venta.estado != Venta.Estado.CONFIRMADA or venta.condicion != Venta.Condicion.CREDITO:
+        messages.error(request, "Solo se pueden cobrar ventas al crédito confirmadas.")
+        return redirect("ventas:detalle", venta.pk)
+    formulario = CobroVentaForm(request.POST or None, empresa=venta.empresa, initial={"fecha": date.today()})
+    if request.method == "POST" and formulario.is_valid():
+        try:
+            cobrar_venta(venta=venta, usuario=request.user, **formulario.cleaned_data)
+        except (VentaError, ContabilidadError) as exc:
+            formulario.add_error(None, str(exc))
+        else:
+            messages.success(request, "Cobro registrado en tesorería y contabilidad.")
+            return redirect("ventas:detalle", venta.pk)
+    return render(request, "ventas/cobrar.html", {
+        "venta": venta, "formulario": formulario, "saldo": saldo_pendiente(venta)
+    })

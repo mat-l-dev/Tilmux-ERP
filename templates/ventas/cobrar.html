@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block titulo %}Registrar cobro{% endblock %}
+{% block titulo_pagina %}Cobro de {{ venta.serie }}-{{ venta.numero }}{% endblock %}
+{% block contenido %}
+<section class="card">
+  <p>Saldo documentado: S/ {{ saldo|floatformat:2 }}. Verifica los cobros históricos antes de registrar uno nuevo.</p>
+  <form method="post">{% csrf_token %}{{ formulario.as_p }}
+    <button class="btn btn-primary" type="submit">Registrar cobro</button>
+    <a class="btn btn-ghost" href="{% url 'ventas:detalle' venta.pk %}">Cancelar</a>
+  </form>
+</section>
+{% endblock %}

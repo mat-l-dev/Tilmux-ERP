@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 from django import forms
 
 from catalogo.models import CuentaTesoreria
@@ -54,3 +56,16 @@ class CabeceraVentaForm(forms.Form):
         if datos.get("condicion") == Venta.Condicion.CONTADO and not datos.get("cuenta"):
             self.add_error("cuenta", "Una venta al contado necesita una cuenta.")
         return datos
+
+
+class CobroVentaForm(forms.Form):
+    fecha = forms.DateField(widget=forms.DateInput(attrs={"type": "date"}))
+    importe = forms.DecimalField(max_digits=18, decimal_places=2, min_value=Decimal("0.01"))
+    cuenta = forms.ModelChoiceField(queryset=CuentaTesoreria.objects.none())
+    canal = forms.ChoiceField(choices=CuentaTesoreria.Canal.choices)
+
+    def __init__(self, *args, empresa, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["cuenta"].queryset = CuentaTesoreria.objects.filter(
+            empresa=empresa, activa=True, moneda="PEN", cuenta_contable__isnull=False
+        )

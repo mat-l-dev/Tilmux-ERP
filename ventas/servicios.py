@@ -190,6 +190,8 @@ def emitir_nota_credito(
         raise VentaError("Solo se acredita una venta confirmada.")
     if fecha < venta.fecha:
         raise VentaError("La fecha de la nota no puede ser anterior a la venta.")
+    if venta.cobros.filter(fecha__gt=fecha).exists():
+        raise VentaError("La nota no puede tener una fecha anterior a un cobro registrado.")
     if motivo_codigo not in MOTIVOS_CREDITO_IMPLEMENTADOS:
         raise VentaError("Este motivo de nota de crédito todavía no está implementado.")
     serie, numero = _validar_numeracion_nota(venta, NotaCredito, serie, numero)
@@ -331,6 +333,8 @@ def emitir_nota_debito(
         raise VentaError("Solo se debita una venta confirmada.")
     if fecha < venta.fecha:
         raise VentaError("La fecha de la nota no puede ser anterior a la venta.")
+    if venta.cobros.filter(fecha__gt=fecha).exists():
+        raise VentaError("La nota no puede tener una fecha anterior a un cobro registrado.")
     serie, numero = _validar_numeracion_nota(venta, NotaDebito, serie, numero)
 
     base, igv = _cent(base), _cent(igv)

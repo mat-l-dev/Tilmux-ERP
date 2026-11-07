@@ -208,7 +208,7 @@ Mientras la venta esté en borrador, el detalle tiene **Editar** para corregir
 descripciones, cantidades o precios. Una venta confirmada no se edita; revisa
 el procedimiento aplicable al comprobante antes de registrar una nota.
 
-Al confirmar: descuenta stock por PEPS, calcula el costo real y registra el cobro.
+Al confirmar se descuenta stock por PEPS y se calcula el costo real. En una venta al contado también se registra el cobro; en una venta al crédito se registra después desde el detalle de la venta. El saldo considera las notas y los cobros vinculados; los cobros históricos no vinculados requieren revisión.
 El correlativo de la serie (`Serie.ultimo_numero`) se actualiza de forma atómica
 en ese momento; una venta en borrador no consume número. Las facturas E001 ya
 aceptadas por SUNAT no se modifican.
