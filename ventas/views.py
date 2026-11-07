@@ -25,6 +25,7 @@ from core.permisos import requiere_escritura
 from inventario.servicios import StockError
 from reportes.casillas import casillas_documento
 
+from .cuentas_cobrar import cuentas_por_cobrar
 from .forms import CabeceraVentaForm, CobroVentaForm, CuotasVentaFormSet
 from .models import NotaCredito, NotaCreditoLinea, NotaDebito, Venta, VentaLinea
 from .servicios import (
@@ -165,6 +166,28 @@ def lista(request):
             "productos": Producto.objects.filter(activo=True),
         },
     )
+
+
+@login_required
+def cuentas_cobrar(request):
+    fecha_texto = request.GET.get("fecha", "") or timezone.localdate().isoformat()
+    error = None
+    try:
+        fecha = date.fromisoformat(fecha_texto)
+    except ValueError:
+        fecha = None
+        error = "Indica una fecha de corte válida."
+    estado = request.GET.get("estado", "pendientes")
+    if estado not in {"pendientes", "todos"}:
+        estado = "pendientes"
+    empresa = empresa_actual(request)
+    consulta = cuentas_por_cobrar(empresa=empresa, fecha=fecha) if fecha and empresa else Venta.objects.none()
+    if estado == "pendientes" and fecha and empresa:
+        consulta = consulta.filter(Q(saldo_documentado__gt=0) | Q(requiere_revision=True))
+    pagina = Paginator(consulta, 25).get_page(request.GET.get("page"))
+    return render(request, "ventas/cuentas_cobrar.html", {
+        "cuentas": pagina, "page_obj": pagina, "fecha": fecha_texto, "estado": estado, "error": error,
+    })
 
 
 @login_required

@@ -7,6 +7,7 @@ app_name = "ventas"
 urlpatterns = [
     path("", views.lista, name="lista"),
     path("nueva/", views.nueva, name="nueva"),
+    path("cuentas-por-cobrar/", views.cuentas_cobrar, name="cuentas_cobrar"),
     path("<int:pk>/", views.detalle, name="detalle"),
     path("<int:pk>/confirmar/", views.confirmar_venta, name="confirmar"),
     path("<int:pk>/cobrar/", views.cobrar, name="cobrar"),

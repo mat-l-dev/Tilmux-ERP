@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block titulo %}Cuentas por cobrar{% endblock %}
+{% block titulo_pagina %}Cuentas por cobrar{% endblock %}
+{% block contenido %}
+<form method="get" class="filtro">
+  <label class="field"><span>Fecha de corte</span><input type="date" name="fecha" value="{{ fecha }}" required></label>
+  <label class="field"><span>Mostrar</span><select name="estado"><option value="pendientes" {% if estado == 'pendientes' %}selected{% endif %}>Pendientes y por revisar</option><option value="todos" {% if estado == 'todos' %}selected{% endif %}>Todas las ventas al crédito</option></select></label>
+  <button class="btn btn-ghost" type="submit">Consultar</button>
+</form>
+{% if error %}<div class="message error">{{ error }}</div>{% endif %}
+<section class="card">
+  <header class="card-head"><h2>Ventas al crédito</h2><a class="btn btn-ghost" href="{% url 'ventas:lista' %}">Volver a ventas</a></header>
+  <p class="muted">Saldos calculados según las fechas registradas de venta, notas y cobros vinculados. Los movimientos anteriores sin vincular no se descuentan y requieren revisión. El primer vencimiento es el pactado originalmente; los cobros no se asignan automáticamente a cuotas.</p>
+  <div class="tabla-scroll"><table class="tabla-doc">
+    <thead><tr><th>Venta</th><th>Cliente</th><th>Primer vencimiento pactado</th><th class="der">Total</th><th class="der">Saldo documentado</th><th>Situación</th></tr></thead>
+    <tbody>{% for v in cuentas %}<tr>
+      <td><a href="{% url 'ventas:detalle' v.pk %}">{{ v.serie }}-{{ v.numero }}</a><br><span class="muted">{{ v.fecha|date:"d/m/Y" }}</span></td>
+      <td>{{ v.cliente_nombre|default:"Consumidor final" }}</td><td>{{ v.primer_vencimiento|date:"d/m/Y"|default:"Sin cuotas" }}</td>
+      <td class="num der">{{ v.moneda }} {{ v.total|floatformat:2 }}</td><td class="num der">{{ v.moneda }} {{ v.saldo_documentado|floatformat:2 }}</td>
+      <td>{% if v.requiere_revision %}Revisar cobro anterior{% elif v.saldo_documentado > 0 %}Pendiente{% elif v.saldo_documentado < 0 %}Saldo a favor{% else %}Sin saldo{% endif %}</td>
+    </tr>{% empty %}<tr><td colspan="6">No hay ventas para esta consulta.</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% if page_obj.has_other_pages %}<nav class="paginacion">{% if page_obj.has_previous %}<a href="{% querystring page=page_obj.previous_page_number %}">Anterior</a>{% endif %}<span>Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>{% if page_obj.has_next %}<a href="{% querystring page=page_obj.next_page_number %}">Siguiente</a>{% endif %}</nav>{% endif %}
+</section>
+{% endblock %}

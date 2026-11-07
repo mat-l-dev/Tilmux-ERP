@@ -33,7 +33,8 @@
 <section class="card">
   <header class="card-head">
     <h2>Comprobantes emitidos</h2>
-    <a class="btn btn-primary" href="{% url 'ventas:nueva' %}">Nueva venta</a>
+    <div><a class="btn btn-ghost" href="{% url 'ventas:cuentas_cobrar' %}">Cuentas por cobrar</a>
+    <a class="btn btn-primary" href="{% url 'ventas:nueva' %}">Nueva venta</a></div>
   </header>
 
   {% if ventas %}
