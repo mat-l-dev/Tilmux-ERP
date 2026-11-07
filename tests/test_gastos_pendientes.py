@@ -3,12 +3,13 @@ from decimal import Decimal
 from uuid import uuid4
 
 from django.contrib.auth import get_user_model
+from django.urls import reverse
 
 from compras.gastos_pendientes import pagar_gasto, registrar_pendiente
 from compras.models_gasto import Gasto, PagoGasto
 from compras.servicios import CompraError
 from contabilidad.models import Asiento, Cuenta
-from core.models import Periodo
+from core.models import Perfil, Periodo
 from tesoreria.models import MovimientoTesoreria
 from tests.test_invariantes import BaseContable
 
@@ -73,3 +74,26 @@ class GastosPendientesTests(BaseContable):
             self.pagar(gasto, "10")
         self.assertFalse(PagoGasto.objects.exists())
         self.assertFalse(MovimientoTesoreria.objects.filter(origen_tipo="PAGO_GASTO").exists())
+
+    def test_pantallas_muestran_saldo_y_ultimo_pago(self):
+        Perfil.objects.create(usuario=self.usuario, empresa=self.empresa)
+        self.client.force_login(self.usuario)
+        sesion = self.client.session
+        sesion["empresa_id"] = self.empresa.pk
+        sesion.save()
+        gasto = self.crear()
+        self.pagar(gasto, "50")
+        listado = self.client.get(reverse("compras:lista"), {"q": "12345"})
+        self.assertContains(listado, "Por pagar")
+        self.assertEqual(listado.context["compras"].object_list[0]["saldo"], Decimal("68"))
+        detalle = self.client.get(reverse("compras:detalle_gasto", args=[gasto.pk]))
+        self.assertContains(detalle, "Ver pagos registrados")
+        self.assertContains(detalle, "Registrar pago")
+        pantalla_pago = self.client.get(reverse("compras:pagar_gasto", args=[gasto.pk]))
+        self.assertContains(pantalla_pago, self.proveedor.nombre)
+        self.assertContains(pantalla_pago, "Saldo pendiente")
+        self.assertEqual(pantalla_pago.context["saldo"], Decimal("68"))
+        self.assertEqual(pantalla_pago.context["formulario"].initial["importe"], Decimal("68"))
+        self.pagar(gasto, "68")
+        respuesta = self.client.get(reverse("compras:pagar_gasto", args=[gasto.pk]))
+        self.assertRedirects(respuesta, reverse("compras:detalle_gasto", args=[gasto.pk]))

@@ -7,17 +7,17 @@
 <div class="doc">
   <div class="doc-main">
     <section class="card">
-      <header class="card-head"><h2>{% if gasto.provision %}Provisión{% else %}Comprobante{% endif %}</h2><span class="chip">{{ gasto.get_estado_display }}</span></header>
+      <header class="card-head"><h2>{% if gasto.provision %}Provisión{% else %}Comprobante{% endif %}</h2><span class="chip">{% if es_pendiente and gasto.estado == 'REGISTRADO' %}Por pagar{% else %}{{ gasto.get_estado_display }}{% endif %}</span></header>
       <dl class="datos">
         <div><dt>Fecha del documento</dt><dd>{{ gasto.fecha|date:"d/m/Y" }}</dd></div>
-        <div><dt>Período tributario</dt><dd>{% if gasto.fecha_anotacion %}{{ gasto.fecha_anotacion|date:"m/Y" }}{% else %}Estimado por emisión{% endif %}</dd></div>
+        <div><dt>Período tributario</dt><dd>{% if gasto.provision %}No aplica a la provisión{% elif gasto.fecha_anotacion %}{{ gasto.fecha_anotacion|date:"m/Y" }}{% else %}Estimado por emisión{% endif %}</dd></div>
         {% if gasto.fecha_devengado %}<div><dt>Fecha de devengo</dt><dd>{{ gasto.fecha_devengado|date:"d/m/Y" }}</dd></div>{% endif %}
         <div><dt>Proveedor</dt><dd>{{ gasto.proveedor.nombre }} · {{ gasto.proveedor.numero_doc|default:"Sin documento" }}</dd></div>
         <div><dt>Tipo</dt><dd>{{ gasto.get_tipo_doc_display }}</dd></div>
         <div><dt>Comprobante</dt><dd>{% if gasto.serie or gasto.numero %}{{ gasto.serie }}-{{ gasto.numero }}{% else %}Sin comprobante{% endif %}</dd></div>
         <div><dt>Concepto</dt><dd>{{ gasto.glosa|default:"—" }}</dd></div>
         <div><dt>Cuenta contable</dt><dd>{{ gasto.cuenta.codigo }} · {{ gasto.cuenta.nombre }}</dd></div>
-        <div><dt>Medio de pago</dt><dd>{% if gasto.medio %}{{ gasto.medio.nombre }}{% else %}No indicado{% endif %}</dd></div>
+        <div><dt>Medio de pago</dt><dd>{% if gasto.medio %}{{ gasto.medio.nombre }}{% elif pagos_gasto %}Ver pagos registrados{% elif es_pendiente %}Aún sin pagos{% else %}No indicado{% endif %}</dd></div>
       </dl>
       <dl class="totales totales-inline">
         <div><dt>Base</dt><dd class="num">{{ gasto.base|floatformat:2 }}</dd></div>

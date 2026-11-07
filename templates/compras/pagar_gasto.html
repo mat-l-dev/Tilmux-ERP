@@ -4,8 +4,9 @@
 {% block contenido %}
 <div class="doc"><div class="doc-main"><form method="post" class="card form">{% csrf_token %}
   <header class="card-head"><h2>Pago de {{ gasto.serie }}-{{ gasto.numero }}</h2></header>
+  <dl class="datos"><div><dt>Proveedor</dt><dd>{{ gasto.proveedor.nombre }}</dd></div><div><dt>Total del comprobante</dt><dd>S/ {{ gasto.total|floatformat:2 }}</dd></div><div><dt>Pagado anteriormente</dt><dd>S/ {{ pagado|floatformat:2 }}</dd></div><div><dt>Saldo pendiente</dt><dd><strong>S/ {{ saldo|floatformat:2 }}</strong></dd></div></dl>
   <p class="preview-note">Puedes registrar un pago parcial. Indica la fecha real y la cuenta desde la que salió el dinero.</p>
   {% if formulario.non_field_errors %}<div class="message error">{{ formulario.non_field_errors }}</div>{% endif %}
-  <div class="grid-fields">{% for campo in formulario %}{% if campo.is_hidden %}{{ campo }}{% else %}<label class="field"><span>{{ campo.label }}</span>{{ campo }}{% if campo.errors %}<span class="message error">{{ campo.errors|join:", " }}</span>{% endif %}</label>{% endif %}{% endfor %}</div>
+  <div class="grid-fields">{% for campo in formulario %}{% if campo.is_hidden %}{{ campo }}{% if campo.errors %}<div class="message error">No se pudo identificar la operación. Vuelve a abrir el formulario.</div>{% endif %}{% else %}<label class="field"><span>{{ campo.label }}</span>{{ campo }}{% if campo.errors %}<span class="message error">{{ campo.errors|join:", " }}</span>{% endif %}</label>{% endif %}{% endfor %}</div>
   <button class="btn btn-primary" type="submit">Registrar pago</button> <a class="btn btn-ghost" href="{% url 'compras:detalle_gasto' gasto.pk %}">Cancelar</a>
 </form></div></div>{% endblock %}

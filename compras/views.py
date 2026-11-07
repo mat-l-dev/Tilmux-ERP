@@ -11,7 +11,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db import IntegrityError, transaction
-from django.db.models import CharField, F, Q, Value
+from django.db.models import CharField, F, Q, Sum, Value
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -47,7 +47,7 @@ from .forms import (
 )
 from .gastos_pendientes import pagar_gasto, registrar_pendiente
 from .models import Compra, CompraLinea, CostoAdicional
-from .models_gasto import Gasto
+from .models_gasto import Gasto, PagoGasto
 from .provisiones import registrar_provision
 from .reversion import revertir_registro
 from .servicios import CompraError, confirmar, pagar, registrar_gasto, validar_comprobante
@@ -119,11 +119,23 @@ def lista(request):
     gastos_pagina = {
         g.pk: g for g in gastos.filter(pk__in=ids_gastos).select_related("proveedor")
     }
+    gastos_con_deuda = set(Asiento.objects.filter(
+        empresa=empresa, origen_tipo="GASTO_PENDIENTE", origen_id__in=ids_gastos,
+        estado=Asiento.Estado.CONFIRMADO,
+    ).values_list("origen_id", flat=True))
+    importes_pagados = {
+        item["gasto_id"]: item["total"] for item in PagoGasto.objects.filter(
+            gasto_id__in=gastos_con_deuda, gasto__empresa=empresa,
+        ).values("gasto_id").annotate(total=Sum("importe"))
+    }
     pagina.object_list = [
         {
             "clase": i["clase"],
             "fecha": i["fecha_listado"],
             "registro": (compras_pagina if i["clase"] == "compra" else gastos_pagina)[i["registro_id"]],
+            "tiene_deuda": i["clase"] == "gasto" and i["registro_id"] in gastos_con_deuda,
+            "saldo": (gastos_pagina[i["registro_id"]].total - importes_pagados.get(i["registro_id"], Decimal("0"))
+                      if i["clase"] == "gasto" and i["registro_id"] in gastos_con_deuda else None),
         }
         for i in indices_pagina
     ]
@@ -244,8 +256,18 @@ def nuevo_gasto_pendiente(request):
 def pagar_gasto_pendiente(request, pk):
     empresa = empresa_actual(request)
     gasto = get_object_or_404(Gasto, pk=pk, empresa=empresa)
+    if request.method == "GET" and (
+        gasto.estado != Gasto.Estado.REGISTRADO or not Asiento.objects.filter(
+            empresa=empresa, origen_tipo="GASTO_PENDIENTE", origen_id=gasto.pk,
+            estado=Asiento.Estado.CONFIRMADO,
+        ).exists()
+    ):
+        messages.error(request, "Este gasto no tiene un saldo habilitado para registrar pagos aquí.")
+        return redirect("compras:detalle_gasto", gasto.pk)
+    pagado = gasto.pagos.aggregate(total=Sum("importe"))["total"] or Decimal("0")
+    saldo = gasto.total - pagado
     formulario = PagoGastoForm(request.POST or None, empresa=empresa,
-                               initial={"fecha": date.today(), "operacion": uuid4()})
+                               initial={"fecha": timezone.localdate(), "operacion": uuid4(), "importe": saldo})
     if request.method == "POST" and formulario.is_valid():
         try:
             _, creado = pagar_gasto(empresa=empresa, gasto_id=gasto.pk, usuario=request.user,
@@ -255,7 +277,9 @@ def pagar_gasto_pendiente(request, pk):
         else:
             messages.success(request, "Pago registrado." if creado else "Este pago ya estaba registrado.")
             return redirect("compras:detalle_gasto", gasto.pk)
-    return render(request, "compras/pagar_gasto.html", {"formulario": formulario, "gasto": gasto})
+    return render(request, "compras/pagar_gasto.html", {
+        "formulario": formulario, "gasto": gasto, "pagado": pagado, "saldo": saldo,
+    })
 
 
 @login_required

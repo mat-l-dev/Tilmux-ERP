@@ -109,7 +109,14 @@ y otros gastos pagados en soles cuando la fecha del documento y la del pago
 coinciden. El registro crea el gasto, el asiento y la salida de tesorería en una
 misma operación. Si marcas su inclusión tributaria, el sistema considera todo
 el IGV como crédito o, si no tiene IGV, el valor como compra no gravada; revisa
-primero que corresponda. Para pagos en otra fecha aún no hay flujo manual.
+primero que corresponda.
+
+**Registrar gasto por pagar.** Si tienes la factura o boleta pero aún no la has
+pagado, registra el comprobante en soles con este botón. La fecha del gasto y la
+del comprobante deben coincidir. En su detalle verás el saldo y podrás registrar
+uno o varios pagos, cada uno con su fecha real y cuenta. Cuando el saldo llega a
+cero, el gasto figura como pagado. Este formulario no vincula provisiones previas:
+si el gasto ya se registró como provisión, no lo vuelvas a ingresar por aquí.
 
 Para proteger el costo PEPS, no se puede ingresar una entrada o salida con fecha
 anterior a una salida ya registrada del mismo producto. Si necesitas corregir

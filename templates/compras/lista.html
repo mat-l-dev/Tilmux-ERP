@@ -76,7 +76,7 @@
         <td>{{ c.proveedor.nombre }}</td>
         <td>{{ c.glosa|default:"—" }}</td>
         <td class="num der">{{ c.total|floatformat:2 }}</td>
-        <td><span class="chip {% if c.estado == 'CONFIRMADA' or c.estado == 'PAGADO' %}chip-ok{% elif c.estado == 'PENDIENTE' or c.provision %}chip-warn{% endif %}">{{ c.get_estado_display }}</span></td>
+        <td><span class="chip {% if c.estado == 'CONFIRMADA' or c.estado == 'PAGADO' %}chip-ok{% elif c.estado == 'PENDIENTE' or c.provision or fila.tiene_deuda and c.estado == 'REGISTRADO' %}chip-warn{% endif %}">{% if fila.tiene_deuda and c.estado == 'REGISTRADO' %}Por pagar{% else %}{{ c.get_estado_display }}{% endif %}</span>{% if fila.tiene_deuda and c.estado == 'REGISTRADO' %}<br><span class="muted">Saldo: S/ {{ fila.saldo|floatformat:2 }}</span>{% endif %}</td>
       </tr>
       {% endwith %}
       {% endfor %}
