@@ -6,6 +6,7 @@ from django.db import transaction
 from django.db.models import Max, Sum
 
 from catalogo.models import CuentaTesoreria
+from core.models import HistorialDocumento
 from tesoreria.models import MovimientoTesoreria
 from tesoreria.servicios import registrar
 
@@ -21,6 +22,29 @@ def saldo_pendiente(venta):
 
     cobrado = venta.cobros.aggregate(total=Sum("importe"))["total"] or Decimal("0")
     return venta.total + suma(venta.notas_debito) - suma(venta.notas_credito) - cobrado
+
+
+@transaction.atomic
+def registrar_cobro_formulario(*, venta, operacion, usuario, **datos):
+    """El mismo envío web no debe registrar dos cobros de una venta."""
+    from uuid import UUID
+
+    if not isinstance(operacion, UUID):
+        raise VentaError("La operación no es válida. Vuelve a abrir el formulario de cobro.")
+    venta = Venta.objects.select_for_update().get(pk=venta.pk, empresa=venta.empresa)
+    identificacion = f"Operación: {operacion}"
+    if HistorialDocumento.objects.filter(
+        empresa=venta.empresa, tipo=HistorialDocumento.Tipo.VENTA, documento_id=venta.pk,
+        accion="COBRO", detalle__endswith=identificacion,
+    ).exists():
+        return False
+    cobro = cobrar_venta(venta=venta, usuario=usuario, **datos)
+    HistorialDocumento.objects.create(
+        empresa=venta.empresa, tipo=HistorialDocumento.Tipo.VENTA, documento_id=venta.pk,
+        usuario=usuario, accion="COBRO",
+        detalle=f"Cobro de S/ {cobro.importe} el {cobro.fecha}. {identificacion}",
+    )
+    return True
 
 
 @transaction.atomic

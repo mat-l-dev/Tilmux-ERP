@@ -107,9 +107,15 @@ class CobrosVentaTest(BaseContable):
         self.client.force_login(user)
         detalle = self.client.get(reverse("ventas:detalle", args=[self.venta.pk]))
         self.assertContains(detalle, "Saldo pendiente")
+        url = reverse("ventas:cobrar", args=[self.venta.pk])
+        formulario = self.client.get(url)
+        datos = {"fecha": "2026-11-21", "importe": "50.00", "cuenta": self.bbva.pk,
+                 "canal": "TRANSFERENCIA", "operacion": str(formulario.context["formulario"].initial["operacion"])}
         response = self.client.post(
-            reverse("ventas:cobrar", args=[self.venta.pk]),
-            {"fecha": "2026-11-21", "importe": "50.00", "cuenta": self.bbva.pk, "canal": "TRANSFERENCIA"},
+            url, datos,
         )
         self.assertRedirects(response, reverse("ventas:detalle", args=[self.venta.pk]))
+        self.assertRedirects(self.client.post(url, datos), reverse("ventas:detalle", args=[self.venta.pk]))
         self.assertEqual(saldo_pendiente(self.venta), Decimal("68"))
+        self.assertEqual(self.venta.cobros.count(), 1)
+        self.assertEqual(MovimientoTesoreria.objects.filter(origen_tipo="COBRO_VENTA").count(), 1)

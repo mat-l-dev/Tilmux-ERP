@@ -59,6 +59,7 @@ class CabeceraVentaForm(forms.Form):
 
 
 class CobroVentaForm(forms.Form):
+    operacion = forms.UUIDField(widget=forms.HiddenInput)
     fecha = forms.DateField(widget=forms.DateInput(attrs={"type": "date"}))
     importe = forms.DecimalField(max_digits=18, decimal_places=2, min_value=Decimal("0.01"))
     cuenta = forms.ModelChoiceField(queryset=CuentaTesoreria.objects.none())

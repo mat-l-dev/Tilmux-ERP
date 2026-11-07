@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from itertools import zip_longest
+from uuid import uuid4
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -39,7 +40,7 @@ from .servicios import (
     emitir_nota_credito,
     emitir_nota_debito,
 )
-from .servicios_cobro import cobrar_venta, saldo_pendiente
+from .servicios_cobro import registrar_cobro_formulario, saldo_pendiente
 from .servicios_cuotas import guardar_cuotas
 
 
@@ -512,14 +513,16 @@ def cobrar(request, pk: int):
     if venta.estado != Venta.Estado.CONFIRMADA or venta.condicion != Venta.Condicion.CREDITO:
         messages.error(request, "Solo se pueden cobrar ventas al crédito confirmadas.")
         return redirect("ventas:detalle", venta.pk)
-    formulario = CobroVentaForm(request.POST or None, empresa=venta.empresa, initial={"fecha": date.today()})
+    formulario = CobroVentaForm(request.POST or None, empresa=venta.empresa,
+                                initial={"fecha": timezone.localdate(), "operacion": uuid4()})
     if request.method == "POST" and formulario.is_valid():
         try:
-            cobrar_venta(venta=venta, usuario=request.user, **formulario.cleaned_data)
+            creado = registrar_cobro_formulario(venta=venta, usuario=request.user, **formulario.cleaned_data)
         except (VentaError, ContabilidadError) as exc:
             formulario.add_error(None, str(exc))
         else:
-            messages.success(request, "Cobro registrado en tesorería y contabilidad.")
+            messages.success(request, "Cobro registrado en tesorería y contabilidad." if creado
+                             else "Este cobro ya estaba registrado.")
             return redirect("ventas:detalle", venta.pk)
     return render(request, "ventas/cobrar.html", {
         "venta": venta, "formulario": formulario, "saldo": saldo_pendiente(venta)
