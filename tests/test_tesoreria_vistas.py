@@ -68,6 +68,23 @@ class TesoreriaVistaTest(TestCase):
         respuesta = self.client.get(reverse("tesoreria:movimientos"), {"cuenta": "abc"})
         self.assertContains(respuesta, "No hay movimientos para esta selección")
 
+    def test_filtros_por_fecha_concepto_y_periodo_invalido(self):
+        MovimientoTesoreria.objects.create(
+            empresa=self.empresa, cuenta=self.cuenta, fecha=date(2026, 11, 3),
+            tipo="EGRESO", importe=5, concepto="Comisión bancaria",
+        )
+        url = reverse("tesoreria:movimientos")
+        respuesta = self.client.get(url, {"desde": "2026-11-03", "hasta": "2026-11-04", "q": "comisión"})
+        self.assertContains(respuesta, "Comisión bancaria")
+        self.assertNotContains(respuesta, "Pago propio")
+        self.assertContains(respuesta, "antes de aplicar los filtros")
+        for filtros in ({"desde": "2026-13-01"}, {"desde": "2026-11-04", "hasta": "2026-11-03"},
+                        {"conciliacion": "invalido"}):
+            with self.subTest(filtros=filtros):
+                respuesta = self.client.get(url, filtros)
+                self.assertTrue(respuesta.context["errores_filtro"])
+                self.assertNotContains(respuesta, "Comisión bancaria")
+
     def test_paginas_no_alteran_totales(self):
         MovimientoTesoreria.objects.bulk_create([
             MovimientoTesoreria(
@@ -80,6 +97,9 @@ class TesoreriaVistaTest(TestCase):
         self.assertEqual(respuesta.context["pagina"].number, 2)
         filas = {fila["cuenta"].pk: fila for fila in respuesta.context["filas"]}
         self.assertEqual(filas[self.cuenta.pk]["neto"], Decimal("110"))
+        filtrada = self.client.get(reverse("tesoreria:movimientos"), {"q": "Registro", "desde": "2026-11-02"})
+        self.assertEqual(filtrada.context["pagina"].paginator.count, 35)
+        self.assertContains(filtrada, "q=Registro&amp;desde=2026-11-02&amp;pagina=2")
 
     def test_documentos_y_estado_de_conciliacion_son_de_la_empresa(self):
         proveedor = Tercero.objects.create(nombre="Proveedor")
@@ -114,6 +134,9 @@ class TesoreriaVistaTest(TestCase):
         self.assertNotContains(respuesta, reverse("compras:detalle", args=[ajena.pk]))
         self.assertContains(respuesta, "Revisar marca")
         self.assertContains(respuesta, "Conciliado")
+        filtrada = self.client.get(reverse("tesoreria:movimientos"), {"conciliacion": "revisar"})
+        self.assertContains(filtrada, "Cobro propio")
+        self.assertNotContains(filtrada, "Pago propio")
 
     def test_comparacion_muestra_candidatos_sin_conciliar_ni_crear_pagos(self):
         primero = MovimientoTesoreria.objects.get(cuenta=self.cuenta, concepto="Pago propio")

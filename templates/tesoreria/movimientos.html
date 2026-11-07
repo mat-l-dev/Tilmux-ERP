@@ -5,10 +5,10 @@
 
 {% block contenido %}
 <section class="card">
-  <header class="card-head"><h2>Movimientos por cuenta</h2><a class="btn btn-ghost" href="{% url 'tesoreria:comparar_banco' %}">Comparar con el banco</a><a class="btn btn-ghost" href="{% url 'tesoreria:historial_conciliaciones' %}">Historial</a></header>
-  <p class="preview-note">Los totales son la suma de movimientos registrados en el ERP. No incluyen necesariamente el saldo inicial y no representan un saldo bancario conciliado. Verifica la moneda de los movimientos antiguos.</p>
+  <header class="card-head tesoreria-cabecera"><div><h2>Movimientos por cuenta</h2><p class="muted tesoreria-subtitulo">Resumen acumulado por cuenta</p></div><div class="acciones-head tesoreria-acciones"><a class="btn btn-primary" href="{% url 'tesoreria:comparar_banco' %}">Comparar con el banco</a><a class="btn btn-ghost" href="{% url 'tesoreria:historial_conciliaciones' %}">Historial de conciliaciones</a></div></header>
+  <p class="preview-note">Los totales son la suma de movimientos registrados en el ERP, antes de aplicar los filtros del historial. No incluyen necesariamente el saldo inicial y no representan un saldo bancario conciliado. Verifica la moneda de los movimientos antiguos.</p>
   {% if filas %}
-  <table class="tabla-doc">
+  <div class="tabla-scroll" tabindex="0" role="region" aria-label="Resumen de movimientos por cuenta"><table class="tabla-doc">
     <thead><tr><th>Cuenta</th><th>Moneda configurada</th><th class="der">Ingresos</th><th class="der">Egresos</th><th class="der">Neto registrado</th></tr></thead>
     <tbody>
       {% for fila in filas %}
@@ -21,7 +21,7 @@
       </tr>
       {% endfor %}
     </tbody>
-  </table>
+  </table></div>
   {% else %}<p class="muted">No hay cuentas registradas para esta empresa.</p>{% endif %}
 </section>
 
@@ -34,10 +34,22 @@
         {% for fila in filas %}<option value="{{ fila.cuenta.pk }}" {% if cuenta_id == fila.cuenta.pk|stringformat:'s' %}selected{% endif %}>{{ fila.cuenta.nombre }}{% if not fila.cuenta.activa %} (inactiva){% endif %}</option>{% endfor %}
       </select>
     </label>
+    <label class="field"><span>Desde</span><input type="date" name="desde" value="{{ request.GET.desde }}"></label>
+    <label class="field"><span>Hasta</span><input type="date" name="hasta" value="{{ request.GET.hasta }}"></label>
+    <label class="field"><span>Conciliación</span><select name="conciliacion">
+      <option value="">Todas</option>
+      <option value="pendiente" {% if request.GET.conciliacion == 'pendiente' %}selected{% endif %}>Sin conciliar</option>
+      <option value="conciliado" {% if request.GET.conciliacion == 'conciliado' %}selected{% endif %}>Conciliados</option>
+      <option value="revisar" {% if request.GET.conciliacion == 'revisar' %}selected{% endif %}>Revisar marca</option>
+    </select></label>
+    <label class="field"><span>Buscar</span><input type="search" name="q" maxlength="200" value="{{ request.GET.q }}" placeholder="Concepto o cuenta"></label>
     <button class="btn btn-ghost" type="submit">Filtrar</button>
+    <a class="btn btn-ghost" href="{% url 'tesoreria:movimientos' %}">Limpiar filtros</a>
   </form>
+  {% if errores_filtro %}<div class="message error">{% for error in errores_filtro %}<div>{{ error }}</div>{% endfor %}</div>{% endif %}
+  <p class="muted">{{ pagina.paginator.count }} movimiento{{ pagina.paginator.count|pluralize }} en esta consulta.</p>
   {% if pagina.object_list %}
-  <table class="tabla-doc">
+  <div class="tabla-scroll" tabindex="0" role="region" aria-label="Historial de movimientos"><table class="tabla-doc">
     <thead><tr><th>Fecha</th><th>Cuenta</th><th>Tipo</th><th>Concepto</th><th>Documento</th><th>Conciliación</th><th>Canal</th><th class="der">Importe registrado</th></tr></thead>
     <tbody>
       {% for movimiento in pagina %}
@@ -47,18 +59,18 @@
         <td>{{ movimiento.get_tipo_display }}</td>
         <td>{{ movimiento.concepto }}</td>
         <td>{% if movimiento.documento_url %}<a href="{{ movimiento.documento_url }}">Ver {{ movimiento.documento_etiqueta|lower }}</a>{% else %}<span class="muted">Sin enlace disponible</span>{% endif %}</td>
-        <td>{% if movimiento.conciliacion_activa and movimiento.conciliado %}Conciliado{% elif movimiento.conciliacion_activa or movimiento.conciliado %}Revisar marca{% else %}Sin conciliar{% endif %}</td>
+        <td>{% if movimiento.conciliacion_activa and movimiento.conciliado %}<span class="chip chip-ok">Conciliado</span>{% elif movimiento.conciliacion_activa or movimiento.conciliado %}<span class="chip chip-warn">Revisar marca</span>{% else %}<span class="chip">Sin conciliar</span>{% endif %}</td>
         <td>{{ movimiento.get_canal_display }}</td>
         <td class="num der">{{ movimiento.importe|floatformat:2 }}</td>
       </tr>
       {% endfor %}
     </tbody>
-  </table>
+  </table></div>
   {% if pagina.has_other_pages %}
   <nav class="filtro" aria-label="Páginas de movimientos">
-    {% if pagina.has_previous %}<a class="btn btn-ghost" href="?cuenta={{ cuenta_id|urlencode }}&amp;pagina={{ pagina.previous_page_number }}">Anterior</a>{% endif %}
+    {% if pagina.has_previous %}<a class="btn btn-ghost" href="{% querystring pagina=pagina.previous_page_number %}">Anterior</a>{% endif %}
     <span>Página {{ pagina.number }} de {{ pagina.paginator.num_pages }}</span>
-    {% if pagina.has_next %}<a class="btn btn-ghost" href="?cuenta={{ cuenta_id|urlencode }}&amp;pagina={{ pagina.next_page_number }}">Siguiente</a>{% endif %}
+    {% if pagina.has_next %}<a class="btn btn-ghost" href="{% querystring pagina=pagina.next_page_number %}">Siguiente</a>{% endif %}
   </nav>
   {% endif %}
   {% else %}<p class="muted">No hay movimientos para esta selección.</p>{% endif %}

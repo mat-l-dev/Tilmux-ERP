@@ -15,6 +15,7 @@ from core.models import Perfil
 from core.permisos import requiere_escritura
 
 from .conciliacion import ConciliacionError, buscar_candidatos, confirmar, revertir
+from .filtros import filtrar_movimientos
 from .forms import BuscarOperacionBancariaForm, ConfirmarConciliacionForm, RevertirConciliacionForm
 from .models import ConciliacionBancaria, MovimientoTesoreria
 from .origenes import enlazar_documentos
@@ -50,11 +51,12 @@ def movimientos(request):
             movimientos = movimientos.filter(cuenta_id=int(cuenta_id))
         else:
             movimientos = movimientos.none()
+    movimientos, errores_filtro = filtrar_movimientos(movimientos, request.GET)
     pagina = Paginator(movimientos, 30).get_page(request.GET.get("pagina"))
     pagina.object_list = list(pagina.object_list)
     enlazar_documentos(empresa=empresa, movimientos=pagina.object_list)
     return render(request, "tesoreria/movimientos.html", {
-        "filas": filas, "pagina": pagina, "cuenta_id": cuenta_id,
+        "filas": filas, "pagina": pagina, "cuenta_id": cuenta_id, "errores_filtro": errores_filtro,
     })
 
 

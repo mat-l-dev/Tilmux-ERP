@@ -25,7 +25,7 @@
     <header class="card-head"><h2>Posibles coincidencias</h2><span class="chip">{{ cantidad }} encontrada{{ cantidad|pluralize }}</span></header>
     <p class="preview-note">Que coincidan el importe y la fecha no demuestra que sea la misma operación. Para confirmar, revisa el extracto y usa su referencia única. Solo se permite vincular una operación del banco con un movimiento del ERP; no se crean pagos.</p>
     {% if candidatos %}
-    <table class="tabla-doc">
+    <div class="tabla-scroll" tabindex="0" role="region" aria-label="Posibles coincidencias bancarias"><table class="tabla-doc">
       <thead><tr><th>Fecha ERP</th><th>Tipo</th><th>Concepto</th><th>Documento</th><th class="der">Importe</th>{% if puede_escribir %}<th>Confirmar</th>{% endif %}</tr></thead>
       <tbody>{% for m in candidatos %}
       <tr><td>{{ m.fecha|date:"d/m/Y" }}</td><td>{{ m.get_tipo_display }}</td><td>{{ m.concepto }}{% if m.conciliacion_activa and m.conciliado %} <span class="chip">Conciliado</span>{% elif m.conciliado or m.conciliacion_activa %} <span class="chip">Revisar marca</span>{% endif %}</td><td>{% if m.documento_url %}<a href="{{ m.documento_url }}">Ver {{ m.documento_etiqueta|lower }}</a>{% else %}Sin enlace disponible{% endif %}</td><td class="num der">{{ m.importe|floatformat:2 }}</td>
@@ -43,7 +43,7 @@
         </form>
       {% endif %}</td>{% endif %}</tr>
       {% endfor %}</tbody>
-    </table>
+    </table></div>
     {% if cantidad > 100 %}<p class="preview-note">Se muestran las primeras 100 coincidencias; revisa la cuenta y los datos de búsqueda.</p>{% endif %}
     {% else %}<p class="muted">No se encontraron movimientos con esos criterios. Esto no demuestra que el cargo o abono no exista.</p>{% endif %}
   </section>

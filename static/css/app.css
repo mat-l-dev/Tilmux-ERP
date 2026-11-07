@@ -1161,6 +1161,10 @@ select {
   min-width: 760px;
 }
 
+.tesoreria-cabecera { flex-wrap: wrap; }
+.tesoreria-acciones { flex-wrap: wrap; }
+.tesoreria-subtitulo { margin: 5px 0 0; }
+
 .tabla-doc .accion-periodo {
   width: 190px;
   min-width: 190px;
