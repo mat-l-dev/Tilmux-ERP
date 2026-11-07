@@ -13,6 +13,7 @@ from django.db.models import Q, Sum
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from catalogo.models import CuentaTesoreria, Producto
@@ -44,7 +45,7 @@ from ventas.models import NotaCredito, NotaDebito, Venta
 
 from .casillas import calcular
 from .sire import ArchivoInvalido, leer_filas, sumar, validar_contexto
-from .utils import rango
+from .utils import FiltroReporteError, filtros_seguros, rango
 
 CERO = Decimal("0")
 
@@ -76,6 +77,7 @@ def _meses_del_rango(desde: date, hasta: date):
 
 
 @login_required
+@filtros_seguros
 def balance(request):
     empresa = empresa_actual(request)
     desde, hasta = rango(request)
@@ -117,6 +119,7 @@ def balance(request):
 
 
 @login_required
+@filtros_seguros
 def mayor(request):
     empresa = empresa_actual(request)
     desde, hasta = rango(request)
@@ -155,6 +158,7 @@ def mayor(request):
 
 
 @login_required
+@filtros_seguros
 def registro_ventas(request):
     empresa = empresa_actual(request)
     desde, hasta = rango(request)
@@ -231,6 +235,7 @@ def registro_ventas(request):
 
 
 @login_required
+@filtros_seguros
 def registro_compras(request):
     empresa = empresa_actual(request)
     desde, hasta = rango(request)
@@ -318,9 +323,17 @@ def registro_compras(request):
 
 
 @login_required
+@filtros_seguros
 def impuestos(request):
     empresa = empresa_actual(request)
-    desde, hasta = rango(request)
+    if not any(request.GET.get(k) for k in ("periodo", "desde", "hasta")):
+        hoy = timezone.localdate()
+        desde = date(hoy.year, hoy.month, 1)
+        hasta = date(hoy.year, hoy.month, calendar.monthrange(hoy.year, hoy.month)[1])
+    else:
+        desde, hasta = rango(request)
+    if not _es_mes(desde, hasta) or desde.year < 2:
+        raise FiltroReporteError("El reporte de impuestos requiere un mes completo válido.")
     totales = {
         "ventas_base": Decimal("0"),
         "ventas_igv": Decimal("0"),

@@ -2,12 +2,16 @@
   <label class="field" style="min-width:190px">
     <span>Mes</span>
     <select name="periodo" data-autosubmit>
-      <option value="">Todo el año</option>
+      <option value="">Elegir mes o período predeterminado</option>
       {% for p in periodos_disponibles %}
       <option value="{{ p.valor }}" {% if p.valor == periodo_seleccionado %}selected{% endif %}>{{ p.etiqueta }}</option>
       {% endfor %}
     </select>
   </label>
+  {% if codigo %}<input type="hidden" name="cuenta" value="{{ codigo }}">{% endif %}
+  <button class="btn btn-ghost" type="submit">Consultar mes</button>
+</form>
+<form method="get" class="filtro">
   <label class="field">
     <span>Desde</span>
     <input type="date" name="desde" value="{{ desde|date:'Y-m-d' }}">
@@ -22,5 +26,5 @@
     <input type="text" name="cuenta" value="{{ codigo }}" maxlength="6">
   </label>
   {% endif %}
-  <button class="btn btn-ghost" type="submit">Aplicar</button>
+  <button class="btn btn-ghost" type="submit">Consultar fechas</button>
 </form>

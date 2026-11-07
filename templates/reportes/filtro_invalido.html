@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block titulo %}Revisar fechas{% endblock %}
+{% block titulo_pagina %}Revisar fechas{% endblock %}
+{% block contenido %}
+<section class="card"><div class="message error">{{ error }}</div>
+<p>Corrige los filtros y vuelve a consultar el reporte.</p>
+<a class="btn btn-ghost" href="{% url 'reportes:balance' %}">Ir a reportes</a></section>
+{% endblock %}

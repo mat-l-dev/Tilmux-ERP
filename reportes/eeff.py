@@ -18,6 +18,8 @@ from django.shortcuts import render
 from contabilidad.models import AsientoLinea
 from core.context import empresa_actual
 
+from .utils import FiltroReporteError, filtros_seguros, rango
+
 CERO = Decimal("0")
 
 ACTIVO_CORRIENTE = (1, 2)
@@ -287,16 +289,12 @@ def construir(empresa, desde: date, hasta: date) -> dict:
 
 
 @login_required
+@filtros_seguros
 def estados(request):
     empresa = empresa_actual(request)
-    hoy = date.today()
-    desde = date(hoy.year, 1, 1)
-    hasta = hoy
-
-    if request.GET.get("hasta"):
-        hasta = date.fromisoformat(request.GET["hasta"])
-    if request.GET.get("desde"):
-        desde = date.fromisoformat(request.GET["desde"])
+    desde, hasta = rango(request)
+    if desde.year < 2:
+        raise FiltroReporteError("El rango debe permitir calcular el período comparativo del año anterior.")
 
     contexto = construir(empresa, desde, hasta)
 

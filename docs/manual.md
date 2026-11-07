@@ -255,6 +255,9 @@ panel, **IGV por pagar** muestra el saldo real de la cuenta 40111. En
 compararse con el registro y la declaración: el 140 es el IGV del mes, el 145
 el saldo a favor anterior y el 184 el resultado (140 - 145). Si el libro y el
 621 no coinciden, revisa si quedó una declaración anterior sin pagar.
+El reporte de impuestos se consulta por un mes completo y, por defecto, muestra
+el mes actual. Los demás reportes permiten elegir un mes o un rango de fechas;
+las exportaciones usan el mismo período que se muestra en pantalla.
 
 La tarjeta **Renta RER por pagar** muestra el saldo de la 40171, es decir, la
 renta de meses anteriores que aún no se paga.

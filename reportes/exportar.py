@@ -25,7 +25,7 @@ from ventas.models import NotaCredito, NotaDebito, Venta
 
 from .eeff import construir
 from .pdf_eeff import generar as generar_pdf
-from .utils import rango
+from .utils import filtros_seguros, rango
 
 CAMPOS_VENTAS = [
     "periodo",
@@ -82,6 +82,7 @@ def _importe(valor) -> str:
 
 
 @login_required
+@filtros_seguros
 def ventas(request):
     empresa = empresa_actual(request)
     desde, hasta = rango(request)
@@ -162,6 +163,7 @@ def ventas(request):
 
 
 @login_required
+@filtros_seguros
 def compras(request):
     empresa = empresa_actual(request)
     desde, hasta = rango(request)
@@ -248,6 +250,7 @@ def _hoja(libro, titulo, filas, subtotales=(), totales=()):
 
 
 @login_required
+@filtros_seguros
 def eeff_excel(request):
     empresa = empresa_actual(request)
     desde, hasta = rango(request)
@@ -305,6 +308,7 @@ def eeff_excel(request):
 
 
 @login_required
+@filtros_seguros
 def eeff_pdf(request):
     empresa = empresa_actual(request)
     desde, hasta = rango(request)
