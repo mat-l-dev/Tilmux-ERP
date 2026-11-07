@@ -180,6 +180,8 @@ class CuotaVenta(models.Model):
 
 class CobroVenta(models.Model):
     venta = models.ForeignKey(Venta, on_delete=models.PROTECT, related_name="cobros")
+    cuota = models.ForeignKey(CuotaVenta, on_delete=models.PROTECT, null=True, blank=True,
+                              related_name="cobros_asignados")
     fecha = models.DateField()
     importe = models.DecimalField(max_digits=18, decimal_places=2)
     cuenta = models.ForeignKey("catalogo.CuentaTesoreria", on_delete=models.PROTECT)

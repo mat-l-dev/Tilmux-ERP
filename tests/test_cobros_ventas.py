@@ -62,6 +62,33 @@ class CobrosVentaTest(BaseContable):
         with self.assertRaises(VentaError):
             self.cobrar("0.01")
 
+    def test_asigna_cobros_a_cuotas_sin_superar_lo_pactado(self):
+        cuota = self.venta.cuotas.get(numero=1)
+        cuota.importe = Decimal("50")
+        cuota.save(update_fields=["importe"])
+        segunda = CuotaVenta.objects.create(
+            venta=self.venta, numero=2, vencimiento=date(2027, 1, 20), importe=68,
+        )
+        primero = self.cobrar("40", cuota=cuota)
+        self.assertEqual(primero.cuota_id, cuota.pk)
+        with self.assertRaisesMessage(VentaError, "supera el importe disponible"):
+            self.cobrar("11", cuota=cuota)
+        self.cobrar("10", cuota=cuota)
+        self.cobrar("68", cuota=segunda)
+        self.assertEqual(saldo_pendiente(self.venta), Decimal("0"))
+        self.assertEqual(cuota.cobros_asignados.count(), 2)
+        self.assertEqual(segunda.cobros_asignados.count(), 1)
+
+    def test_no_asigna_cuota_ajena_ni_con_cobros_anteriores_sin_asignar(self):
+        otra_venta = Venta.objects.create(empresa=self.empresa, fecha=self.venta.fecha, serie="F002", numero="2")
+        otra_cuota = CuotaVenta.objects.create(venta=otra_venta, numero=1, vencimiento=date(2026, 12, 20), importe=118)
+        with self.assertRaisesMessage(VentaError, "cuota no pertenece"):
+            self.cobrar("10", cuota=otra_cuota)
+        self.cobrar("10")
+        with self.assertRaisesMessage(VentaError, "cobros sin asignar"):
+            self.cobrar("10", cuota=self.venta.cuotas.get())
+        self.assertEqual(self.venta.cobros.count(), 1)
+
     def test_rechaza_cobro_retroactivo_excesivo_o_cuenta_inactiva(self):
         for importe, opciones in [("119", {}), ("1", {"fecha": date(2026, 11, 19)})]:
             with self.assertRaises(VentaError):
@@ -98,7 +125,7 @@ class CobrosVentaTest(BaseContable):
     def test_periodo_cerrado_no_deja_cobro_ni_movimiento(self):
         Periodo.objects.filter(empresa=self.empresa, anio=2026, mes=11).update(estado=Periodo.Estado.CERRADO)
         with self.assertRaises(ContabilidadError):
-            self.cobrar("10")
+            self.cobrar("10", cuota=self.venta.cuotas.get())
         self.assertFalse(self.venta.cobros.exists())
         self.assertFalse(MovimientoTesoreria.objects.filter(origen_tipo="COBRO_VENTA").exists())
 
@@ -110,7 +137,8 @@ class CobrosVentaTest(BaseContable):
         url = reverse("ventas:cobrar", args=[self.venta.pk])
         formulario = self.client.get(url)
         datos = {"fecha": "2026-11-21", "importe": "50.00", "cuenta": self.bbva.pk,
-                 "canal": "TRANSFERENCIA", "operacion": str(formulario.context["formulario"].initial["operacion"])}
+                 "canal": "TRANSFERENCIA", "cuota": self.venta.cuotas.get().pk,
+                 "operacion": str(formulario.context["formulario"].initial["operacion"])}
         response = self.client.post(
             url, datos,
         )
@@ -118,4 +146,6 @@ class CobrosVentaTest(BaseContable):
         self.assertRedirects(self.client.post(url, datos), reverse("ventas:detalle", args=[self.venta.pk]))
         self.assertEqual(saldo_pendiente(self.venta), Decimal("68"))
         self.assertEqual(self.venta.cobros.count(), 1)
+        self.assertEqual(self.venta.cobros.get().cuota_id, self.venta.cuotas.get().pk)
         self.assertEqual(MovimientoTesoreria.objects.filter(origen_tipo="COBRO_VENTA").count(), 1)
+        self.assertContains(self.client.get(reverse("ventas:detalle", args=[self.venta.pk])), "Cobros asignados")

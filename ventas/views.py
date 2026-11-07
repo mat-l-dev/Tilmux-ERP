@@ -11,7 +11,8 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Q, Sum
+from django.db.models import DecimalField, Q, Sum, Value
+from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -478,6 +479,11 @@ def detalle(request, pk: int):
         "ventas/detalle.html",
         {
             "venta": venta,
+            "cuotas_detalle": venta.cuotas.annotate(
+                asignado=Coalesce(Sum("cobros_asignados__importe"), Value(Decimal("0")),
+                                  output_field=DecimalField(max_digits=18, decimal_places=2)),
+            ),
+            "cobros_detalle": venta.cobros.select_related("cuenta", "cuota"),
             "asiento": asiento,
             "saldo_credito": saldo_credito,
             "saldo_favor": abs(saldo_credito) if saldo_credito is not None and saldo_credito < 0 else None,
@@ -513,7 +519,7 @@ def cobrar(request, pk: int):
     if venta.estado != Venta.Estado.CONFIRMADA or venta.condicion != Venta.Condicion.CREDITO:
         messages.error(request, "Solo se pueden cobrar ventas al crédito confirmadas.")
         return redirect("ventas:detalle", venta.pk)
-    formulario = CobroVentaForm(request.POST or None, empresa=venta.empresa,
+    formulario = CobroVentaForm(request.POST or None, empresa=venta.empresa, venta=venta,
                                 initial={"fecha": timezone.localdate(), "operacion": uuid4()})
     if request.method == "POST" and formulario.is_valid():
         try:

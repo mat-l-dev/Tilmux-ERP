@@ -5,10 +5,12 @@ from __future__ import annotations
 from decimal import Decimal
 
 from django import forms
+from django.db.models import DecimalField, Sum, Value
+from django.db.models.functions import Coalesce
 
 from catalogo.models import CuentaTesoreria
 
-from .models import Venta
+from .models import CuotaVenta, Venta
 
 CANALES = [
     ("TRANSFERENCIA", "Transferencia"),
@@ -58,17 +60,31 @@ class CabeceraVentaForm(forms.Form):
         return datos
 
 
+class CuotaCobroChoiceField(forms.ModelChoiceField):
+    def label_from_instance(self, obj):
+        return (f"Cuota {obj.numero} · vence {obj.vencimiento:%d/%m/%Y} · "
+                f"asignado S/ {obj.asignado:.2f} de {obj.importe:.2f}")
+
+
 class CobroVentaForm(forms.Form):
     operacion = forms.UUIDField(widget=forms.HiddenInput)
     fecha = forms.DateField(widget=forms.DateInput(attrs={"type": "date"}))
     importe = forms.DecimalField(max_digits=18, decimal_places=2, min_value=Decimal("0.01"))
     cuenta = forms.ModelChoiceField(queryset=CuentaTesoreria.objects.none())
     canal = forms.ChoiceField(choices=CuentaTesoreria.Canal.choices)
+    cuota = CuotaCobroChoiceField(
+        queryset=CuotaVenta.objects.none(), required=False, label="Cuota a la que corresponde (opcional)",
+        empty_label="Sin asignar a una cuota",
+    )
 
-    def __init__(self, *args, empresa, **kwargs):
+    def __init__(self, *args, empresa, venta, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["cuenta"].queryset = CuentaTesoreria.objects.filter(
             empresa=empresa, activa=True, moneda="PEN", cuenta_contable__isnull=False
+        )
+        self.fields["cuota"].queryset = CuotaVenta.objects.filter(venta=venta).annotate(
+            asignado=Coalesce(Sum("cobros_asignados__importe"), Value(Decimal("0")),
+                              output_field=DecimalField(max_digits=18, decimal_places=2)),
         )
 
 

@@ -10,7 +10,7 @@ from core.models import HistorialDocumento
 from tesoreria.models import MovimientoTesoreria
 from tesoreria.servicios import registrar
 
-from .models import CobroVenta, Venta
+from .models import CobroVenta, CuotaVenta, Venta
 from .servicios import VentaError
 
 
@@ -42,13 +42,14 @@ def registrar_cobro_formulario(*, venta, operacion, usuario, **datos):
     HistorialDocumento.objects.create(
         empresa=venta.empresa, tipo=HistorialDocumento.Tipo.VENTA, documento_id=venta.pk,
         usuario=usuario, accion="COBRO",
-        detalle=f"Cobro de S/ {cobro.importe} el {cobro.fecha}. {identificacion}",
+        detalle=(f"Cobro de S/ {cobro.importe} el {cobro.fecha}"
+                 f"{f', cuota {cobro.cuota.numero}' if cobro.cuota_id else ', sin cuota asignada'}. {identificacion}"),
     )
     return True
 
 
 @transaction.atomic
-def cobrar_venta(*, venta, fecha, importe, cuenta, canal, usuario=None):
+def cobrar_venta(*, venta, fecha, importe, cuenta, canal, usuario=None, cuota=None):
     venta = Venta.objects.select_for_update().get(pk=venta.pk)
     if venta.estado != Venta.Estado.CONFIRMADA or venta.condicion != Venta.Condicion.CREDITO:
         raise VentaError("Solo se pueden cobrar ventas al crédito confirmadas.")
@@ -86,8 +87,18 @@ def cobrar_venta(*, venta, fecha, importe, cuenta, canal, usuario=None):
     saldo = saldo_pendiente(venta)
     if importe > saldo:
         raise VentaError(f"El importe excede el saldo pendiente de S/ {max(saldo, Decimal('0')):.2f}.")
+    if cuota is not None:
+        cuota = CuotaVenta.objects.select_for_update().filter(pk=cuota.pk, venta=venta).first()
+        if cuota is None:
+            raise VentaError("La cuota no pertenece a esta venta.")
+        if (venta.cobros.filter(cuota__isnull=True).exists()
+                or venta.notas_credito.exists() or venta.notas_debito.exists()):
+            raise VentaError("Hay cobros sin asignar o notas que requieren revisión antes de asignar cuotas.")
+        asignado = cuota.cobros_asignados.aggregate(total=Sum("importe"))["total"] or Decimal("0")
+        if importe > cuota.importe - asignado:
+            raise VentaError("El cobro supera el importe disponible para asignar a esta cuota.")
     cobro = CobroVenta.objects.create(
-        venta=venta, fecha=fecha, importe=importe, cuenta=cuenta, canal=canal, creado_por=usuario
+        venta=venta, fecha=fecha, importe=importe, cuenta=cuenta, canal=canal, creado_por=usuario, cuota=cuota
     )
     registrar(
         empresa=venta.empresa,
