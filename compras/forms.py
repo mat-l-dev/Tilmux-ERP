@@ -97,6 +97,23 @@ class GastoPagadoForm(forms.Form):
         return datos
 
 
+class ProvisionGastoForm(forms.Form):
+    fecha = forms.DateField(label="Fecha del gasto devengado", widget=forms.DateInput(attrs={"type": "date"}))
+    proveedor = forms.ModelChoiceField(queryset=Tercero.objects.none(), label="Proveedor")
+    importe = forms.DecimalField(max_digits=18, decimal_places=2, min_value=Decimal("0.01"), label="Importe en soles")
+    cuenta = forms.ModelChoiceField(queryset=Cuenta.objects.none(), label="Cuenta de gasto")
+    glosa = forms.CharField(max_length=255, label="Concepto")
+    confirmado = forms.BooleanField(label="Confirmo que el gasto corresponde a una obligación ya generada")
+    operacion = forms.UUIDField(widget=forms.HiddenInput)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["proveedor"].queryset = Tercero.objects.filter(activo=True, rol__in=["PROVEEDOR", "AMBOS"])
+        self.fields["cuenta"].queryset = Cuenta.objects.filter(
+            version="2026", activa=True, elemento=6, admite_movimiento=True
+        )
+
+
 class ImportarGastoForm(forms.Form):
     cuenta = forms.ModelChoiceField(queryset=Cuenta.objects.none(), label="Cuenta del gasto")
     medio = forms.ModelChoiceField(queryset=CuentaTesoreria.objects.none(), label="Cuenta desde la que se pagó")

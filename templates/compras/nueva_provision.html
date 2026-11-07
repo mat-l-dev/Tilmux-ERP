@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block titulo %}Registrar gasto devengado{% endblock %}
+{% block titulo_pagina %}Registrar gasto devengado{% endblock %}
+{% block contenido %}
+<div class="doc"><div class="doc-main">
+  <form method="post" class="card form">{% csrf_token %}
+    <header class="card-head"><h2>Gasto pendiente de comprobante</h2></header>
+    <p class="preview-note">Usa este registro para una obligación por bienes o servicios ya recibidos. No registra un pago ni crédito fiscal y no reemplaza el comprobante del proveedor. Solo admite importes en soles sin IGV.</p>
+    {{ formulario.operacion }}
+    {% if formulario.non_field_errors %}<div class="message error">{{ formulario.non_field_errors }}</div>{% endif %}
+    {% if formulario.operacion.errors %}<div class="message error">La operación no es válida. Vuelve a abrir el formulario.</div>{% endif %}
+    <div class="grid-fields">{% for campo in formulario.visible_fields %}
+      <label class="field{% if campo.name == 'glosa' %} field-full{% endif %}"><span>{{ campo.label }}</span>{{ campo }}
+        {% if campo.errors %}<span class="message error">{{ campo.errors|join:", " }}</span>{% endif %}
+      </label>{% endfor %}
+    </div>
+    <button class="btn btn-primary" type="submit">Registrar gasto devengado</button>
+    <a class="btn btn-ghost" href="{% url 'compras:lista' %}">Cancelar</a>
+  </form>
+</div></div>
+{% endblock %}

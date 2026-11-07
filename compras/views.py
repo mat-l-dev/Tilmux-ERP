@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from itertools import zip_longest
+from uuid import uuid4
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -36,9 +37,10 @@ from ventas.models import Venta
 from ventas.models_guia import GuiaRemision
 
 from .anotacion import AnotacionError, cambiar_fecha_anotacion
-from .forms import CabeceraCompraForm, GastoPagadoForm, ImportarGastoForm
+from .forms import CabeceraCompraForm, GastoPagadoForm, ImportarGastoForm, ProvisionGastoForm
 from .models import Compra, CompraLinea, CostoAdicional
 from .models_gasto import Gasto
+from .provisiones import registrar_provision
 from .reversion import revertir_registro
 from .servicios import CompraError, confirmar, pagar, registrar_gasto, validar_comprobante
 
@@ -144,6 +146,31 @@ def anotacion(request, clase: str, pk: int):
     else:
         messages.success(request, "Período de anotación actualizado; revisa la comparación con el RCE.")
     return redirect(destino, pk=pk)
+
+
+@login_required
+@requiere_escritura
+def nueva_provision(request):
+    empresa = empresa_actual(request)
+    if empresa is None:
+        messages.error(request, "Primero configura una empresa.")
+        return redirect("core:panel")
+    formulario = ProvisionGastoForm(
+        request.POST if request.method == "POST" else None,
+        initial={"fecha": date.today(), "operacion": uuid4()},
+    )
+    if request.method == "POST" and formulario.is_valid():
+        datos = formulario.cleaned_data.copy()
+        datos.pop("confirmado")
+        try:
+            gasto, creado = registrar_provision(empresa=empresa, usuario=request.user, **datos)
+        except (CompraError, ContabilidadError) as exc:
+            formulario.add_error(None, str(exc))
+        else:
+            mensaje = "Gasto devengado registrado." if creado else "Esta operación ya estaba registrada."
+            messages.success(request, mensaje)
+            return redirect("compras:detalle_gasto", gasto.pk)
+    return render(request, "compras/nueva_provision.html", {"formulario": formulario})
 
 
 @login_required

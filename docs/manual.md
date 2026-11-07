@@ -175,9 +175,14 @@ Al registrar un gasto pagado puedes seleccionar las provisiones pendientes del
 mismo proveedor. Si suman exactamente el total y tanto ellas como el comprobante
 no tienen IGV, el sistema vincula los documentos y cancela la 4212 sin volver a
 registrar el gasto. Revisa la selección: si no seleccionas provisiones, se
-registra un gasto nuevo. No admite pagos parciales ni diferencias o IGV; la
-creación manual de nuevas provisiones desde la interfaz está pendiente. Los
+registra un gasto nuevo. No admite pagos parciales ni diferencias o IGV. Los
 vínculos históricos por sí solos no implican que se haya liquidado la deuda.
+
+Para registrar una obligación por bienes o servicios ya recibidos y aún sin
+comprobante, usa **Compras → Registrar gasto devengado**. El formulario admite
+soles sin IGV y crea el gasto y la deuda, sin pago ni crédito fiscal. Un segundo
+envío de la misma operación no vuelve a registrarla. Al recibir el comprobante,
+la liquidación sigue limitada a los casos indicados en el párrafo anterior.
 
 **Fecha devengado y anotación.** El devengo identifica el período económico del
 gasto. Desde el detalle de una compra confirmada o de un gasto puedes indicar la
