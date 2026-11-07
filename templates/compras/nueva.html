@@ -24,7 +24,7 @@
         </label>
         <label class="field">
           <span>Tipo</span>
-          <select name="tipo_doc">
+          <select name="tipo_doc" data-tipo-compra>
             <option value="FACTURA" {% if cabecera.tipo_doc == "FACTURA" %}selected{% endif %}>Factura</option>
             <option value="BOLETA" {% if cabecera.tipo_doc == "BOLETA" %}selected{% endif %}>Boleta</option>
             <option value="OTRO" {% if cabecera.tipo_doc == "OTRO" %}selected{% endif %}>Otro</option>
@@ -50,11 +50,11 @@
         </label>
         <label class="field">
           <span>RUC del nuevo</span>
-          <input type="text" name="proveedor_ruc" maxlength="11" inputmode="numeric" placeholder="20123456789">
+          <input type="text" name="proveedor_ruc" value="{{ cabecera.proveedor_ruc|default:'' }}" maxlength="11" inputmode="numeric" placeholder="20123456789">
         </label>
         <label class="field field-wide">
           <span>Nombre del nuevo</span>
-          <input type="text" name="proveedor_nombre" placeholder="Razón social">
+          <input type="text" name="proveedor_nombre" value="{{ cabecera.proveedor_nombre|default:'' }}" placeholder="Razón social">
         </label>
         <label class="field field-full">
           <span>Glosa</span>
@@ -94,7 +94,7 @@
               <select name="linea_producto">
                 <option value="">—</option>
                 {% for p in productos %}
-                <option value="{{ p.pk }}" {% if fila.seleccionado == p.pk %}selected{% endif %}>{{ p.sku }} · {{ p.nombre }}</option>
+                <option value="{{ p.pk }}" {% if fila.seleccionado|stringformat:'s' == p.pk|stringformat:'s' %}selected{% endif %}>{{ p.sku }} · {{ p.nombre }}</option>
                 {% endfor %}
               </select>
             </td>
@@ -144,10 +144,10 @@
 
       <div class="preview">
         <p class="preview-title">Asiento estimado</p>
-        <div class="preview-row"><span>20111 · Inventario</span><b class="num" data-total-base>0,00</b></div>
-        <div class="preview-row"><span>40111 · IGV</span><b class="num" data-total-igv>0,00</b></div>
+        <div class="preview-row"><span>20111 · Inventario</span><b class="num" data-asiento-inventario>0,00</b></div>
+        <div class="preview-row"><span>40111 · IGV</span><b class="num" data-asiento-igv>0,00</b></div>
         <div class="preview-row"><span>4212 · Por pagar</span><b class="num" data-total-total>0,00</b></div>
-        <p class="preview-note">El costo unitario final incluye los costos de internamiento.</p>
+        <p class="preview-note">El costo unitario final incluye los costos de internamiento. Si no corresponde crédito, el IGV forma parte del costo.</p>
       </div>
 
       <button class="btn btn-primary btn-block" type="submit">{% if compra %}Guardar cambios{% else %}Guardar compra{% endif %}</button>

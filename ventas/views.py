@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal, InvalidOperation
+from itertools import zip_longest
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -21,6 +22,8 @@ from contabilidad.servicios import ContabilidadError
 from core.context import empresa_actual
 from core.contexto import usuario_actual
 from core.filtros import periodo_mes
+from core.lineas_documento import calcular as calcular_linea_validada
+from core.lineas_documento import numero_id
 from core.models import HistorialDocumento
 from core.permisos import requiere_escritura
 from inventario.servicios import StockError
@@ -62,37 +65,32 @@ def _leer_filas(post) -> tuple[list[dict], list[str]]:
 
     filas: list[dict] = []
     errores: list[str] = []
+    if len({len(productos), len(cantidades), len(precios)}) != 1:
+        errores.append("Las líneas están incompletas; revisa los productos, cantidades y precios.")
+    if any(descripcion.strip() for descripcion in descripciones[len(productos):]):
+        errores.append("Hay descripciones sin una línea de producto.")
 
     for indice, (producto_id, cantidad_txt, precio_txt) in enumerate(
-        zip(productos, cantidades, precios, strict=False), start=1
+        zip_longest(productos, cantidades, precios, fillvalue=""), start=1
     ):
-        if not producto_id and not cantidad_txt and not precio_txt:
+        descripcion = descripciones[indice - 1] if indice <= len(descripciones) else ""
+        if not producto_id and not cantidad_txt and not precio_txt and not descripcion.strip():
             continue
         fila = {
             "producto_id": producto_id,
             "cantidad": cantidad_txt,
             "precio": precio_txt,
-            "descripcion": (
-                descripciones[indice - 1] if indice <= len(descripciones) else ""
-            ),
+            "descripcion": descripcion,
         }
         try:
-            producto = Producto.objects.get(pk=int(producto_id))
-            cantidad = Decimal(cantidad_txt.replace(",", "."))
-            precio = Decimal(precio_txt.replace(",", "."))
+            producto = Producto.objects.get(pk=numero_id(producto_id), activo=True)
+            cantidad, precio, base, igv, total = calcular_linea_validada(cantidad_txt, precio_txt, con_igv)
         except (ValueError, TypeError, InvalidOperation, Producto.DoesNotExist):
             errores.append(f"Línea {indice}: revisa producto, cantidad y precio.")
             fila["seleccionado"] = producto_id
             filas.append(fila)
             continue
 
-        if cantidad <= 0 or precio <= 0:
-            errores.append(f"Línea {indice}: cantidad y precio deben ser positivos.")
-            fila["seleccionado"] = producto.pk
-            filas.append(fila)
-            continue
-
-        base, igv, total = calcular_linea(cantidad, precio, con_igv)
         fila.update(
             {
                 "producto": producto,
@@ -108,6 +106,8 @@ def _leer_filas(post) -> tuple[list[dict], list[str]]:
 
     if not filas:
         errores.append("Agrega al menos una línea.")
+    if not errores and sum((f["total"] for f in filas), Decimal("0")) >= Decimal("10000000000000000"):
+        errores.append("El total de la venta excede el importe permitido.")
     return filas, errores
 
 

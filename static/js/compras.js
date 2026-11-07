@@ -45,6 +45,10 @@
     document.querySelectorAll("[data-total-base]").forEach((e) => (e.textContent = fmt(base)));
     document.querySelectorAll("[data-total-igv]").forEach((e) => (e.textContent = fmt(igv)));
     document.querySelectorAll("[data-total-total]").forEach((e) => (e.textContent = fmt(total)));
+    const tipo = document.querySelector("[data-tipo-compra]");
+    const conCredito = tipo && tipo.value === "FACTURA";
+    document.querySelectorAll("[data-asiento-inventario]").forEach((e) => (e.textContent = fmt(conCredito ? base : total)));
+    document.querySelectorAll("[data-asiento-igv]").forEach((e) => (e.textContent = fmt(conCredito ? igv : 0)));
   }
 
   document.addEventListener("input", (event) => {
@@ -55,6 +59,8 @@
 
   const igvControl = document.querySelector("#id_con_igv");
   if (igvControl) igvControl.addEventListener("change", totales);
+  const tipoCompra = document.querySelector("[data-tipo-compra]");
+  if (tipoCompra) tipoCompra.addEventListener("change", totales);
 
   totales();
 })();

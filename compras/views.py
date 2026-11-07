@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal, InvalidOperation
+from itertools import zip_longest
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -17,13 +18,14 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from catalogo.models import CuentaTesoreria, Producto, Tercero
-from contabilidad.calculos import calcular_linea
 from contabilidad.models import Asiento, Cuenta
 from contabilidad.moneda import SinTipoCambio, a_soles
 from contabilidad.servicios import ContabilidadError
 from core.context import empresa_actual
 from core.contexto import usuario_actual
 from core.filtros import periodo_mes
+from core.lineas_documento import calcular as calcular_linea_validada
+from core.lineas_documento import dinero, numero_id
 from core.models import Empresa, HistorialDocumento, Periodo
 from core.permisos import requiere_escritura
 from documentos.xml_cpe import Guia, XMLInvalido, leer
@@ -38,10 +40,6 @@ from .forms import CabeceraCompraForm, GastoPagadoForm, ImportarGastoForm
 from .models import Compra, CompraLinea, CostoAdicional
 from .models_gasto import Gasto
 from .servicios import CompraError, confirmar, pagar, registrar_gasto, validar_comprobante
-
-
-def _decimal(texto: str) -> Decimal:
-    return Decimal(str(texto).replace(",", ".").strip())
 
 
 @login_required
@@ -295,17 +293,18 @@ def nueva(request):
     proveedor = None
     proveedor_id = request.POST.get("proveedor") or ""
     if proveedor_id:
-        proveedor = Tercero.objects.filter(pk=proveedor_id).first()
-    if proveedor is None:
+        try:
+            proveedor = Tercero.objects.filter(
+                pk=numero_id(proveedor_id), rol__in=["PROVEEDOR", "AMBOS"], activo=True
+            ).first()
+        except ValueError:
+            proveedor = None
+        if proveedor is None:
+            errores.append("Selecciona un proveedor activo válido.")
+    else:
         nombre = request.POST.get("proveedor_nombre", "").strip()
         ruc = request.POST.get("proveedor_ruc", "").strip()
-        if nombre and len(ruc) == 11 and ruc.isdigit():
-            proveedor, _ = Tercero.objects.get_or_create(
-                tipo_doc="RUC",
-                numero_doc=ruc,
-                defaults={"nombre": nombre, "rol": "PROVEEDOR"},
-            )
-        else:
+        if not (nombre and len(ruc) == 11 and ruc.isascii() and ruc.isdecimal()):
             errores.append("Elige un proveedor o escribe nombre y RUC de 11 dígitos.")
 
     filas: list[dict] = []
@@ -314,31 +313,31 @@ def nueva(request):
     precios = request.POST.getlist("linea_precio")
     descripciones = request.POST.getlist("linea_descripcion")
     con_igv = bool(request.POST.get("con_igv"))
+    if len({len(productos_ids), len(cantidades), len(precios)}) != 1:
+        errores.append("Las líneas están incompletas; revisa los productos, cantidades y precios.")
+    if any(descripcion.strip() for descripcion in descripciones[len(productos_ids):]):
+        errores.append("Hay descripciones sin una línea de producto.")
 
     for indice, (producto_id, cantidad_txt, precio_txt) in enumerate(
-        zip(productos_ids, cantidades, precios, strict=False), start=1
+        zip_longest(productos_ids, cantidades, precios, fillvalue=""), start=1
     ):
-        if not producto_id and not cantidad_txt and not precio_txt:
+        descripcion = descripciones[indice - 1] if indice <= len(descripciones) else ""
+        if not producto_id and not cantidad_txt and not precio_txt and not descripcion.strip():
             continue
         fila = {
             "producto_id": producto_id,
+            "seleccionado": producto_id,
             "cantidad": cantidad_txt,
             "precio": precio_txt,
-            "descripcion": (
-                descripciones[indice - 1] if indice <= len(descripciones) else ""
-            ),
+            "descripcion": descripcion,
         }
         try:
-            producto = Producto.objects.get(pk=int(producto_id))
-            cantidad = _decimal(cantidad_txt)
-            precio = _decimal(precio_txt)
-            if cantidad <= 0 or precio <= 0:
-                raise ValueError
+            producto = Producto.objects.get(pk=numero_id(producto_id), activo=True)
+            cantidad, precio, base, igv, total = calcular_linea_validada(cantidad_txt, precio_txt, con_igv)
         except (ValueError, TypeError, InvalidOperation, Producto.DoesNotExist):
             errores.append(f"Línea {indice}: revisa producto, cantidad y precio.")
             filas.append(fila)
             continue
-        base, igv, total = calcular_linea(cantidad, precio, con_igv)
         fila.update(
             {
                 "producto": producto,
@@ -359,21 +358,29 @@ def nueva(request):
     conceptos = request.POST.getlist("costo_concepto")
     bases = request.POST.getlist("costo_base")
     igvs = request.POST.getlist("costo_igv")
-    for concepto, base_txt, igv_txt in zip(conceptos, bases, igvs, strict=False):
-        if not concepto.strip() and not base_txt:
+    if len({len(conceptos), len(bases), len(igvs)}) != 1:
+        errores.append("Las filas de costos adicionales están incompletas.")
+    for concepto, base_txt, igv_txt in zip_longest(conceptos, bases, igvs, fillvalue=""):
+        if not concepto.strip() and not base_txt and not igv_txt:
             continue
         try:
-            base = _decimal(base_txt or "0")
-            igv = _decimal(igv_txt or "0")
-        except (InvalidOperation, TypeError):
+            base = dinero(base_txt)
+            igv = dinero(igv_txt)
+            if not concepto.strip() or base <= 0 or base + igv >= Decimal("10000000000000000"):
+                raise ValueError
+        except ValueError:
             errores.append(f"Costo «{concepto}»: importes inválidos.")
-            continue
-        if base < 0 or igv < 0:
-            errores.append(f"Costo «{concepto}»: importes negativos.")
+            costos.append({"concepto": concepto, "base": base_txt, "igv": igv_txt})
             continue
         costos.append(
             {"concepto": concepto, "base": base, "igv": igv, "total": base + igv}
         )
+
+    if not errores and (
+        sum((f["total"] for f in filas), Decimal("0")) + sum((c["total"] for c in costos), Decimal("0"))
+        >= Decimal("10000000000000000")
+    ):
+        errores.append("El total de la compra excede el importe permitido.")
 
     contexto.update(
         {
@@ -388,6 +395,8 @@ def nueva(request):
                 "serie": request.POST.get("serie", "F001"),
                 "numero": request.POST.get("numero", ""),
                 "proveedor": proveedor_id,
+                "proveedor_ruc": request.POST.get("proveedor_ruc", ""),
+                "proveedor_nombre": request.POST.get("proveedor_nombre", ""),
                 "glosa": request.POST.get("glosa", ""),
                 "factura_pendiente": bool(request.POST.get("factura_pendiente")),
             },
@@ -404,6 +413,14 @@ def nueva(request):
 
     datos = formulario.cleaned_data
     factura_pendiente = bool(request.POST.get("factura_pendiente"))
+    if proveedor is None:
+        proveedor, _ = Tercero.objects.get_or_create(
+            tipo_doc="RUC", numero_doc=datos["proveedor_ruc"],
+            defaults={"nombre": datos["proveedor_nombre"], "rol": "PROVEEDOR"},
+        )
+        if not proveedor.activo or proveedor.rol not in ("PROVEEDOR", "AMBOS"):
+            errores.append("El RUC ya pertenece a un tercero que no está activo como proveedor.")
+            return render(request, "compras/nueva.html", contexto)
 
     if compra_edit is None:
         compra = Compra(empresa=empresa, creado_por=usuario_actual.get())

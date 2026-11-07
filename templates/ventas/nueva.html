@@ -108,7 +108,7 @@
               <select name="linea_producto" class="js-producto">
                 <option value="">—</option>
                 {% for p in productos %}
-                <option value="{{ p.pk }}" {% if fila.seleccionado == p.pk %}selected{% endif %}>{{ p.sku }} · {{ p.nombre }}</option>
+                <option value="{{ p.pk }}" {% if fila.seleccionado|stringformat:'s' == p.pk|stringformat:'s' %}selected{% endif %}>{{ p.sku }} · {{ p.nombre }}</option>
                 {% endfor %}
               </select>
             </td>
