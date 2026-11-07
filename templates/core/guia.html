@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block titulo %}Guía de uso{% endblock %}
+{% block titulo_pagina %}Guía de uso{% endblock %}
+{% block contenido %}
+<section class="card">
+  <header class="card-head"><h2>¿Qué quieres hacer?</h2></header>
+  <p>Esta guía explica las funciones disponibles y sus límites. Los importes de los ejemplos son ficticios.</p>
+  <p><a href="#elegir">Elegir una opción</a> · <a href="#compras">Comprar mercadería</a> · <a href="#gastos">Registrar y pagar gastos</a> · <a href="#provisiones">Gastos sin comprobante</a> · <a href="#ventas">Ventas y cobros</a> · <a href="#sire">Revisar SIRE</a> · <a href="#fechas">Fechas y períodos</a></p>
+</section>
+
+<section class="card" id="elegir">
+  <header class="card-head"><h2>1. Elegir la opción correcta</h2></header>
+  <div class="tabla-scroll"><table class="tabla-doc"><thead><tr><th>Situación</th><th>Opción en Compras</th><th>Resultado</th></tr></thead><tbody>
+    <tr><td>Compraste productos para vender</td><td>Nueva compra</td><td>Al confirmar, registra el inventario y la deuda.</td></tr>
+    <tr><td>Pagaste un servicio o comisión el mismo día del comprobante</td><td>Registrar gasto pagado</td><td>Registra el gasto y la salida de dinero juntos.</td></tr>
+    <tr><td>Tienes un comprobante de gasto, pero lo pagarás después</td><td>Registrar gasto por pagar</td><td>Registra la deuda; luego puedes añadir pagos parciales.</td></tr>
+    <tr><td>El gasto ya ocurrió, pero aún no llegó el comprobante</td><td>Registrar gasto devengado</td><td>Registra una provisión, sin salida de dinero ni comprobante.</td></tr>
+  </tbody></table></div>
+  <p>Ve a <a href="{% url 'compras:lista' %}">Compras y gastos</a> para encontrar estas opciones.</p>
+</section>
+
+<section class="card" id="compras">
+  <header class="card-head"><h2>2. Comprar mercadería y registrar pagos</h2></header>
+  <ol>
+    <li>En <strong>Compras → Nueva compra</strong>, selecciona el proveedor y completa el comprobante y los productos.</li>
+    <li>Guarda y revisa la compra. Mientras esté en borrador puedes editarla. Al confirmarla se registra el inventario y la cuenta por pagar.</li>
+    <li>Para registrar un pago, abre la compra y elige <strong>Pagar compra</strong>. Indica fecha real, cuenta, canal e importe; puedes pagar en partes si la compra está en soles.</li>
+    <li>Vuelve al detalle para revisar los pagos vinculados, el importe cancelado y el saldo. Si el sistema indica que no hay movimientos vinculados, revisa el historial antes de registrar otro pago.</li>
+  </ol>
+  <p>Si la factura todavía no llegó, puedes guardar la compra como pendiente de factura. No se incorpora al inventario ni a la contabilidad hasta completarla y confirmarla. Las nuevas compras en moneda extranjera aún no se confirman desde este flujo.</p>
+</section>
+
+<section class="card" id="gastos">
+  <header class="card-head"><h2>3. Registrar un gasto y pagarlo después</h2></header>
+  <p><strong>Ejemplo:</strong> recibes una factura por S/ 118: base S/ 100 e IGV S/ 18. Primero pagas S/ 50 y después los S/ 68 restantes.</p>
+  <ol>
+    <li>En <strong>Compras → Registrar gasto por pagar</strong>, escribe el proveedor, fecha, serie, número, base, IGV, cuenta de gasto y concepto.</li>
+    <li>Marca las opciones tributarias solo después de comprobar que corresponden. Registra el gasto. El formulario es para soles y usa la fecha del comprobante como fecha del gasto.</li>
+    <li>En el detalle verás <strong>Por pagar</strong> y el saldo de S/ 118. Selecciona <strong>Registrar pago</strong>, indica S/ 50, la fecha real y la cuenta de salida.</li>
+    <li>El saldo será S/ 68. Registra el segundo pago cuando ocurra; al completar el total, el estado pasa a <strong>Pagado</strong>.</li>
+    <li>Para volver a encontrarlo, usa en Compras el filtro <strong>Pago de gastos → Gastos por pagar</strong>. Este filtro se limita a los gastos de este flujo.</li>
+  </ol>
+  <p>Si el gasto ya se pagó por completo en la fecha del comprobante, utiliza <strong>Registrar gasto pagado</strong>. Al importar XML como gasto, la opción disponible también registra el pago completo en esa misma fecha. Si aún no se pagó, copia los datos al formulario de gasto por pagar.</p>
+  <p>Una boleta puede aparecer en el total documental sin incluirse como crédito fiscal. La marca tributaria no verifica por sí sola los requisitos de SUNAT.</p>
+</section>
+
+<section class="card" id="provisiones">
+  <header class="card-head"><h2>4. Gasto ocurrido sin comprobante</h2></header>
+  <ol>
+    <li>Si existe una obligación por un servicio o bien ya recibido, pero falta el comprobante, entra en <strong>Compras → Registrar gasto devengado</strong>.</li>
+    <li>Completa proveedor, fecha del gasto, importe en soles, cuenta y concepto. Al confirmar se registra una provisión, sin pago ni crédito fiscal.</li>
+    <li>Cuando llegue el comprobante, revisa la provisión antes de registrar otro gasto para evitar duplicarlo.</li>
+  </ol>
+  <p>Actualmente puedes vincular provisiones al registrar un gasto pagado si pertenecen al mismo proveedor, suman exactamente el comprobante y ambos son sin IGV. El pago debe coincidir con la fecha del comprobante. Si hay IGV, diferencias o un pago posterior, ese enlace todavía requiere otro tratamiento y no debe duplicarse por el formulario de gasto por pagar.</p>
+</section>
+
+<section class="card" id="ventas">
+  <header class="card-head"><h2>5. Venta al crédito y cobros</h2></header>
+  <ol>
+    <li>En <a href="{% url 'ventas:lista' %}">Ventas</a>, selecciona <strong>Nueva venta</strong>, completa el comprobante, cliente y productos, y elige la condición <strong>Crédito</strong>.</li>
+    <li>Guarda el borrador. En su detalle usa <strong>Programar cuotas</strong> y registra importes y vencimientos; la suma debe coincidir con el total.</li>
+    <li>Revisa y confirma la venta. Cuando recibas dinero, abre su detalle y usa <strong>Registrar cobro</strong> con la fecha y cuenta correspondientes.</li>
+    <li>En <strong>Ventas → Cuentas por cobrar</strong> puedes consultar el saldo documentado a una fecha de corte.</li>
+  </ol>
+  <p>Los cobros se vinculan a la venta, pero todavía no se distribuyen automáticamente entre sus cuotas. Los movimientos antiguos sin vincular necesitan revisión; el primer vencimiento mostrado es el pactado originalmente.</p>
+</section>
+
+<section class="card" id="sire">
+  <header class="card-head"><h2>6. Comparar con la propuesta SIRE</h2></header>
+  <ol>
+    <li>Descarga la propuesta correspondiente desde SUNAT y comprueba empresa y período.</li>
+    <li>En el ERP abre <a href="{% url 'reportes:conciliacion' %}">Conciliación SUNAT</a> y luego <strong>Conciliar con la propuesta del SIRE</strong>.</li>
+    <li>Selecciona año, mes y registro: <strong>RCE</strong> para compras o <strong>RVIE</strong> para ventas. Carga el archivo y pulsa <strong>Conciliar</strong>.</li>
+    <li>Revisa los totales y los avisos de moneda, RUC o período. Si hay diferencias, compara los comprobantes y sus fechas individualmente antes de decidir una corrección.</li>
+  </ol>
+  <p>La comparación es por totales; que coincidan no prueba que cada documento coincida. El total documental puede incluir boletas sin crédito fiscal. El ERP no modifica la propuesta ni envía la declaración a SUNAT.</p>
+</section>
+
+<section class="card" id="fechas">
+  <header class="card-head"><h2>7. Entender las fechas</h2></header>
+  <ul>
+    <li><strong>Emisión:</strong> fecha del comprobante.</li>
+    <li><strong>Devengo:</strong> fecha económica del gasto. En los formularios descritos se usa la misma fecha indicada al registrarlo.</li>
+    <li><strong>Anotación:</strong> período registrado para contrastar con el RCE; si falta, el ERP estima usando emisión.</li>
+    <li><strong>Pago o cobro:</strong> fecha real en que salió o entró el dinero, que puede ser distinta de la emisión.</li>
+  </ul>
+  <p>Los períodos cerrados restringen cambios contables. Si una fecha o un importe no coinciden con tus documentos, revísalos antes de registrar otra operación.</p>
+</section>
+{% endblock %}

@@ -1,5 +1,8 @@
 # Manual de uso
 
+También puedes abrir **Guía de uso** en el menú del ERP. Allí encontrarás
+ejemplos paso a paso para compras, gastos, ventas, cobros y conciliación SIRE.
+
 ## Entrar
 
 Doble clic en **Tilmux ERP** del escritorio. Abre `http://127.0.0.1:8000`.

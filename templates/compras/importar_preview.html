@@ -34,6 +34,7 @@
       <form method="post" class="form">
         {% csrf_token %}
         <p class="preview-note">Este registro genera una salida de dinero en la fecha del comprobante. Úsalo solo si el pago ocurrió ese día y por el total.</p>
+        <p class="preview-note">Si aún no lo has pagado, usa <a href="{% url 'compras:nuevo_gasto_pendiente' %}">Registrar gasto por pagar</a> y copia los datos del comprobante: el XML no se trasladará automáticamente.</p>
         {% if formulario.non_field_errors %}<div class="message error">{{ formulario.non_field_errors }}</div>{% endif %}
         <div class="grid-fields">
           {% for campo in formulario %}

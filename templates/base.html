@@ -68,6 +68,9 @@
       </a>
 
       <p class="nav-title">Sistema</p>
+      <a class="nav-item {% if url == 'guia' %}is-active{% endif %}" href="{% url 'core:guia' %}">
+        <svg class="icon"><use href="#i-documento"></use></svg><span>Guía de uso</span>
+      </a>
       <a class="nav-item {% if '/periodos' in request.path %}is-active{% endif %}" href="{% url 'core:periodos' %}">
         <svg class="icon"><use href="#i-reloj"></use></svg><span>Periodos</span>
       </a>

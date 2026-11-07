@@ -36,6 +36,11 @@ from .resumen_ventas import ventas_netas_por_mes
 MESES_CORTOS = ("Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Set", "Oct", "Nov", "Dic")
 
 
+@login_required
+def guia(request):
+    return render(request, "core/guia.html")
+
+
 def _meses_atras(anio: int, mes: int, pasos: int) -> tuple[int, int]:
     total = anio * 12 + (mes - 1) - pasos
     return total // 12, total % 12 + 1
