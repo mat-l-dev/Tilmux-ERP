@@ -199,8 +199,8 @@ def registrar_gasto(
             raise InvalidOperation
     except (InvalidOperation, ValueError, TypeError):
         raise CompraError("Indica importes válidos para el gasto.") from None
-    if base < 0 or igv < 0 or total <= 0:
-        raise CompraError("La base y el IGV no pueden ser negativos y el total debe ser positivo.")
+    if base <= 0 or igv < 0 or total <= 0:
+        raise CompraError("La base y el total deben ser positivos y el IGV no puede ser negativo.")
     if base + igv != total:
         raise CompraError("El gasto no cuadra: base más IGV no da el total.")
     if not provision and medio is None:

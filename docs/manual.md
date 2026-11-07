@@ -93,8 +93,8 @@ se marcan tras revisar el caso. No se procesan notas, ajustes de totales ni
 gastos en moneda extranjera por este flujo. El XML no se conserva y su lectura
 no verifica su validez ante SUNAT.
 
-Al registrar un gasto, el sistema valida que los importes sean positivos o cero
-según corresponda, que la cuenta de gasto esté habilitada y que el medio de pago
+Al registrar un gasto, el sistema exige base y total positivos e IGV no negativo,
+comprueba que la cuenta de gasto esté habilitada y que el medio de pago
 sea una cuenta activa en soles de la empresa con cuenta contable vinculada.
 
 **Registrar gasto pagado.** Desde la lista de compras puedes registrar comisiones

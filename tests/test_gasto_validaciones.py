@@ -43,6 +43,7 @@ class ValidacionGastoTest(TestCase):
     def test_rechaza_importes_invalidos_sin_crear_movimientos(self):
         for valores in (
             {"base": "-1", "igv": "2", "total": "1"},
+            {"base": "0", "igv": "18", "total": "18"},
             {"base": "1", "igv": "-1", "total": "0"},
             {"base": "NaN"},
             {"base": "Infinity"},
