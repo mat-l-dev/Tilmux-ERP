@@ -5,7 +5,7 @@
 <div class="doc"><div class="doc-main"><form method="post" class="card form">{% csrf_token %}
   <header class="card-head"><h2>Comprobante pendiente de pago</h2></header>
   <p class="preview-note">Registra un gasto en soles. El pago se registra por separado. Si no vinculas provisiones, se usa la fecha del comprobante como fecha de devengo.</p>
-  <p class="preview-note"><strong>¿Ya registraste este gasto como provisión?</strong> Selecciona las provisiones correspondientes para no volver a registrar el gasto. Solo se admiten provisiones verificables del mismo proveedor, sin IGV y por el total exacto.</p>
+  <p class="preview-note"><strong>¿Ya registraste este gasto como provisión?</strong> Selecciona las provisiones verificables del mismo proveedor para no duplicar el gasto. Sin IGV deben sumar el total; para una factura con IGV y crédito fiscal, vincula una sola provisión por la base y confirma que corresponde a ella. Verifica que el comprobante cumpla los requisitos tributarios.</p>
   {% if formulario.non_field_errors %}<div class="message error">{{ formulario.non_field_errors }}</div>{% endif %}
   <div class="grid-fields">{% for campo in formulario %}<label class="field"><span>{{ campo.label }}</span>{{ campo }}{% if campo.help_text %}<span class="preview-note">{{ campo.help_text }}</span>{% endif %}{% if campo.errors %}<span class="message error">{{ campo.errors|join:", " }}</span>{% endif %}</label>{% endfor %}</div>
   <p class="preview-note">Marca la estimación de crédito fiscal solo si el comprobante cumple los requisitos aplicables. El registro no envía información a SUNAT.</p>

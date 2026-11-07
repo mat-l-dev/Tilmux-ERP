@@ -26,13 +26,13 @@ def cuenta_deuda_provision(asiento, importe):
     raise CompraError("La cuenta por pagar de una provisión no coincide con su importe.")
 
 
-def preparar_provisiones(*, empresa, proveedor, fecha, igv, total, ids):
+def preparar_provisiones(*, empresa, proveedor, fecha, igv, total, ids, permite_igv=False):
     from .servicios import CompraError
 
     ids = list(ids)
     if not ids:
         return []
-    if len(ids) != len(set(ids)) or igv != 0:
+    if len(ids) != len(set(ids)) or (igv != 0 and not permite_igv):
         raise CompraError("La liquidación solo admite provisiones distintas y comprobantes sin IGV.")
     provisiones = list(Gasto.objects.select_for_update().filter(pk__in=ids).order_by("pk"))
     if len(provisiones) != len(ids):
@@ -56,7 +56,7 @@ def preparar_provisiones(*, empresa, proveedor, fecha, igv, total, ids):
             )
         item.cuenta_deuda = cuenta_deuda_provision(asientos[0], item.total)
     if sum((item.total for item in provisiones), Decimal("0")) != total:
-        raise CompraError("Las provisiones seleccionadas deben sumar exactamente el total del comprobante.")
+        raise CompraError("Las provisiones seleccionadas deben sumar exactamente el importe esperado del comprobante.")
     return provisiones
 
 
@@ -90,7 +90,9 @@ def validar_provisiones_vinculadas(*, gasto, provisiones, exigir_reclasificacion
     """Verifica el respaldo de una deuda vinculada sin suponer pagos históricos."""
     from .servicios import CompraError
 
-    if not provisiones or gasto.provision or gasto.igv != 0:
+    if (not provisiones or gasto.provision
+            or (gasto.igv and (not gasto.con_credito or gasto.tipo_doc != Gasto.TipoDoc.FACTURA
+                               or len(provisiones) != 1))):
         raise CompraError("Las provisiones vinculadas necesitan revisión antes del pago.")
     sin_comprobante = Decimal("0")
     for item in provisiones:
@@ -117,21 +119,25 @@ def validar_provisiones_vinculadas(*, gasto, provisiones, exigir_reclasificacion
             empresa=gasto.empresa, origen_tipo="GASTO", origen_id=item.pk,
         ).exists():
             raise CompraError("La deuda o los movimientos de una provisión necesitan revisión.")
-    if sum((item.total for item in provisiones), Decimal("0")) != gasto.total:
-        raise CompraError("Las provisiones vinculadas no suman el total del comprobante.")
+    esperado = gasto.base if gasto.igv else gasto.total
+    if sum((item.total for item in provisiones), Decimal("0")) != esperado:
+        raise CompraError("Las provisiones vinculadas no suman el importe esperado del comprobante.")
     if exigir_reclasificacion:
         reclasificaciones = list(Asiento.objects.filter(
             empresa=gasto.empresa, origen_tipo="GASTO_RECLAS_PROV", origen_id=gasto.pk,
         ).prefetch_related("lineas__cuenta"))
-        if sin_comprobante:
+        if sin_comprobante or gasto.igv:
             if (len(reclasificaciones) != 1 or reclasificaciones[0].estado != Asiento.Estado.CONFIRMADO
                     or reclasificaciones[0].fecha != gasto.fecha):
                 raise CompraError("La reclasificación de las provisiones necesita revisión.")
             lineas = list(reclasificaciones[0].lineas.all())
             debito = sum((x.debe - x.haber for x in lineas if x.cuenta.codigo == "4211"), Decimal("0"))
             credito = sum((x.haber - x.debe for x in lineas if x.cuenta.codigo == "4212"), Decimal("0"))
-            if (debito != sin_comprobante or credito != sin_comprobante
-                    or any(x.cuenta.version != "2026" or x.cuenta.codigo not in ("4211", "4212") for x in lineas)):
+            credito_fiscal = sum((x.debe - x.haber for x in lineas if x.cuenta.codigo == "40111"), Decimal("0"))
+            if (debito != sin_comprobante or credito != sin_comprobante + gasto.igv
+                    or credito_fiscal != gasto.igv
+                    or any(x.cuenta.version != "2026" or x.cuenta.codigo not in ("4211", "4212", "40111")
+                           for x in lineas)):
                 raise CompraError("Los importes de la reclasificación necesitan revisión.")
         elif reclasificaciones:
             raise CompraError("La reclasificación de las provisiones necesita revisión.")

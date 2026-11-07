@@ -117,6 +117,11 @@ class ProvisionGastoForm(forms.Form):
 
 
 class GastoPendienteForm(GastoPagadoForm):
+    confirma_base_provision = forms.BooleanField(
+        required=False, label="Confirmo que la provisión corresponde a la base sin IGV de esta factura",
+        help_text="Márcalo solo al vincular una provisión con una factura con IGV y crédito fiscal.",
+    )
+
     def __init__(self, *args, empresa, **kwargs):
         super().__init__(*args, empresa=empresa, **kwargs)
         self.fields.pop("medio")
@@ -125,7 +130,7 @@ class GastoPendienteForm(GastoPagadoForm):
         self.fields["tipo_doc"].choices = [c for c in Gasto.TipoDoc.choices if c[0] != Gasto.TipoDoc.OTRO]
         self.fields["provisiones"].label = "Gastos devengados que respalda este comprobante (opcional)"
         self.fields["provisiones"].help_text = (
-            "Solo gastos del mismo proveedor, sin IGV y que sumen exactamente el comprobante. "
+            "Sin IGV: deben sumar el total. Con IGV y crédito fiscal: una provisión por la base exacta. "
             "La cuenta de gasto indicada arriba no se usa si vinculas provisiones."
         )
 

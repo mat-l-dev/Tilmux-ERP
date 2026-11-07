@@ -197,8 +197,13 @@ Para registrar una obligación por bienes o servicios ya recibidos y aún sin
 comprobante, usa **Compras → Registrar gasto devengado**. El formulario admite
 soles sin IGV y crea el gasto y la deuda, sin pago ni crédito fiscal. Un segundo
 envío de la misma operación no vuelve a registrarla. Al recibir el comprobante,
-el vínculo está limitado a importes sin IGV e iguales a las provisiones; para
-pagos posteriores usa el flujo de gasto por pagar explicado arriba.
+regístralo como gasto por pagar y selecciona las provisiones correspondientes.
+Sin IGV, deben sumar exactamente el total. Para una factura con IGV y crédito
+fiscal, se admite una sola provisión por el importe exacto de la base: confirma
+que corresponde a esa base y marca la opción de crédito únicamente después de
+verificar sus requisitos. El ERP registra el IGV al recibir la factura, sin
+repetir el gasto; el pago se registra por separado. Los demás casos con IGV y
+provisiones requieren revisión contable antes de registrarse.
 
 **Fecha devengado y anotación.** El devengo identifica el período económico del
 gasto. Desde el detalle de una compra confirmada o de un gasto puedes indicar la

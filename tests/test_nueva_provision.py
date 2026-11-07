@@ -174,6 +174,40 @@ class NuevaProvisionTest(BaseContable):
         self.assertIsNone(provision.gasto_origen_id)
         self.assertFalse(Gasto.objects.filter(serie="F001", numero="21").exists())
 
+    def test_factura_con_igv_reconoce_credito_y_paga_sin_repetir_gasto(self):
+        self.client.post(self.url, self.datos)
+        provision = Gasto.objects.get(empresa=self.empresa, provision=True)
+        datos = {"fecha": "2026-11-11", "proveedor": self.proveedor.pk, "tipo_doc": "FACTURA",
+                 "serie": "F001", "numero": "30", "base": "28", "igv": "5.04",
+                 "cuenta": self.datos["cuenta"], "glosa": "Servicio", "provisiones": [provision.pk],
+                 "con_credito": "on"}
+        url = reverse("compras:nuevo_gasto_pendiente")
+        self.assertContains(self.client.post(url, datos), "La liquidación solo admite")
+        self.assertFalse(Gasto.objects.filter(serie="F001", numero="30").exists())
+        datos["confirma_base_provision"] = "on"
+        datos["base"] = "27"
+        self.assertContains(self.client.post(url, datos), "sumar exactamente")
+        self.assertFalse(Gasto.objects.filter(serie="F001", numero="30").exists())
+        datos["base"] = "28"
+        self.assertEqual(self.client.post(url, datos).status_code, 302)
+        factura = Gasto.objects.get(serie="F001", numero="30")
+        asiento = Asiento.objects.get(origen_tipo="GASTO_RECLAS_PROV", origen_id=factura.pk)
+        self.assertEqual(asiento.lineas.get(cuenta__codigo="4211").debe, Decimal("28"))
+        self.assertEqual(asiento.lineas.get(cuenta__codigo="40111").debe, Decimal("5.04"))
+        self.assertEqual(asiento.lineas.get(cuenta__codigo="4212").haber, Decimal("33.04"))
+        for importe in ("10", "23.04"):
+            respuesta = self.client.post(reverse("compras:pagar_gasto", args=[factura.pk]), {
+                "fecha": "2026-11-12", "importe": importe, "cuenta": self.bbva.pk, "canal": "TRANSFERENCIA",
+                "operacion": str(uuid4()),
+            })
+            self.assertEqual(respuesta.status_code, 302)
+        lineas = Asiento.objects.filter(empresa=self.empresa, estado="CONFIRMADO").values_list(
+            "lineas__cuenta__codigo", "lineas__debe", "lineas__haber")
+        saldos = {codigo: sum((debe - haber for c, debe, haber in lineas if c == codigo), Decimal("0"))
+                  for codigo in ("6391", "4211", "4212", "40111")}
+        self.assertEqual(saldos, {"6391": Decimal("28"), "4211": Decimal("0"),
+                                  "4212": Decimal("0"), "40111": Decimal("5.04")})
+
     def test_pago_bloqueado_si_asiento_de_provision_fue_anulado(self):
         self.client.post(self.url, self.datos)
         provision = Gasto.objects.get(empresa=self.empresa, provision=True)

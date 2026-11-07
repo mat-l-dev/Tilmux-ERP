@@ -33,7 +33,7 @@ def importe_valido(valor, *, permite_cero=False):
 
 @transaction.atomic
 def registrar_pendiente(*, empresa, proveedor, fecha, tipo_doc, serie, numero, base, igv,
-                        cuenta, glosa, con_credito, deducible, usuario, provisiones=()):
+                        cuenta, glosa, con_credito, deducible, usuario, provisiones=(), confirma_base_provision=False):
     Empresa.objects.select_for_update().get(pk=empresa.pk)
     serie, numero = serie.strip().upper(), numero.strip()
     if tipo_doc not in (Gasto.TipoDoc.FACTURA, Gasto.TipoDoc.BOLETA) or not serie or not numero:
@@ -51,8 +51,13 @@ def registrar_pendiente(*, empresa, proveedor, fecha, tipo_doc, serie, numero, b
     base, igv = importe_valido(base), importe_valido(igv, permite_cero=True)
     total = importe_valido(base + igv)
     validar_comprobante(empresa=empresa, proveedor=proveedor, tipo_doc=tipo_doc, serie=serie, numero=numero)
+    if provisiones and igv and (not con_credito or tipo_doc != Gasto.TipoDoc.FACTURA
+                                or len(provisiones) != 1 or not confirma_base_provision):
+        raise CompraError("La liquidación solo admite una provisión por la base de una factura "
+                          "con crédito fiscal confirmado.")
     provisiones = preparar_provisiones(
-        empresa=empresa, proveedor=proveedor, fecha=fecha, igv=igv, total=total,
+        empresa=empresa, proveedor=proveedor, fecha=fecha, igv=igv, total=base if igv else total,
+        permite_igv=bool(igv),
         ids=[item.pk for item in provisiones],
     )
     cuentas = {c.codigo: c for c in Cuenta.objects.filter(version="2026", codigo__in=["4211", "4212", "40111"])}
@@ -72,14 +77,19 @@ def registrar_pendiente(*, empresa, proveedor, fecha, tipo_doc, serie, numero, b
         sin_comprobante = validar_provisiones_vinculadas(
             gasto=gasto, provisiones=provisiones, exigir_reclasificacion=False,
         )
-        if sin_comprobante:
+        if sin_comprobante or igv:
             if "4211" not in cuentas:
                 raise CompraError("Falta la cuenta contable de comprobantes no emitidos.")
+            lineas = []
+            if sin_comprobante:
+                lineas.append((cuentas["4211"], sin_comprobante, Decimal("0"), "Deuda sin comprobante"))
+            if igv:
+                lineas.append((cuentas["40111"], igv, Decimal("0"), "IGV de la factura"))
+            lineas.append((cuentas["4212"], Decimal("0"), sin_comprobante + igv, "Deuda documentada"))
             postear_lineas(
                 empresa=empresa, fecha=fecha, tipo="PROVISION_GASTO", usuario=usuario,
                 glosa=f"Comprobante recibido {serie}-{numero}",
-                lineas=[(cuentas["4211"], sin_comprobante, Decimal("0"), "Deuda sin comprobante"),
-                        (cuentas["4212"], Decimal("0"), sin_comprobante, "Deuda documentada")],
+                lineas=lineas,
                 origen_tipo="GASTO_RECLAS_PROV", origen_id=gasto.pk,
             )
         validar_provisiones_vinculadas(gasto=gasto, provisiones=provisiones)
