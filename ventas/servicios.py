@@ -11,7 +11,7 @@ from django.db.models import Q, Sum
 from django.db.models.functions import Trim, Upper
 from django.utils import timezone
 
-from catalogo.models import Serie
+from catalogo.models import CuentaTesoreria, Serie
 from contabilidad.servicios import Montos, postear
 from core.models import Empresa
 from inventario.servicios import entrar, salir
@@ -86,11 +86,18 @@ def confirmar(venta: Venta) -> Venta:
     venta = Venta.objects.select_for_update().get(pk=venta.pk)
     if venta.estado != Venta.Estado.BORRADOR:
         raise VentaError("Solo se confirma una venta en borrador.")
+    if venta.condicion not in Venta.Condicion.values or venta.tipo_doc not in Venta.TipoDoc.values:
+        raise VentaError("Revisa el tipo de documento y la condición de pago.")
     Empresa.objects.select_for_update().get(pk=venta.empresa_id)
 
     lineas = list(venta.lineas.select_related("producto"))
     if not lineas:
         raise VentaError("La venta no tiene líneas.")
+    for linea in lineas:
+        if linea.cantidad <= 0 or linea.base <= 0 or linea.igv < 0 or linea.total != linea.base + linea.igv:
+            raise VentaError("Revisa las líneas: cantidad y base positivas, IGV no negativo y total consistente.")
+    if venta.moneda != "PEN":
+        raise VentaError("La confirmación de ventas en moneda extranjera aún no está disponible.")
 
     base = _cent(sum((linea.base for linea in lineas), Decimal("0")))
     igv = _cent(sum((linea.igv for linea in lineas), Decimal("0")))
@@ -115,6 +122,15 @@ def confirmar(venta: Venta) -> Venta:
         )
     if venta.condicion == Venta.Condicion.CONTADO and venta.cuenta is None:
         raise VentaError("Una venta al contado necesita una cuenta de tesorería.")
+    if venta.condicion == Venta.Condicion.CONTADO:
+        cuenta = CuentaTesoreria.objects.select_for_update().get(pk=venta.cuenta_id)
+        if (
+            cuenta.empresa_id != venta.empresa_id or not cuenta.activa
+            or cuenta.moneda != "PEN" or not cuenta.cuenta_contable_id
+        ):
+            raise VentaError("Selecciona una cuenta de tesorería activa en soles de la empresa, con cuenta contable.")
+        if venta.canal not in CuentaTesoreria.Canal.values:
+            raise VentaError("Selecciona un canal de cobro válido.")
 
     costo_venta = Decimal("0")
     for linea in lineas:
