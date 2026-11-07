@@ -20,7 +20,7 @@ from tesoreria.models import MovimientoTesoreria
 from tesoreria.servicios import anotar
 
 from .comprobantes import buscar_comprobante, ruc_valido
-from .models import Compra
+from .models import Compra, CostoAdicional
 from .models_gasto import Gasto
 
 logger = logging.getLogger(__name__)
@@ -79,13 +79,17 @@ def confirmar(compra: Compra) -> Compra:
     lineas = list(compra.lineas.select_related("producto", "producto__unidad"))
     if not lineas:
         raise CompraError("La compra no tiene líneas.")
+    for linea in lineas:
+        if linea.cantidad <= 0 or linea.base <= 0 or linea.igv < 0 or linea.total != linea.base + linea.igv:
+            raise CompraError("Revisa las líneas: cantidad y base positivas, IGV no negativo y total consistente.")
 
     costos = list(compra.costos.all())
     asignado = {linea.pk: Decimal("0") for linea in lineas}
 
     for costo in costos:
-        if costo.base <= 0:
-            continue
+        if (costo.base <= 0 or costo.igv < 0 or costo.total != costo.base + costo.igv
+                or costo.criterio not in CostoAdicional.Criterio.values):
+            raise CompraError("Revisa los costos adicionales: importe, IGV, total y criterio deben ser válidos.")
         pesos = [
             linea.base if costo.criterio == costo.Criterio.VALOR else linea.cantidad
             for linea in lineas
@@ -95,18 +99,17 @@ def confirmar(compra: Compra) -> Compra:
             raise CompraError(
                 f"No se puede prorratear «{costo.concepto}»: base cero."
             )
-        acumulado = Decimal("0")
+        importe_costo = costo.base if compra.con_credito else costo.total
+        peso_acumulado = Decimal("0")
+        asignacion_acumulada = Decimal("0")
         for indice, linea in enumerate(lineas):
-            if indice == len(lineas) - 1:
-                parte = _cent(costo.base) - acumulado
-            else:
-                parte = _cent(costo.base * pesos[indice] / suma)
-                acumulado += parte
+            peso_acumulado += pesos[indice]
+            nuevo_acumulado = _cent(importe_costo * peso_acumulado / suma)
+            parte = nuevo_acumulado - asignacion_acumulada
+            asignacion_acumulada = nuevo_acumulado
             asignado[linea.pk] += parte
 
     for linea in lineas:
-        if linea.cantidad <= 0:
-            raise CompraError("Hay una línea con cantidad cero.")
         # Si el comprobante no da crédito fiscal, su IGV forma parte del costo.
         impuesto_al_costo = Decimal("0") if compra.con_credito else Decimal(linea.igv)
         costo_total_linea = Decimal(linea.base) + impuesto_al_costo + asignado[linea.pk]

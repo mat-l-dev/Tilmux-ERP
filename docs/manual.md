@@ -61,6 +61,10 @@ separado para no confundirlas con facturas adicionales.
 **Compras → Nueva compra.** Escribes la factura del proveedor, agregas las líneas
 (con su descripción) y, si hubo flete o aduana, los costos de internamiento. Se
 prorratean por valor y el costo unitario final los incluye.
+Cuando la compra no usa crédito fiscal, el IGV de los costos adicionales se
+incorpora al costo del inventario. El reparto conserva los céntimos del costo
+total y no asigna importes negativos a las líneas. Revisa si cada costo es
+atribuible a la mercadería antes de registrarlo.
 
 En el listado de compras y gastos puedes consultar por fecha de emisión,
 devengo del gasto o anotación tributaria. Si no hay fecha de devengo o anotación

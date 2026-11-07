@@ -219,7 +219,7 @@ def nueva(request):
     compra_edit = None
     editar_id = request.GET.get("editar") or request.POST.get("compra_id")
     if editar_id:
-        compra_edit = get_object_or_404(Compra, pk=editar_id, empresa=empresa)
+        compra_edit = get_object_or_404(Compra.objects.select_for_update(), pk=editar_id, empresa=empresa)
         if compra_edit.estado not in (Compra.Estado.BORRADOR, Compra.Estado.PENDIENTE):
             messages.error(
                 request, "Solo se edita una compra en borrador o pendiente."
