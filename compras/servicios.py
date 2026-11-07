@@ -190,7 +190,17 @@ def registrar_gasto(
     provisiones_ids=(),
 ) -> Gasto:
     serie, numero = serie[:4], numero[:20]
-    base, igv, total = _cent(base), _cent(igv), _cent(total)
+    try:
+        valores = [Decimal(str(valor)) for valor in (base, igv, total)]
+        if any(not valor.is_finite() or abs(valor) >= Decimal("10000000000000000") for valor in valores):
+            raise InvalidOperation
+        base, igv, total = (_cent(valor) for valor in valores)
+        if any(abs(valor) >= Decimal("10000000000000000") for valor in (base, igv, total)):
+            raise InvalidOperation
+    except (InvalidOperation, ValueError, TypeError):
+        raise CompraError("Indica importes válidos para el gasto.") from None
+    if base < 0 or igv < 0 or total <= 0:
+        raise CompraError("La base y el IGV no pueden ser negativos y el total debe ser positivo.")
     if base + igv != total:
         raise CompraError("El gasto no cuadra: base más IGV no da el total.")
     if not provision and medio is None:
@@ -207,6 +217,18 @@ def registrar_gasto(
             raise CompraError("Este flujo solo admite crédito fiscal en facturas.")
         if not serie.strip() or not numero.strip() or not ruc_valido(proveedor):
             raise CompraError("Para marcar crédito, indica serie, número y RUC de 11 dígitos del proveedor.")
+
+    if cuenta.elemento != 6 or not cuenta.activa or not cuenta.admite_movimiento or cuenta.version != "2026":
+        raise CompraError("Selecciona una cuenta de gasto activa que admita movimientos.")
+    if provision and medio is not None:
+        raise CompraError("Una provisión no debe indicar una cuenta de pago.")
+    if not provision and (
+        medio.empresa_id != empresa.pk or not medio.activa or medio.moneda != "PEN" or not medio.cuenta_contable_id
+    ):
+        raise CompraError("Selecciona una cuenta de tesorería activa en soles de la empresa, con cuenta contable.")
+    estado_esperado = Gasto.Estado.PROVISION if provision else Gasto.Estado.PAGADO
+    if estado and estado != estado_esperado:
+        raise CompraError("El estado del gasto no corresponde a la operación registrada.")
 
     if not provision:
         validar_comprobante(

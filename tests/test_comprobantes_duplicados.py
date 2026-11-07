@@ -22,7 +22,9 @@ class ComprobantesDuplicadosTest(TestCase):
     def setUpTestData(cls):
         cls.empresa = Empresa.objects.create(nombre="Prueba", razon_social="Prueba SAC", ruc="20123456789")
         cls.proveedor = Tercero.objects.create(nombre="Proveedor", tipo_doc="RUC", numero_doc="20100000001")
-        cls.cuenta = Cuenta.objects.create(codigo="6391", nombre="Gastos", elemento=6, naturaleza="D")
+        cls.cuenta = Cuenta.objects.create(
+            codigo="6391", nombre="Gastos", elemento=6, naturaleza="D", activa=True, admite_movimiento=True
+        )
         cls.medio = CuentaTesoreria.objects.create(empresa=cls.empresa, nombre="Banco", cuenta_contable=cls.cuenta)
 
     def test_no_confirmar_compra_ya_registrada_como_gasto(self):
