@@ -45,10 +45,10 @@ unidades, series y cuentas de tesorería. Las cuentas contables ya están cargad
 
 Un usuario con un perfil asignado a una empresa solo puede seleccionarla en el
 ERP; si está inactiva, no se cambia a otra automáticamente. Los superusuarios
-pueden seleccionar cualquier empresa activa. Los usuarios sin perfil o con
-perfil sin empresa conservan acceso heredado a las empresas activas: hay que
-asignarles una empresa antes de usar el sistema con varias empresas. Este
-control no sustituye una revisión completa de permisos del administrador.
+pueden seleccionar cualquier empresa activa. Un usuario sin perfil, sin empresa
+asignada o con empresa inactiva debe solicitar su asignación al administrador
+antes de acceder a operaciones. La administración de Django está reservada a
+superusuarios; los catálogos siguen siendo compartidos entre empresas.
 
 ## Compras
 

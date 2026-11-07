@@ -15,10 +15,14 @@ class ConciliacionError(Exception):
     pass
 
 
-def _validar_usuario(usuario):
+def _validar_usuario(usuario, empresa):
     if usuario is None or not usuario.is_authenticated or not usuario.is_active:
         raise ConciliacionError("La operación necesita un usuario autenticado.")
     perfil = getattr(usuario, "perfil", None)
+    if not usuario.is_superuser and (
+        perfil is None or perfil.empresa_id != empresa.pk or not perfil.empresa.activa
+    ):
+        raise ConciliacionError("El usuario no tiene acceso a esta empresa.")
     if perfil is not None and perfil.rol == Perfil.Rol.LECTOR:
         raise ConciliacionError("Tu usuario es de solo lectura.")
 
@@ -34,7 +38,7 @@ def buscar_candidatos(*, empresa, cuenta, fecha, tipo, importe):
 
 @transaction.atomic
 def confirmar(*, empresa, cuenta, fecha, tipo, importe, movimiento_id, referencia, usuario):
-    _validar_usuario(usuario)
+    _validar_usuario(usuario, empresa)
     referencia = " ".join(referencia.split()).upper()
     if not referencia or len(referencia) > 100:
         raise ConciliacionError("Indica una referencia bancaria de hasta 100 caracteres.")
@@ -69,7 +73,7 @@ def confirmar(*, empresa, cuenta, fecha, tipo, importe, movimiento_id, referenci
 
 @transaction.atomic
 def revertir(*, empresa, conciliacion_id, motivo, usuario):
-    _validar_usuario(usuario)
+    _validar_usuario(usuario, empresa)
     motivo = motivo.strip()
     if not motivo or len(motivo) > 1000:
         raise ConciliacionError("Indica un motivo de reversión de hasta 1000 caracteres.")

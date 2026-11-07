@@ -12,7 +12,7 @@ from catalogo.models import CuentaTesoreria, Tercero
 from compras.models_gasto import Gasto
 from compras.servicios import CompraError
 from contabilidad.models import Cuenta
-from core.models import Empresa
+from core.models import Empresa, Perfil
 from tesoreria.models import MovimientoTesoreria
 
 from .test_invariantes import BaseContable
@@ -23,6 +23,7 @@ class ImportarGastoSeguroTest(TestCase):
     def setUpTestData(cls):
         cls.empresa = Empresa.objects.create(nombre="Empresa", razon_social="Empresa", ruc="20615841961")
         cls.usuario = get_user_model().objects.create_user(username="xml")
+        Perfil.objects.create(usuario=cls.usuario, empresa=cls.empresa)
         cls.cuenta = Cuenta.objects.create(
             codigo="6391", nombre="Comisiones", elemento=6, naturaleza="D", admite_movimiento=True, activa=True,
         )
@@ -92,6 +93,8 @@ class ImportarGastoSeguroTest(TestCase):
 
     def test_no_permite_reutilizar_xml_tras_cambiar_empresa(self):
         otra = Empresa.objects.create(nombre="Otra", razon_social="Otra", ruc="20123456789")
+        admin = get_user_model().objects.create_superuser(username="xml_admin", password="prueba")
+        self.client.force_login(admin)
         sesion = self.client.session
         sesion["empresa_id"] = otra.pk
         sesion.save()
@@ -103,6 +106,7 @@ class ImportarGastoSeguroTest(TestCase):
 class ImportarGastoContableTest(BaseContable):
     def test_factura_pagada_sin_credito_crea_gasto_y_movimiento(self):
         usuario = get_user_model().objects.create_user(username="xml_contable")
+        Perfil.objects.create(usuario=usuario, empresa=self.empresa)
         self.client.force_login(usuario)
         sesion = self.client.session
         sesion["empresa_id"] = self.empresa.pk

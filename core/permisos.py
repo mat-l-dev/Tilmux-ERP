@@ -16,6 +16,9 @@ def requiere_escritura(view):
     @wraps(view)
     def _envoltura(request, *args, **kwargs):
         perfil = getattr(request.user, "perfil", None)
+        if not request.user.is_superuser and (perfil is None or perfil.empresa_id is None or not perfil.empresa.activa):
+            messages.error(request, "Tu usuario no tiene una empresa activa asignada.")
+            return redirect("core:panel")
         if perfil is not None and perfil.rol == Perfil.Rol.LECTOR:
             messages.error(request, "Tu usuario es de solo lectura.")
             return redirect("core:panel")

@@ -13,7 +13,7 @@ from catalogo.models import Tercero
 from compras.models import Compra
 from compras.models_gasto import Gasto
 from contabilidad.models import Cuenta
-from core.models import Empresa, HistorialDocumento, Periodo
+from core.models import Empresa, HistorialDocumento, Perfil, Periodo
 from reportes.casillas import calcular
 
 
@@ -24,6 +24,7 @@ class PeriodoAnotacionTest(TestCase):
         cls.proveedor = Tercero.objects.create(nombre="Proveedor", tipo_doc="RUC", numero_doc="20100000001")
         cls.cuenta = Cuenta.objects.create(codigo="6391", nombre="Gasto", elemento=6, naturaleza="D")
         cls.usuario = get_user_model().objects.create_user(username="periodo")
+        Perfil.objects.create(usuario=cls.usuario, empresa=cls.empresa)
         cls.compra = Compra.objects.create(
             empresa=cls.empresa,
             proveedor=cls.proveedor,

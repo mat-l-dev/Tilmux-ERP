@@ -25,7 +25,7 @@ from contabilidad.servicios import (
     postear_lineas,
 )
 from core.contexto import usuario_actual
-from core.models import HistorialDocumento, Periodo
+from core.models import HistorialDocumento, Perfil, Periodo
 from reportes.casillas import calcular
 from reportes.eeff import construir
 from tesoreria.models import MovimientoTesoreria
@@ -212,6 +212,7 @@ class PagoIGV(BaseContable):
             estado=Periodo.Estado.CERRADO
         )
         usuario = get_user_model().objects.create_user(username="pago_cerrado")
+        Perfil.objects.create(usuario=usuario, empresa=self.empresa)
         self.client.force_login(usuario)
         respuesta = self.client.get(reverse("reportes:impuestos"), {"periodo": "2026-11"})
         self.assertContains(respuesta, "Registrar pago de IGV")
@@ -300,6 +301,7 @@ class PagoIGV(BaseContable):
         usuario = get_user_model().objects.create_user(
             username="probador", password="secreto"
         )
+        Perfil.objects.create(usuario=usuario, empresa=self.empresa)
         self.client.force_login(usuario)
 
         respuesta = self.client.get(

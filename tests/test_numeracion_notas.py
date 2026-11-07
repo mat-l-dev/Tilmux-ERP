@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
-from core.models import Empresa
+from core.models import Empresa, Perfil
 from ventas.models import NotaCredito, NotaDebito, Venta
 from ventas.servicios import VentaError, _validar_numeracion_nota, emitir_nota_credito, emitir_nota_debito
 
@@ -86,6 +86,7 @@ class NumeracionNotasTest(TestCase):
 
     def test_formularios_no_inventan_la_serie_de_la_nota(self):
         usuario = get_user_model().objects.create_user(username="registro")
+        Perfil.objects.create(usuario=usuario, empresa=self.empresa)
         self.client.force_login(usuario)
         for nombre in ("nota_credito", "nota_debito"):
             with self.subTest(tipo=nombre):

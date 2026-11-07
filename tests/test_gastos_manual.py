@@ -10,7 +10,7 @@ from catalogo.models import CuentaTesoreria
 from compras.models_gasto import Gasto
 from compras.servicios import registrar_gasto
 from contabilidad.models import Asiento, AsientoLinea, Cuenta
-from core.models import Empresa, HistorialDocumento
+from core.models import Empresa, HistorialDocumento, Perfil
 from tesoreria.models import MovimientoTesoreria
 
 from .test_invariantes import BaseContable
@@ -19,6 +19,7 @@ from .test_invariantes import BaseContable
 class GastoManualTest(BaseContable):
     def setUp(self):
         self.usuario = get_user_model().objects.create_user(username="gastos")
+        Perfil.objects.create(usuario=self.usuario, empresa=self.empresa)
         self.client.force_login(self.usuario)
         session = self.client.session
         session["empresa_id"] = self.empresa.pk

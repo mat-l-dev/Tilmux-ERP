@@ -11,7 +11,7 @@ from catalogo.models import CuentaTesoreria, Tercero
 from compras.models import Compra
 from compras.servicios import CompraError, confirmar, pagar, revaluar
 from contabilidad.models import Asiento, Cuenta
-from core.models import Empresa, TipoCambio
+from core.models import Empresa, Perfil, TipoCambio
 from tesoreria.models import MovimientoTesoreria
 
 
@@ -31,6 +31,7 @@ class ProteccionesPagoTest(TestCase):
             total_moneda_origen=Decimal("100"),
         )
         cls.usuario = get_user_model().objects.create_user(username="pago")
+        Perfil.objects.create(usuario=cls.usuario, empresa=cls.empresa)
 
     def test_rechaza_pago_parcial_en_moneda_extranjera_sin_movimiento(self):
         with self.assertRaisesMessage(CompraError, "pagos parciales"):

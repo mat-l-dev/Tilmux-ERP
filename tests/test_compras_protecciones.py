@@ -9,7 +9,7 @@ from django.urls import reverse
 from catalogo.models import Producto, Tercero, UnidadMedida
 from compras.models import Compra
 from contabilidad.models import Asiento
-from core.models import Empresa, HistorialDocumento, Periodo
+from core.models import Empresa, HistorialDocumento, Perfil, Periodo
 from inventario.models import CapaFIFO, MovimientoStock
 
 
@@ -20,6 +20,7 @@ class ProteccionesCompraTest(TestCase):
         cls.otra = Empresa.objects.create(nombre="B", razon_social="B SAC", ruc="20123456780")
         cls.proveedor = Tercero.objects.create(nombre="Proveedor")
         cls.usuario = get_user_model().objects.create_user(username="compras")
+        Perfil.objects.create(usuario=cls.usuario, empresa=cls.empresa)
         cls.compra = Compra.objects.create(
             empresa=cls.empresa, proveedor=cls.proveedor, fecha=date(2026, 10, 15),
             serie="F001", numero="1", estado=Compra.Estado.CONFIRMADA, glosa="Original",

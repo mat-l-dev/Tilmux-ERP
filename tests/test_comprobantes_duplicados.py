@@ -14,7 +14,7 @@ from compras.models import Compra
 from compras.models_gasto import Gasto
 from compras.servicios import CompraError, confirmar, registrar_gasto
 from contabilidad.models import Cuenta
-from core.models import Empresa
+from core.models import Empresa, Perfil
 
 
 class ComprobantesDuplicadosTest(TestCase):
@@ -139,6 +139,7 @@ class ComprobantesDuplicadosTest(TestCase):
             estado=Compra.Estado.CONFIRMADA,
         )
         usuario = get_user_model().objects.create_user(username="revisor")
+        Perfil.objects.create(usuario=usuario, empresa=self.empresa)
         self.client.force_login(usuario)
         respuesta = self.client.post(
             reverse("compras:corregir", args=[compra.pk]),

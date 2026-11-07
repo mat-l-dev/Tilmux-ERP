@@ -13,7 +13,7 @@ from compras.models import Compra
 from compras.models_gasto import Gasto
 from compras.servicios import CompraError
 from contabilidad.models import Cuenta
-from core.models import Empresa
+from core.models import Empresa, Perfil
 
 
 class ListadoComprasTest(TestCase):
@@ -40,6 +40,7 @@ class ListadoComprasTest(TestCase):
             empresa=otra, proveedor=proveedor, cuenta=cuenta, fecha=date(2026, 10, 3), serie="F003", numero="789"
         )
         cls.usuario = get_user_model().objects.create_user(username="lista")
+        Perfil.objects.create(usuario=cls.usuario, empresa=cls.empresa)
 
     def setUp(self):
         self.client.force_login(self.usuario)

@@ -79,3 +79,28 @@ class EmpresasPermisosTest(TestCase):
         self.assertEqual(self.client.session["empresa_id"], self.otra.pk)
         respuesta = self.client.get(reverse("core:panel"))
         self.assertEqual(respuesta.context["empresa_activa"], self.otra)
+
+    def test_sin_empresa_no_puede_acceder_a_operaciones_ni_cambiar_empresa(self):
+        for tiene_perfil in (False, True):
+            with self.subTest(tiene_perfil=tiene_perfil):
+                usuario = get_user_model().objects.create_user(username=f"sin_empresa_{tiene_perfil}")
+                if tiene_perfil:
+                    Perfil.objects.create(usuario=usuario, empresa=None)
+                self.client.force_login(usuario)
+                session = self.client.session
+                session["empresa_id"] = self.otra.pk
+                session.save()
+                respuesta = self.client.get(reverse("core:panel"))
+                self.assertIsNone(respuesta.context["empresa_activa"])
+                self.assertContains(respuesta, "No tienes una empresa activa asignada")
+                for ruta in (reverse("ventas:lista"), reverse("compras:lista"), reverse("tesoreria:movimientos")):
+                    self.assertEqual(self.client.get(ruta).status_code, 403)
+                self.assertEqual(self.client.post(reverse("core:cambiar_empresa"), {
+                    "empresa_id": self.otra.pk,
+                }).status_code, 403)
+
+    def test_usuario_staff_no_superusuario_no_accede_al_admin(self):
+        self.usuario.is_staff = True
+        self.usuario.save(update_fields=["is_staff"])
+        respuesta = self.client.get(reverse("admin:index"))
+        self.assertEqual(respuesta.status_code, 403)

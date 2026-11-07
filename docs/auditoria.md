@@ -790,8 +790,9 @@ for cod in ["1061", "1031", "40111", "40171", "4212"]:
 - Los perfiles que tienen empresa asignada solo pueden seleccionar esa empresa;
   si está inactiva, no se asigna otra. Las vistas de venta y sus notas comprueban
   la empresa activa; el cambio de empresa acepta solo destinos internos seguros.
-- Los usuarios sin perfil o con perfil sin empresa conservan acceso heredado a
-  empresas activas; los superusuarios pueden acceder a todas. El aislamiento
-  completo, incluidos permisos del administrador y catálogos, sigue pendiente.
+- Los usuarios sin perfil, sin empresa asignada o con empresa inactiva no
+  acceden a operaciones. Solo los superusuarios acceden a la administración y
+  pueden seleccionar todas las empresas activas. Los catálogos compartidos y
+  el aislamiento de los demás módulos aún requieren revisión.
 - La administración de períodos es de solo consulta para evitar cambiar un
   cierre por fuera del servicio que guarda su historial.

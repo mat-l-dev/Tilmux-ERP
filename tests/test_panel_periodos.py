@@ -9,7 +9,7 @@ from django.urls import reverse
 
 from contabilidad.models import Cuenta
 from contabilidad.servicios import postear_lineas
-from core.models import Empresa
+from core.models import Empresa, Perfil
 from ventas.models import NotaCredito, NotaDebito, Venta
 
 
@@ -18,6 +18,7 @@ class PanelPeriodosTest(TestCase):
     def setUpTestData(cls):
         cls.empresa = Empresa.objects.create(nombre="Empresa", razon_social="Empresa", ruc="20123456789")
         cls.usuario = get_user_model().objects.create_user(username="panel")
+        Perfil.objects.create(usuario=cls.usuario, empresa=cls.empresa)
         cls.caja = Cuenta.objects.create(codigo="101", nombre="Caja", elemento=1, naturaleza="D")
         contraparte = Cuenta.objects.create(codigo="501", nombre="Capital", elemento=5, naturaleza="A")
         for numero, (fecha, monto) in enumerate([

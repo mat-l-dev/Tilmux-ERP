@@ -10,14 +10,16 @@ from .models import Empresa
 
 
 def empresas_disponibles(usuario):
-    """Restringe los perfiles asignados; conserva acceso heredado sin asignación."""
+    """Solo administradores globales o la empresa asignada al perfil."""
     empresas = Empresa.objects.filter(activa=True)
     if not usuario.is_authenticated:
         return empresas.none()
     perfil = getattr(usuario, "perfil", None)
-    if not usuario.is_superuser and perfil is not None and perfil.empresa_id is not None:
-        return empresas.filter(pk=perfil.empresa_id)
-    return empresas
+    if usuario.is_superuser:
+        return empresas
+    if perfil is None or perfil.empresa_id is None:
+        return empresas.none()
+    return empresas.filter(pk=perfil.empresa_id)
 
 
 def empresa_actual(request: HttpRequest) -> Empresa | None:

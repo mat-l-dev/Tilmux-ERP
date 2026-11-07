@@ -20,6 +20,7 @@ class ConciliacionBancariaTest(TestCase):
         cls.empresa = Empresa.objects.create(nombre="Empresa", razon_social="Empresa", ruc="20123456789")
         cls.otra = Empresa.objects.create(nombre="Otra", razon_social="Otra", ruc="20123456780")
         cls.usuario = get_user_model().objects.create_user(username="conciliador")
+        Perfil.objects.create(usuario=cls.usuario, empresa=cls.empresa)
         cls.lector = get_user_model().objects.create_user(username="lector_conciliacion")
         Perfil.objects.create(usuario=cls.lector, empresa=cls.empresa, rol=Perfil.Rol.LECTOR)
         cls.cuenta = CuentaTesoreria.objects.create(empresa=cls.empresa, nombre="Banco", moneda="PEN")

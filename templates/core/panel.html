@@ -4,6 +4,9 @@
 {% block titulo_pagina %}Panel{% endblock %}
 
 {% block contenido %}
+{% if not empresa_activa %}
+<div class="message warning">No tienes una empresa activa asignada. Contacta a un administrador para acceder a las operaciones.</div>
+{% endif %}
 <form method="get" class="filtro">
   <label class="field" style="min-width:190px">
     <span>Mes de trabajo</span>

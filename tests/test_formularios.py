@@ -86,7 +86,7 @@ class CompraTest(SimpleTestCase):
 class ConfirmacionVentaTest(SimpleTestCase):
     def test_muestra_error_de_stock_sin_error_de_servidor(self):
         request = RequestFactory().post("/ventas/1/confirmar/")
-        request.user = SimpleNamespace(is_authenticated=True, perfil=None)
+        request.user = SimpleNamespace(is_authenticated=True, is_superuser=True, perfil=None)
         venta = SimpleNamespace(pk=1)
         with (
             patch("ventas.views.empresa_actual", return_value=object()),
@@ -100,7 +100,7 @@ class ConfirmacionVentaTest(SimpleTestCase):
 
     def test_compra_muestra_aviso_de_movimiento_retroactivo(self):
         request = RequestFactory().post("/compras/1/confirmar/")
-        request.user = SimpleNamespace(is_authenticated=True, perfil=None)
+        request.user = SimpleNamespace(is_authenticated=True, is_superuser=True, perfil=None)
         compra = SimpleNamespace(pk=1)
         with (
             patch("compras.views.empresa_actual", return_value=object()),

@@ -13,7 +13,7 @@ from django.urls import reverse
 
 from contabilidad.models import Asiento, Cuenta
 from contabilidad.servicios import ContabilidadError, postear_lineas
-from core.models import Empresa, HistorialDocumento, Periodo
+from core.models import Empresa, HistorialDocumento, Perfil, Periodo
 from core.periodos import cerrar_mes
 
 
@@ -24,6 +24,7 @@ class PeriodosSeguridadTest(TestCase):
         cls.otra = Empresa.objects.create(nombre="B", razon_social="B", ruc="20123456780")
         cls.admin = get_user_model().objects.create_superuser(username="admin_periodos", password="prueba")
         cls.usuario = get_user_model().objects.create_user(username="usuario_periodos")
+        Perfil.objects.create(usuario=cls.usuario, empresa=cls.empresa)
         cls.periodo = Periodo.objects.create(empresa=cls.empresa, anio=2026, mes=10)
         cls.ajeno = Periodo.objects.create(empresa=cls.otra, anio=2026, mes=10)
 

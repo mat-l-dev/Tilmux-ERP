@@ -8,7 +8,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from catalogo.models import CuentaTesoreria
-from core.models import Empresa
+from core.models import Empresa, Perfil
 from tesoreria.models import MovimientoTesoreria
 
 
@@ -18,6 +18,7 @@ class TesoreriaVistaTest(TestCase):
         cls.empresa = Empresa.objects.create(nombre="A", razon_social="A", ruc="20123456789")
         cls.otra = Empresa.objects.create(nombre="B", razon_social="B", ruc="20123456780")
         cls.usuario = get_user_model().objects.create_user(username="consulta_tesoreria")
+        Perfil.objects.create(usuario=cls.usuario, empresa=cls.empresa)
         cls.cuenta = CuentaTesoreria.objects.create(empresa=cls.empresa, nombre="Banco propio", moneda="PEN")
         cls.cuenta_usd = CuentaTesoreria.objects.create(empresa=cls.empresa, nombre="Cuenta dólares", moneda="USD")
         cls.cuenta_otra = CuentaTesoreria.objects.create(empresa=cls.otra, nombre="Banco ajeno", moneda="PEN")
