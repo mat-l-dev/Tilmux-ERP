@@ -5,7 +5,7 @@
 <section class="card">
   <header class="card-head"><h2>¿Qué quieres hacer?</h2></header>
   <p>Esta guía explica las funciones disponibles y sus límites. Los importes de los ejemplos son ficticios.</p>
-  <p><a href="#elegir">Elegir una opción</a> · <a href="#compras">Comprar mercadería</a> · <a href="#gastos">Registrar y pagar gastos</a> · <a href="#provisiones">Gastos sin comprobante</a> · <a href="#ventas">Ventas y cobros</a> · <a href="#sire">Revisar SIRE</a> · <a href="#fechas">Fechas y períodos</a></p>
+  <p><a href="#elegir">Elegir una opción</a> · <a href="#compras">Comprar mercadería</a> · <a href="#gastos">Registrar y pagar gastos</a> · <a href="#provisiones">Gastos sin comprobante</a> · <a href="#ventas">Ventas y cobros</a> · <a href="#banco">Revisar el banco</a> · <a href="#sire">Revisar SIRE</a> · <a href="#fechas">Fechas y períodos</a></p>
 </section>
 
 <section class="card" id="elegir">
@@ -65,8 +65,18 @@
   <p>Los cobros se vinculan a la venta, pero todavía no se distribuyen automáticamente entre sus cuotas. Los movimientos antiguos sin vincular necesitan revisión; el primer vencimiento mostrado es el pactado originalmente.</p>
 </section>
 
+<section class="card" id="banco">
+  <header class="card-head"><h2>6. Revisar movimientos y comparar con el banco</h2></header>
+  <ol>
+    <li>En <a href="{% url 'tesoreria:movimientos' %}">Tesorería</a> elige la cuenta y revisa sus ingresos y salidas. Abre el documento desde la fila cuando haya un enlace disponible.</li>
+    <li>Para comparar una operación del extracto, pulsa <strong>Comparar con el banco</strong> e indica cuenta, fecha, tipo e importe. Revisa los candidatos antes de confirmar una coincidencia.</li>
+    <li>El historial permite consultar las conciliaciones y su referencia. Una fila <strong>Revisar marca</strong> indica una marca anterior o una inconsistencia que necesita revisión.</li>
+  </ol>
+  <p>El neto mostrado suma los movimientos registrados; no necesariamente incluye el saldo inicial y no es el saldo bancario conciliado. Los movimientos sin enlace no se asocian automáticamente a un comprobante.</p>
+</section>
+
 <section class="card" id="sire">
-  <header class="card-head"><h2>6. Comparar con la propuesta SIRE</h2></header>
+  <header class="card-head"><h2>7. Comparar con la propuesta SIRE</h2></header>
   <ol>
     <li>Descarga la propuesta correspondiente desde SUNAT y comprueba empresa y período.</li>
     <li>En el ERP abre <a href="{% url 'reportes:conciliacion' %}">Conciliación SUNAT</a> y luego <strong>Conciliar con la propuesta del SIRE</strong>.</li>
@@ -77,7 +87,7 @@
 </section>
 
 <section class="card" id="fechas">
-  <header class="card-head"><h2>7. Entender las fechas</h2></header>
+  <header class="card-head"><h2>8. Entender las fechas</h2></header>
   <ul>
     <li><strong>Emisión:</strong> fecha del comprobante.</li>
     <li><strong>Devengo:</strong> fecha económica del gasto. En los formularios descritos se usa la misma fecha indicada al registrarlo.</li>

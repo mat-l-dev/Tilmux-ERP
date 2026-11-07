@@ -38,7 +38,7 @@
   </form>
   {% if pagina.object_list %}
   <table class="tabla-doc">
-    <thead><tr><th>Fecha</th><th>Cuenta</th><th>Tipo</th><th>Concepto</th><th>Canal</th><th class="der">Importe registrado</th></tr></thead>
+    <thead><tr><th>Fecha</th><th>Cuenta</th><th>Tipo</th><th>Concepto</th><th>Documento</th><th>Conciliación</th><th>Canal</th><th class="der">Importe registrado</th></tr></thead>
     <tbody>
       {% for movimiento in pagina %}
       <tr>
@@ -46,6 +46,8 @@
         <td>{{ movimiento.cuenta.nombre }}</td>
         <td>{{ movimiento.get_tipo_display }}</td>
         <td>{{ movimiento.concepto }}</td>
+        <td>{% if movimiento.documento_url %}<a href="{{ movimiento.documento_url }}">Ver {{ movimiento.documento_etiqueta|lower }}</a>{% else %}<span class="muted">Sin enlace disponible</span>{% endif %}</td>
+        <td>{% if movimiento.conciliacion_activa and movimiento.conciliado %}Conciliado{% elif movimiento.conciliacion_activa or movimiento.conciliado %}Revisar marca{% else %}Sin conciliar{% endif %}</td>
         <td>{{ movimiento.get_canal_display }}</td>
         <td class="num der">{{ movimiento.importe|floatformat:2 }}</td>
       </tr>

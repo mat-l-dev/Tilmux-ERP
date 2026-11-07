@@ -2,14 +2,19 @@
 
 from datetime import date
 from decimal import Decimal
+from uuid import uuid4
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
-from catalogo.models import CuentaTesoreria
+from catalogo.models import CuentaTesoreria, Tercero
+from compras.models import Compra
+from compras.models_gasto import Gasto, PagoGasto
+from contabilidad.models import Cuenta
 from core.models import Empresa, Perfil
-from tesoreria.models import MovimientoTesoreria
+from tesoreria.models import ConciliacionBancaria, MovimientoTesoreria
+from ventas.models import CobroVenta, Venta
 
 
 class TesoreriaVistaTest(TestCase):
@@ -75,6 +80,40 @@ class TesoreriaVistaTest(TestCase):
         self.assertEqual(respuesta.context["pagina"].number, 2)
         filas = {fila["cuenta"].pk: fila for fila in respuesta.context["filas"]}
         self.assertEqual(filas[self.cuenta.pk]["neto"], Decimal("110"))
+
+    def test_documentos_y_estado_de_conciliacion_son_de_la_empresa(self):
+        proveedor = Tercero.objects.create(nombre="Proveedor")
+        cuenta_contable = Cuenta.objects.create(codigo="6391", nombre="Gastos", elemento=6, naturaleza="D")
+        compra = Compra.objects.create(empresa=self.empresa, proveedor=proveedor, fecha=date(2026, 11, 1))
+        gasto = Gasto.objects.create(empresa=self.empresa, proveedor=proveedor, cuenta=cuenta_contable,
+                                     fecha=date(2026, 11, 1), total=10)
+        pago = PagoGasto.objects.create(gasto=gasto, cuenta=self.cuenta, fecha=date(2026, 11, 1),
+                                        importe=10, operacion=uuid4())
+        venta = Venta.objects.create(empresa=self.empresa, fecha=date(2026, 11, 1))
+        cobro = CobroVenta.objects.create(venta=venta, cuenta=self.cuenta, fecha=date(2026, 11, 1),
+                                          importe=10, canal="TRANSFERENCIA")
+        ajena = Compra.objects.create(empresa=self.otra, proveedor=proveedor, fecha=date(2026, 11, 1))
+        for tipo, pk in [("COMPRA_PAGO", compra.pk), ("PAGO_GASTO", pago.pk), ("COBRO_VENTA", cobro.pk),
+                         ("COMPRA_PAGO", ajena.pk)]:
+            MovimientoTesoreria.objects.create(empresa=self.empresa, cuenta=self.cuenta, fecha=date(2026, 11, 2),
+                                               tipo="EGRESO", importe=10, concepto="Vínculo", origen_tipo=tipo,
+                                               origen_id=pk)
+        marcado = MovimientoTesoreria.objects.get(cuenta=self.cuenta, concepto="Cobro propio")
+        marcado.conciliado = True
+        marcado.save(update_fields=["conciliado"])
+        conciliado = MovimientoTesoreria.objects.get(cuenta=self.cuenta, concepto="Pago propio")
+        conciliado.conciliado = True
+        conciliado.save(update_fields=["conciliado"])
+        ConciliacionBancaria.objects.create(empresa=self.empresa, cuenta=self.cuenta, movimiento=conciliado,
+                                           fecha_banco=conciliado.fecha, tipo=conciliado.tipo,
+                                           importe=conciliado.importe, referencia="PRUEBA", creado_por=self.usuario)
+        respuesta = self.client.get(reverse("tesoreria:movimientos"))
+        self.assertContains(respuesta, reverse("compras:detalle", args=[compra.pk]))
+        self.assertContains(respuesta, reverse("compras:detalle_gasto", args=[gasto.pk]))
+        self.assertContains(respuesta, reverse("ventas:detalle", args=[venta.pk]))
+        self.assertNotContains(respuesta, reverse("compras:detalle", args=[ajena.pk]))
+        self.assertContains(respuesta, "Revisar marca")
+        self.assertContains(respuesta, "Conciliado")
 
     def test_comparacion_muestra_candidatos_sin_conciliar_ni_crear_pagos(self):
         primero = MovimientoTesoreria.objects.get(cuenta=self.cuenta, concepto="Pago propio")

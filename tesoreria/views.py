@@ -5,7 +5,7 @@ from decimal import Decimal
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.db.models import Q, Sum
+from django.db.models import Exists, OuterRef, Q, Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
@@ -17,6 +17,7 @@ from core.permisos import requiere_escritura
 from .conciliacion import ConciliacionError, buscar_candidatos, confirmar, revertir
 from .forms import BuscarOperacionBancariaForm, ConfirmarConciliacionForm, RevertirConciliacionForm
 from .models import ConciliacionBancaria, MovimientoTesoreria
+from .origenes import enlazar_documentos
 
 
 @login_required
@@ -25,7 +26,11 @@ def movimientos(request):
     cuentas = CuentaTesoreria.objects.filter(empresa=empresa).order_by("nombre", "pk")
     movimientos = MovimientoTesoreria.objects.filter(
         empresa=empresa, cuenta__empresa=empresa,
-    ).select_related("cuenta").order_by("-fecha", "-pk")
+    ).select_related("cuenta").annotate(
+        conciliacion_activa=Exists(ConciliacionBancaria.objects.filter(
+            empresa=empresa, movimiento_id=OuterRef("pk"), activa=True,
+        )),
+    ).order_by("-fecha", "-pk")
     resumenes = {
         item["cuenta_id"]: item
         for item in movimientos.order_by().values("cuenta_id").annotate(
@@ -46,6 +51,8 @@ def movimientos(request):
         else:
             movimientos = movimientos.none()
     pagina = Paginator(movimientos, 30).get_page(request.GET.get("pagina"))
+    pagina.object_list = list(pagina.object_list)
+    enlazar_documentos(empresa=empresa, movimientos=pagina.object_list)
     return render(request, "tesoreria/movimientos.html", {
         "filas": filas, "pagina": pagina, "cuenta_id": cuenta_id,
     })
