@@ -139,6 +139,21 @@ class CobrosVentaTest(BaseContable):
         cobro.refresh_from_db()
         self.assertIsNone(cobro.cuota_id)
 
+    def test_no_asigna_un_cobro_mayor_a_cuota_ni_cuota_de_otra_venta(self):
+        usuario = get_user_model().objects.create_user(username="asignacion_limites")
+        cobro = self.cobrar("50")
+        cuota = self.venta.cuotas.get()
+        cuota.importe = Decimal("40")
+        cuota.save(update_fields=["importe"])
+        otra = Venta.objects.create(empresa=self.empresa, fecha=self.venta.fecha, serie="F002", numero="3")
+        cuota_ajena = CuotaVenta.objects.create(venta=otra, numero=1, vencimiento=date(2026, 12, 20), importe=100)
+        with self.assertRaisesMessage(VentaError, "supera el importe disponible"):
+            asignar_cobro(venta=self.venta, cobro_id=cobro.pk, cuota_id=cuota.pk, usuario=usuario)
+        with self.assertRaisesMessage(VentaError, "no pertenecen a esta venta"):
+            asignar_cobro(venta=self.venta, cobro_id=cobro.pk, cuota_id=cuota_ajena.pk, usuario=usuario)
+        cobro.refresh_from_db()
+        self.assertIsNone(cobro.cuota_id)
+
     def test_pantalla_exige_confirmacion_para_asignar(self):
         usuario = get_user_model().objects.create_superuser(username="asignador_web", password="test")
         self.client.force_login(usuario)
