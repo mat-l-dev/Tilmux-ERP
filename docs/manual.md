@@ -209,6 +209,7 @@ descripciones, cantidades o precios. Una venta confirmada no se edita; revisa
 el procedimiento aplicable al comprobante antes de registrar una nota.
 
 Al confirmar se descuenta stock por PEPS y se calcula el costo real. En una venta al contado también se registra el cobro; en una venta al crédito se registra después desde el detalle de la venta. El saldo considera las notas y los cobros vinculados; los cobros históricos no vinculados requieren revisión.
+Antes de confirmar una venta al crédito, registra las cuotas pactadas desde su detalle. Por ahora la suma debe coincidir con el total de la venta; los anticipos, detracciones, retenciones y otras deducciones requieren tratamiento adicional. Las cuotas muestran lo pactado originalmente y no distribuyen automáticamente los cobros ni las notas posteriores.
 El correlativo de la serie (`Serie.ultimo_numero`) se actualiza de forma atómica
 en ese momento; una venta en borrador no consume número. Las facturas E001 ya
 aceptadas por SUNAT no se modifican.

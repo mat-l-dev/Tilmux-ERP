@@ -69,3 +69,11 @@ class CobroVentaForm(forms.Form):
         self.fields["cuenta"].queryset = CuentaTesoreria.objects.filter(
             empresa=empresa, activa=True, moneda="PEN", cuenta_contable__isnull=False
         )
+
+
+class CuotaVentaForm(forms.Form):
+    vencimiento = forms.DateField(label="Vencimiento", widget=forms.DateInput(attrs={"type": "date"}))
+    importe = forms.DecimalField(label="Importe", max_digits=18, decimal_places=2, min_value=Decimal("0.01"))
+
+
+CuotasVentaFormSet = forms.formset_factory(CuotaVentaForm, extra=1, max_num=100, validate_max=True, can_delete=True)

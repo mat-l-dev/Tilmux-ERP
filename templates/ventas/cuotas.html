@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block titulo %}Programar cuotas{% endblock %}
+{% block titulo_pagina %}Cuotas de {{ venta.serie }}-{{ venta.numero }}{% endblock %}
+{% block contenido %}
+<section class="card">
+  <p>Total de la venta: S/ {{ venta.total|floatformat:2 }}. La suma de las cuotas debe ser igual al total.</p>
+  <p class="muted">Los anticipos, detracciones, retenciones y otras deducciones aún no se incluyen en esta programación.</p>
+  {% if error %}<div class="message error">{{ error }}</div>{% endif %}
+  <form method="post" id="form-cuotas">{% csrf_token %}
+    {{ formulario.management_form }}{{ formulario.non_form_errors }}
+    <div id="cuotas">
+      {% for fila in formulario %}<div class="grid-fields cuota">{{ fila.as_p }}</div>{% endfor %}
+    </div>
+    <template id="cuota-vacia"><div class="grid-fields cuota">{{ formulario.empty_form.as_p }}</div></template>
+    <button type="button" class="btn btn-ghost" id="agregar-cuota">Agregar cuota</button>
+    <button type="submit" class="btn btn-primary">Guardar cuotas</button>
+    <a class="btn btn-ghost" href="{% url 'ventas:detalle' venta.pk %}">Cancelar</a>
+  </form>
+</section>
+<script>
+  document.getElementById('agregar-cuota').addEventListener('click', function () {
+    const total = document.getElementById('id_form-TOTAL_FORMS');
+    const indice = Number(total.value);
+    if (indice >= 100) return;
+    const html = document.getElementById('cuota-vacia').innerHTML.replaceAll('__prefix__', String(indice));
+    document.getElementById('cuotas').insertAdjacentHTML('beforeend', html);
+    total.value = indice + 1;
+  });
+</script>
+{% endblock %}

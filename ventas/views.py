@@ -25,7 +25,7 @@ from core.permisos import requiere_escritura
 from inventario.servicios import StockError
 from reportes.casillas import casillas_documento
 
-from .forms import CabeceraVentaForm, CobroVentaForm
+from .forms import CabeceraVentaForm, CobroVentaForm, CuotasVentaFormSet
 from .models import NotaCredito, NotaCreditoLinea, NotaDebito, Venta, VentaLinea
 from .servicios import (
     MOTIVOS_CREDITO_IMPLEMENTADOS,
@@ -35,6 +35,7 @@ from .servicios import (
     emitir_nota_debito,
 )
 from .servicios_cobro import cobrar_venta, saldo_pendiente
+from .servicios_cuotas import guardar_cuotas
 
 
 def _numero_siguiente(empresa, tipo_doc: str, serie: str) -> str:
@@ -182,7 +183,7 @@ def nueva(request):
     venta_edit = None
     editar_id = request.GET.get("editar") or request.POST.get("venta_id")
     if editar_id:
-        venta_edit = get_object_or_404(Venta, pk=editar_id, empresa=empresa)
+        venta_edit = get_object_or_404(Venta.objects.select_for_update(), pk=editar_id, empresa=empresa)
         if venta_edit.estado != Venta.Estado.BORRADOR:
             messages.error(request, "Solo se puede editar una venta en borrador.")
             return redirect("ventas:detalle", venta_edit.pk)
@@ -292,6 +293,8 @@ def nueva(request):
     venta.modificado_por = usuario_actual.get()
     venta.modificado_en = timezone.now()
     venta.save()
+    if venta.condicion == Venta.Condicion.CONTADO:
+        venta.cuotas.all().delete()
 
     for orden, fila in enumerate(filas, start=1):
         VentaLinea.objects.create(
@@ -487,3 +490,28 @@ def cobrar(request, pk: int):
     return render(request, "ventas/cobrar.html", {
         "venta": venta, "formulario": formulario, "saldo": saldo_pendiente(venta)
     })
+
+
+@login_required
+@requiere_escritura
+def cuotas(request, pk: int):
+    venta = get_object_or_404(Venta, pk=pk, empresa=empresa_actual(request))
+    if venta.estado != Venta.Estado.BORRADOR or venta.condicion != Venta.Condicion.CREDITO:
+        messages.error(request, "Solo se pueden programar cuotas en una venta al crédito en borrador.")
+        return redirect("ventas:detalle", venta.pk)
+    inicial = list(venta.cuotas.values("vencimiento", "importe"))
+    formulario = CuotasVentaFormSet(request.POST if request.method == "POST" else None, initial=inicial)
+    error = None
+    if request.method == "POST" and formulario.is_valid():
+        try:
+            guardar_cuotas(
+                venta=venta,
+                cuotas=[f.cleaned_data for f in formulario if f.cleaned_data and not f.cleaned_data.get("DELETE")],
+                usuario=request.user,
+            )
+        except VentaError as exc:
+            error = str(exc)
+        else:
+            messages.success(request, "Cuotas guardadas. Revisa los importes antes de confirmar la venta.")
+            return redirect("ventas:detalle", venta.pk)
+    return render(request, "ventas/cuotas.html", {"venta": venta, "formulario": formulario, "error": error})

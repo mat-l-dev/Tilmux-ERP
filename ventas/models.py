@@ -163,6 +163,21 @@ class Venta(models.Model):
         return f"{self.serie}-{self.numero} · {self.total}"
 
 
+class CuotaVenta(models.Model):
+    venta = models.ForeignKey(Venta, on_delete=models.PROTECT, related_name="cuotas")
+    numero = models.PositiveSmallIntegerField()
+    vencimiento = models.DateField()
+    importe = models.DecimalField(max_digits=18, decimal_places=2)
+
+    class Meta:
+        ordering = ["numero"]
+        constraints = [
+            models.UniqueConstraint(fields=["venta", "numero"], name="cuota_venta_numero_unico"),
+            models.CheckConstraint(condition=models.Q(importe__gt=0), name="cuota_venta_importe_positivo"),
+            models.CheckConstraint(condition=models.Q(numero__gt=0), name="cuota_venta_numero_positivo"),
+        ]
+
+
 class CobroVenta(models.Model):
     venta = models.ForeignKey(Venta, on_delete=models.PROTECT, related_name="cobros")
     fecha = models.DateField()

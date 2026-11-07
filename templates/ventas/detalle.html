@@ -59,6 +59,17 @@
 
     {% include "reportes/_casillas_documento.html" %}
 
+    {% if venta.condicion == "CREDITO" %}
+    <section class="card">
+      <header class="card-head"><h2>Cuotas pactadas</h2></header>
+      <p class="muted">Importes y vencimientos acordados al registrar la venta. Los cobros y notas posteriores se muestran por separado.</p>
+      <table class="tabla-doc"><thead><tr><th>Cuota</th><th>Vencimiento</th><th class="der">Importe</th></tr></thead><tbody>
+        {% for cuota in venta.cuotas.all %}<tr><td>{{ cuota.numero }}</td><td>{{ cuota.vencimiento|date:"d/m/Y" }}</td><td class="num der">{{ cuota.importe|floatformat:2 }}</td></tr>{% empty %}<tr><td colspan="3">No hay cuotas registradas.</td></tr>{% endfor %}
+      </tbody></table>
+      {% if venta.estado == "BORRADOR" %}<a class="btn btn-ghost" href="{% url 'ventas:cuotas' venta.pk %}">Programar cuotas</a>{% endif %}
+    </section>
+    {% endif %}
+
     {% if saldo_credito is not None %}
     <section class="card">
       <header class="card-head"><h2>Cobros de la venta</h2></header>

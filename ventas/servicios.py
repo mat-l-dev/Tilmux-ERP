@@ -96,6 +96,12 @@ def confirmar(venta: Venta) -> Venta:
     igv = _cent(sum((linea.igv for linea in lineas), Decimal("0")))
     total = base + igv
 
+    if venta.condicion == Venta.Condicion.CREDITO:
+        from .servicios_cuotas import validar_cuotas
+
+        cuotas = list(venta.cuotas.values("vencimiento", "importe"))
+        validar_cuotas(venta, cuotas, total)
+
     if venta.tipo_doc == Venta.TipoDoc.FACTURA:
         if venta.cliente is None or venta.cliente.tipo_doc != "RUC":
             raise VentaError("Una factura exige cliente con RUC.")

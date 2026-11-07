@@ -8,7 +8,7 @@ from contabilidad.models import Asiento
 from contabilidad.servicios import ContabilidadError
 from core.models import Periodo
 from tesoreria.models import MovimientoTesoreria
-from ventas.models import Venta, VentaLinea
+from ventas.models import CuotaVenta, Venta, VentaLinea
 from ventas.servicios import VentaError, confirmar, emitir_nota_credito
 from ventas.servicios_cobro import cobrar_venta, saldo_pendiente
 
@@ -31,6 +31,7 @@ class CobrosVentaTest(BaseContable):
         VentaLinea.objects.create(
             venta=self.venta, producto=self.producto, cantidad=1, precio_unitario=118, base=100, igv=18, total=118
         )
+        CuotaVenta.objects.create(venta=self.venta, numero=1, vencimiento=date(2026, 12, 20), importe=118)
         self.venta = confirmar(self.venta)
 
     def cobrar(self, importe, **opciones):
