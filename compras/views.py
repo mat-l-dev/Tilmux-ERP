@@ -311,7 +311,7 @@ def detalle_gasto(request, pk: int):
     )
     pagos = list(gasto.pagos.select_related("cuenta"))
     pago_ids = [p.pk for p in pagos]
-    origenes = (Q(origen_tipo__in=["GASTO", "GASTO_PENDIENTE"], origen_id=gasto.pk)
+    origenes = (Q(origen_tipo__in=["GASTO", "GASTO_PENDIENTE", "GASTO_RECLAS_PROV"], origen_id=gasto.pk)
                 | Q(origen_tipo="PAGO_GASTO", origen_id__in=pago_ids))
     asientos = Asiento.objects.filter(origenes, empresa=empresa).prefetch_related("lineas__cuenta")
     movimientos = MovimientoTesoreria.objects.filter(

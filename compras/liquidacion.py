@@ -11,6 +11,21 @@ from tesoreria.models import MovimientoTesoreria
 from .models_gasto import Gasto
 
 
+def cuenta_deuda_provision(asiento, importe):
+    """Acepta 4211 nueva y 4212 histórica, sin mezclar las dos."""
+    from .servicios import CompraError
+
+    saldos = {"4211": Decimal("0"), "4212": Decimal("0")}
+    for linea in asiento.lineas.all():
+        if linea.cuenta.version == "2026" and linea.cuenta.codigo in saldos:
+            saldos[linea.cuenta.codigo] += linea.haber - linea.debe
+    if saldos == {"4211": importe, "4212": Decimal("0")}:
+        return "4211"
+    if saldos == {"4211": Decimal("0"), "4212": importe}:
+        return "4212"
+    raise CompraError("La cuenta por pagar de una provisión no coincide con su importe.")
+
+
 def preparar_provisiones(*, empresa, proveedor, fecha, igv, total, ids):
     from .servicios import CompraError
 
@@ -39,10 +54,7 @@ def preparar_provisiones(*, empresa, proveedor, fecha, igv, total, ids):
             raise CompraError(
                 "La provisión necesita un único asiento vigente anterior al comprobante; revisa su contabilidad."
             )
-        saldo = sum((linea.haber - linea.debe for linea in asientos[0].lineas.all()
-                     if linea.cuenta.codigo == "4212"), Decimal("0"))
-        if saldo != item.total:
-            raise CompraError("La cuenta por pagar de una provisión no coincide con su importe.")
+        item.cuenta_deuda = cuenta_deuda_provision(asientos[0], item.total)
     if sum((item.total for item in provisiones), Decimal("0")) != total:
         raise CompraError("Las provisiones seleccionadas deben sumar exactamente el total del comprobante.")
     return provisiones
@@ -50,11 +62,18 @@ def preparar_provisiones(*, empresa, proveedor, fecha, igv, total, ids):
 
 def liquidar_provisiones(*, gasto, provisiones, medio):
     cuenta = Cuenta.objects.get(version="2026", codigo="4212")
+    sin_comprobante = sum((item.total for item in provisiones if item.cuenta_deuda == "4211"), Decimal("0"))
+    lineas = []
+    if sin_comprobante:
+        cuenta_no_emitida = Cuenta.objects.get(version="2026", codigo="4211")
+        lineas.extend([(cuenta_no_emitida, sin_comprobante, Decimal("0"), "Reclasificación de deuda"),
+                       (cuenta, Decimal("0"), sin_comprobante, "Comprobante recibido")])
+    lineas.extend([(cuenta, gasto.total, Decimal("0"), "Cancelación de provisiones"),
+                   (medio.cuenta_contable, Decimal("0"), gasto.total, "Salida de dinero")])
     postear_lineas(
         empresa=gasto.empresa, fecha=gasto.fecha, tipo="PAGO_PROVEEDOR",
         glosa=f"Liquidación de provisiones · {gasto.proveedor.nombre}"[:255],
-        lineas=[(cuenta, gasto.total, Decimal("0"), "Cancelación de provisiones"),
-                (medio.cuenta_contable, Decimal("0"), gasto.total, "Salida de dinero")],
+        lineas=lineas,
         origen_tipo="GASTO", origen_id=gasto.pk,
     )
     for item in provisiones:
@@ -67,12 +86,13 @@ def liquidar_provisiones(*, gasto, provisiones, medio):
         )
 
 
-def validar_provisiones_vinculadas(*, gasto, provisiones):
+def validar_provisiones_vinculadas(*, gasto, provisiones, exigir_reclasificacion=True):
     """Verifica el respaldo de una deuda vinculada sin suponer pagos históricos."""
     from .servicios import CompraError
 
     if not provisiones or gasto.provision or gasto.igv != 0:
         raise CompraError("Las provisiones vinculadas necesitan revisión antes del pago.")
+    sin_comprobante = Decimal("0")
     for item in provisiones:
         if (item.empresa_id != gasto.empresa_id or item.proveedor_id != gasto.proveedor_id
                 or not item.provision or item.gasto_origen_id != gasto.pk
@@ -90,11 +110,29 @@ def validar_provisiones_vinculadas(*, gasto, provisiones):
         if (len(asientos) != 1 or asientos[0].estado != Asiento.Estado.CONFIRMADO
                 or asientos[0].tipo_operacion != "PROVISION_GASTO" or asientos[0].fecha > gasto.fecha):
             raise CompraError("El asiento de una provisión necesita revisión.")
-        saldo = sum((linea.haber - linea.debe for linea in asientos[0].lineas.all()
-                     if linea.cuenta.version == "2026" and linea.cuenta.codigo == "4212"), Decimal("0"))
-        if saldo != item.total or MovimientoTesoreria.objects.filter(
+        origen = cuenta_deuda_provision(asientos[0], item.total)
+        if origen == "4211":
+            sin_comprobante += item.total
+        if MovimientoTesoreria.objects.filter(
             empresa=gasto.empresa, origen_tipo="GASTO", origen_id=item.pk,
         ).exists():
             raise CompraError("La deuda o los movimientos de una provisión necesitan revisión.")
     if sum((item.total for item in provisiones), Decimal("0")) != gasto.total:
         raise CompraError("Las provisiones vinculadas no suman el total del comprobante.")
+    if exigir_reclasificacion:
+        reclasificaciones = list(Asiento.objects.filter(
+            empresa=gasto.empresa, origen_tipo="GASTO_RECLAS_PROV", origen_id=gasto.pk,
+        ).prefetch_related("lineas__cuenta"))
+        if sin_comprobante:
+            if (len(reclasificaciones) != 1 or reclasificaciones[0].estado != Asiento.Estado.CONFIRMADO
+                    or reclasificaciones[0].fecha != gasto.fecha):
+                raise CompraError("La reclasificación de las provisiones necesita revisión.")
+            lineas = list(reclasificaciones[0].lineas.all())
+            debito = sum((x.debe - x.haber for x in lineas if x.cuenta.codigo == "4211"), Decimal("0"))
+            credito = sum((x.haber - x.debe for x in lineas if x.cuenta.codigo == "4212"), Decimal("0"))
+            if (debito != sin_comprobante or credito != sin_comprobante
+                    or any(x.cuenta.version != "2026" or x.cuenta.codigo not in ("4211", "4212") for x in lineas)):
+                raise CompraError("Los importes de la reclasificación necesitan revisión.")
+        elif reclasificaciones:
+            raise CompraError("La reclasificación de las provisiones necesita revisión.")
+    return sin_comprobante

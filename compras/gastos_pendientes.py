@@ -55,7 +55,7 @@ def registrar_pendiente(*, empresa, proveedor, fecha, tipo_doc, serie, numero, b
         empresa=empresa, proveedor=proveedor, fecha=fecha, igv=igv, total=total,
         ids=[item.pk for item in provisiones],
     )
-    cuentas = {c.codigo: c for c in Cuenta.objects.filter(version="2026", codigo__in=["4212", "40111"])}
+    cuentas = {c.codigo: c for c in Cuenta.objects.filter(version="2026", codigo__in=["4211", "4212", "40111"])}
     if "4212" not in cuentas or (con_credito and igv and "40111" not in cuentas):
         raise CompraError("Faltan cuentas contables necesarias para registrar el gasto.")
     gasto = Gasto.objects.create(
@@ -69,6 +69,19 @@ def registrar_pendiente(*, empresa, proveedor, fecha, tipo_doc, serie, numero, b
         for provision in provisiones:
             provision.gasto_origen = gasto
             provision.save(update_fields=["gasto_origen"])
+        sin_comprobante = validar_provisiones_vinculadas(
+            gasto=gasto, provisiones=provisiones, exigir_reclasificacion=False,
+        )
+        if sin_comprobante:
+            if "4211" not in cuentas:
+                raise CompraError("Falta la cuenta contable de comprobantes no emitidos.")
+            postear_lineas(
+                empresa=empresa, fecha=fecha, tipo="PROVISION_GASTO", usuario=usuario,
+                glosa=f"Comprobante recibido {serie}-{numero}",
+                lineas=[(cuentas["4211"], sin_comprobante, Decimal("0"), "Deuda sin comprobante"),
+                        (cuentas["4212"], Decimal("0"), sin_comprobante, "Deuda documentada")],
+                origen_tipo="GASTO_RECLAS_PROV", origen_id=gasto.pk,
+            )
         validar_provisiones_vinculadas(gasto=gasto, provisiones=provisiones)
         for provision in provisiones:
             HistorialDocumento.objects.create(

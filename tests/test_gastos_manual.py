@@ -111,8 +111,12 @@ class GastoManualTest(BaseContable):
         lineas = AsientoLinea.objects.filter(asiento__empresa=self.empresa, asiento__estado="CONFIRMADO")
         gasto = sum((linea.debe - linea.haber for linea in lineas.filter(cuenta__codigo="6391")), Decimal("0"))
         deuda = sum((linea.haber - linea.debe for linea in lineas.filter(cuenta__codigo="4212")), Decimal("0"))
+        deuda_no_emitida = sum(
+            (linea.haber - linea.debe for linea in lineas.filter(cuenta__codigo="4211")), Decimal("0")
+        )
         self.assertEqual(gasto, Decimal("28"))
         self.assertEqual(deuda, Decimal("0"))
+        self.assertEqual(deuda_no_emitida, Decimal("0"))
         self.assertEqual(MovimientoTesoreria.objects.filter(origen_tipo="GASTO", origen_id=factura.pk).count(), 1)
         self.assertEqual(
             HistorialDocumento.objects.filter(

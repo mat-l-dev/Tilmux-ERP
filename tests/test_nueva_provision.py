@@ -42,7 +42,7 @@ class NuevaProvisionTest(BaseContable):
         asiento = Asiento.objects.get(empresa=self.empresa, origen_tipo="GASTO", origen_id=provision.pk)
         lineas = {linea.cuenta.codigo: (linea.debe, linea.haber) for linea in asiento.lineas.all()}
         self.assertEqual(lineas["6391"], (Decimal("28"), Decimal("0")))
-        self.assertEqual(lineas["4212"], (Decimal("0"), Decimal("28")))
+        self.assertEqual(lineas["4211"], (Decimal("0"), Decimal("28")))
         self.assertFalse(MovimientoTesoreria.objects.filter(origen_tipo="GASTO", origen_id=provision.pk).exists())
         self.assertTrue(
             HistorialDocumento.objects.filter(
@@ -123,7 +123,10 @@ class NuevaProvisionTest(BaseContable):
         provision.refresh_from_db()
         self.assertEqual(provision.gasto_origen_id, factura.pk)
         self.assertFalse(MovimientoTesoreria.objects.exists())
-        self.assertEqual(Asiento.objects.filter(empresa=self.empresa).count(), 1)
+        self.assertEqual(Asiento.objects.filter(empresa=self.empresa).count(), 2)
+        reclasificacion = Asiento.objects.get(origen_tipo="GASTO_RECLAS_PROV", origen_id=factura.pk)
+        self.assertEqual(reclasificacion.lineas.get(cuenta__codigo="4211").debe, Decimal("28"))
+        self.assertEqual(reclasificacion.lineas.get(cuenta__codigo="4212").haber, Decimal("28"))
         detalle = self.client.get(reverse("compras:detalle_gasto", args=[factura.pk]))
         self.assertContains(detalle, "Saldo pendiente")
         self.assertContains(detalle, "Registrar pago")
@@ -145,8 +148,10 @@ class NuevaProvisionTest(BaseContable):
         )
         gasto = sum((debe - haber for codigo, debe, haber in lineas if codigo == "6391"), Decimal("0"))
         deuda = sum((haber - debe for codigo, debe, haber in lineas if codigo == "4212"), Decimal("0"))
+        deuda_no_emitida = sum((haber - debe for codigo, debe, haber in lineas if codigo == "4211"), Decimal("0"))
         self.assertEqual(gasto, Decimal("28"))
         self.assertEqual(deuda, Decimal("0"))
+        self.assertEqual(deuda_no_emitida, Decimal("0"))
 
     def test_provision_con_igv_o_respaldo_invalido_no_vincula(self):
         self.client.post(self.url, self.datos)
@@ -185,3 +190,49 @@ class NuevaProvisionTest(BaseContable):
         self.assertContains(respuesta, "necesita revisión")
         self.assertFalse(factura.pagos.exists())
         self.assertFalse(MovimientoTesoreria.objects.filter(origen_tipo="PAGO_GASTO").exists())
+
+    def test_vincula_provisiones_antiguas_y_nuevas_sin_reescribir_asientos(self):
+        datos = self.datos | {"importe": "10", "operacion": str(uuid4())}
+        self.client.post(self.url, datos)
+        antigua = Gasto.objects.get(empresa=self.empresa, provision=True)
+        asiento_antiguo = Asiento.objects.get(origen_tipo="GASTO", origen_id=antigua.pk)
+        linea = asiento_antiguo.lineas.get(cuenta__codigo="4211")
+        linea.cuenta = Cuenta.objects.get(version="2026", codigo="4212")
+        linea.save(update_fields=["cuenta"])
+        self.client.post(self.url, self.datos | {"importe": "18", "operacion": str(uuid4())})
+        nueva = Gasto.objects.filter(empresa=self.empresa, provision=True).exclude(pk=antigua.pk).get()
+        factura_datos = {
+            "fecha": "2026-11-11", "proveedor": self.proveedor.pk, "tipo_doc": "FACTURA",
+            "serie": "F001", "numero": "23", "base": "28", "igv": "0", "cuenta": self.datos["cuenta"],
+            "glosa": "Comisión facturada", "provisiones": [antigua.pk, nueva.pk],
+        }
+        self.assertEqual(self.client.post(reverse("compras:nuevo_gasto_pendiente"), factura_datos).status_code, 302)
+        factura = Gasto.objects.get(serie="F001", numero="23")
+        reclasificacion = Asiento.objects.get(origen_tipo="GASTO_RECLAS_PROV", origen_id=factura.pk)
+        self.assertEqual(reclasificacion.lineas.get(cuenta__codigo="4211").debe, Decimal("18"))
+        self.assertEqual(reclasificacion.lineas.get(cuenta__codigo="4212").haber, Decimal("18"))
+        linea.refresh_from_db()
+        self.assertEqual(linea.cuenta.codigo, "4212")
+        respuesta = self.client.post(reverse("compras:pagar_gasto", args=[factura.pk]), {
+            "fecha": "2026-11-12", "importe": "28", "cuenta": self.bbva.pk, "canal": "TRANSFERENCIA",
+            "operacion": str(uuid4()),
+        })
+        self.assertEqual(respuesta.status_code, 302)
+        factura.refresh_from_db()
+        self.assertEqual(factura.estado, Gasto.Estado.PAGADO)
+
+    def test_si_se_anula_la_reclasificacion_no_se_permite_pago(self):
+        self.client.post(self.url, self.datos)
+        provision = Gasto.objects.get(empresa=self.empresa, provision=True)
+        datos = {"fecha": "2026-11-11", "proveedor": self.proveedor.pk, "tipo_doc": "FACTURA",
+                 "serie": "F001", "numero": "24", "base": "28", "igv": "0",
+                 "cuenta": self.datos["cuenta"], "glosa": "Servicio", "provisiones": [provision.pk]}
+        self.assertEqual(self.client.post(reverse("compras:nuevo_gasto_pendiente"), datos).status_code, 302)
+        factura = Gasto.objects.get(serie="F001", numero="24")
+        Asiento.objects.filter(origen_tipo="GASTO_RECLAS_PROV", origen_id=factura.pk).update(estado="ANULADO")
+        respuesta = self.client.post(reverse("compras:pagar_gasto", args=[factura.pk]), {
+            "fecha": "2026-11-12", "importe": "10", "cuenta": self.bbva.pk, "canal": "TRANSFERENCIA",
+            "operacion": str(uuid4()),
+        })
+        self.assertContains(respuesta, "reclasificación de las provisiones necesita revisión")
+        self.assertFalse(factura.pagos.exists())

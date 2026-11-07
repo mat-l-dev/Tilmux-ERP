@@ -35,7 +35,7 @@ Abrir http://127.0.0.1:8000
 | Comando | Qué hace |
 |---|---|
 | `cargar_pcge` | Carga las 1.636 cuentas del PCGE 2026 |
-| `sembrar_tilmux` | Crea la empresa, sus periodos y activa las 44 cuentas en uso |
+| `sembrar_tilmux` | Crea la empresa, sus periodos y activa las cuentas en uso |
 | `sembrar_base` | Unidades, series y cuentas de tesorería |
 | `sembrar_reglas` | Las 15 reglas contables |
 | `sembrar_productos` | Los dos SKUs iniciales |

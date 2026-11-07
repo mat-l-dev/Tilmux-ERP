@@ -228,6 +228,8 @@ def registrar_gasto(
         raise CompraError("Selecciona una cuenta de gasto activa que admita movimientos.")
     if provision and medio is not None:
         raise CompraError("Una provisión no debe indicar una cuenta de pago.")
+    if provision and igv:
+        raise CompraError("No se registra IGV en una provisión sin comprobante.")
     if not provision and (
         medio.empresa_id != empresa.pk or not medio.activa or medio.moneda != "PEN" or not medio.cuenta_contable_id
     ):
@@ -284,7 +286,7 @@ def registrar_gasto(
         cuentas = {
             c.codigo: c
             for c in Cuenta.objects.filter(
-                version="2026", codigo__in=["40111", "4212"]
+                version="2026", codigo__in=["40111", "4211"]
             )
         }
         lineas = [
@@ -305,7 +307,7 @@ def registrar_gasto(
                 )
             )
         lineas.append(
-            (cuentas["4212"], Decimal("0.00"), total, "Por pagar")
+            (cuentas["4211"], Decimal("0.00"), total, "Comprobante pendiente")
         )
         postear_lineas(
             empresa=empresa,

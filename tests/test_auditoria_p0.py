@@ -145,7 +145,7 @@ class Provisiones(BaseContable):
             tipo_operacion="PROVISION_GASTO",
         )
         self.assertEqual(
-            asiento.lineas.get(cuenta__codigo="4212").haber,
+            asiento.lineas.get(cuenta__codigo="4211").haber,
             Decimal("50.00"),
         )
         self.assertEqual(calcular(self.empresa, 2026, 11)["no_gravado"], Decimal("0"))

@@ -30,7 +30,7 @@
       </dl>
       {% if gasto.gasto_origen %}<p class="preview-note">Esta provisión está vinculada al <a href="{% url 'compras:detalle_gasto' gasto.gasto_origen.pk %}">comprobante {{ gasto.gasto_origen.serie }}-{{ gasto.gasto_origen.numero }}</a>. Consulta allí su estado de pago.</p>{% elif gasto.provision %}<p class="preview-note">Provisión sin comprobante vinculado.</p>{% endif %}
       {% if provisiones %}<p class="preview-note">Provisiones vinculadas: {% for p in provisiones %}<a href="{% url 'compras:detalle_gasto' p.pk %}">{{ p.glosa|default:"Ver provisión" }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}.</p>{% endif %}
-      {% if deuda_provision %}<p class="preview-note">El gasto y la deuda se reconocieron en las provisiones vinculadas. Los asientos de pago aparecen abajo cuando se registran.</p>{% endif %}
+      {% if deuda_provision %}<p class="preview-note">El gasto se reconoció en las provisiones vinculadas. La reclasificación y los pagos, cuando correspondan, aparecen abajo.</p>{% endif %}
       {% if es_pendiente %}<p>Saldo pendiente: <strong>S/ {{ saldo_pendiente|floatformat:2 }}</strong></p>{% endif %}
       {% if not gasto.provision %}<p class="preview-note">Estas opciones muestran lo registrado en el ERP; no verifican por sí solas el tratamiento tributario ni la aceptación del comprobante.</p>{% endif %}
     </section>

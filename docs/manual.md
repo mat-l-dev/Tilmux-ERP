@@ -43,8 +43,8 @@ los registros del ERP y deben contrastarse con los comprobantes y el SIRE.
 ## Catálogos
 
 En **Configuración** (el admin) se cargan productos, proveedores, clientes,
-unidades, series y cuentas de tesorería. Las cuentas contables ya están cargadas:
-1 636 del PCGE 2026, con 44 activas.
+unidades, series y cuentas de tesorería. El catálogo contable incluye las
+cuentas del PCGE 2026; las usadas habitualmente se activan en la configuración inicial.
 
 Un usuario con un perfil asignado a una empresa solo puede seleccionarla en el
 ERP; si está inactiva, no se cambia a otra automáticamente. Los superusuarios
@@ -181,14 +181,15 @@ evitar cambios directos que no actualicen la contabilidad.
 
 La provisión:
 
-- Debita la cuenta de gasto y acredita la cuenta por pagar 4212.
+- Debita la cuenta de gasto y acredita la cuenta 4211 por comprobantes aún no recibidos.
 - No mueve tesorería: todavía no ha salido dinero.
 - No aparece en el registro de compras ni en el PDT 621.
 
 Al registrar un gasto pagado puedes seleccionar las provisiones pendientes del
 mismo proveedor. Si suman exactamente el total y tanto ellas como el comprobante
-no tienen IGV, el sistema vincula los documentos y cancela la 4212 sin volver a
-registrar el gasto. Revisa la selección: si no seleccionas provisiones, se
+no tienen IGV, el sistema vincula los documentos, reclasifica la deuda a 4212 y la cancela sin volver a
+registrar el gasto. Las provisiones históricas registradas en 4212 conservan su asiento original.
+Revisa la selección: si no seleccionas provisiones, se
 registra un gasto nuevo. Este flujo no admite pagos parciales ni diferencias o IGV. Los
 vínculos históricos por sí solos no implican que se haya liquidado la deuda.
 
