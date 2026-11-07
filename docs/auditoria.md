@@ -779,6 +779,8 @@ for cod in ["1061", "1031", "40111", "40171", "4212"]:
   cuenta en soles por fecha cercana (tres días), tipo e importe exacto. Se
   muestran todas las alternativas hasta el límite visible de 100; las marcas
   previas se informan, pero no se modifican.
-- Coincidir en importe y fecha no acredita identidad. No se importa el
-  extracto ni se crean asociaciones o movimientos: la conciliación persistente,
-  con referencias bancarias y control de duplicados, sigue pendiente.
+- Coincidir en importe y fecha no acredita identidad. El usuario puede
+  confirmar una coincidencia con referencia bancaria única por cuenta; se
+  conserva el usuario y la reversión exige motivo. No se importan extractos ni
+  se crean pagos. Solo se admite un movimiento del ERP por operación bancaria;
+  las marcas históricas sin referencia no se interpretan automáticamente.

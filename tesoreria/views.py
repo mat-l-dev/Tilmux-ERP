@@ -2,17 +2,21 @@
 
 from decimal import Decimal
 
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Q, Sum
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
 
 from catalogo.models import CuentaTesoreria
 from core.context import empresa_actual
+from core.models import Perfil
+from core.permisos import requiere_escritura
 
-from .conciliacion import buscar_candidatos
-from .forms import BuscarOperacionBancariaForm
-from .models import MovimientoTesoreria
+from .conciliacion import ConciliacionError, buscar_candidatos, confirmar, revertir
+from .forms import BuscarOperacionBancariaForm, ConfirmarConciliacionForm, RevertirConciliacionForm
+from .models import ConciliacionBancaria, MovimientoTesoreria
 
 
 @login_required
@@ -56,10 +60,69 @@ def comparar_banco(request):
     )
     candidatos = None
     cantidad = 0
+    datos_bancarios = None
     if request.method == "POST" and formulario.is_valid():
         consulta = buscar_candidatos(empresa=empresa, **formulario.cleaned_data)
         cantidad = consulta.count()
         candidatos = list(consulta[:100])
+        datos_bancarios = formulario.cleaned_data
+    perfil = getattr(request.user, "perfil", None)
     return render(request, "tesoreria/comparar_banco.html", {
         "formulario": formulario, "candidatos": candidatos, "cantidad": cantidad,
+        "datos_bancarios": datos_bancarios, "puede_escribir": perfil is None or perfil.rol != Perfil.Rol.LECTOR,
     })
+
+
+@login_required
+@requiere_escritura
+@require_POST
+def confirmar_conciliacion(request):
+    empresa = empresa_actual(request)
+    formulario = ConfirmarConciliacionForm(request.POST, empresa=empresa)
+    if formulario.is_valid():
+        datos = formulario.cleaned_data.copy()
+        datos.pop("confirmo")
+        try:
+            confirmar(empresa=empresa, usuario=request.user, **datos)
+        except ConciliacionError as exc:
+            messages.error(request, str(exc))
+        else:
+            messages.success(request, "Conciliación guardada con su referencia bancaria.")
+            return redirect("tesoreria:historial_conciliaciones")
+    else:
+        messages.error(request, "Revisa los datos, la referencia y la confirmación antes de conciliar.")
+    return redirect("tesoreria:comparar_banco")
+
+
+@login_required
+def historial_conciliaciones(request):
+    empresa = empresa_actual(request)
+    registros = ConciliacionBancaria.objects.filter(empresa=empresa).select_related(
+        "cuenta", "movimiento", "creado_por", "revertido_por",
+    ).order_by("-creado", "-pk")
+    pagina = Paginator(registros, 30).get_page(request.GET.get("pagina"))
+    perfil = getattr(request.user, "perfil", None)
+    return render(request, "tesoreria/conciliaciones.html", {
+        "pagina": pagina, "puede_escribir": perfil is None or perfil.rol != Perfil.Rol.LECTOR,
+    })
+
+
+@login_required
+@requiere_escritura
+@require_POST
+def revertir_conciliacion(request, pk):
+    empresa = empresa_actual(request)
+    get_object_or_404(ConciliacionBancaria, pk=pk, empresa=empresa)
+    formulario = RevertirConciliacionForm(request.POST)
+    if formulario.is_valid():
+        try:
+            revertir(
+                empresa=empresa, conciliacion_id=pk, motivo=formulario.cleaned_data["motivo"], usuario=request.user,
+            )
+        except ConciliacionError as exc:
+            messages.error(request, str(exc))
+        else:
+            messages.success(request, "Conciliación revertida; el historial se conserva.")
+    else:
+        messages.error(request, "Indica un motivo de reversión válido.")
+    return redirect("tesoreria:historial_conciliaciones")

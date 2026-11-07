@@ -32,3 +32,13 @@ class BuscarOperacionBancariaForm(forms.Form):
         if not date(1900, 1, 4) <= fecha <= date(9999, 12, 28):
             raise forms.ValidationError("Indica una fecha dentro del rango admitido.")
         return fecha
+
+
+class ConfirmarConciliacionForm(BuscarOperacionBancariaForm):
+    movimiento_id = forms.IntegerField(min_value=1, widget=forms.HiddenInput)
+    referencia = forms.CharField(max_length=100, label="Referencia única del banco")
+    confirmo = forms.BooleanField(label="Confirmo que revisé la operación en el extracto")
+
+
+class RevertirConciliacionForm(forms.Form):
+    motivo = forms.CharField(max_length=1000, label="Motivo de la reversión")

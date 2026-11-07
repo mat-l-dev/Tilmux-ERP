@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load l10n %}
 
 {% block titulo %}Comparar operación bancaria{% endblock %}
 {% block titulo_pagina %}Comparar operación bancaria{% endblock %}
@@ -16,17 +17,31 @@
     </div>
     <button class="btn btn-primary" type="submit">Buscar posibles coincidencias</button>
     <a class="btn btn-ghost" href="{% url 'tesoreria:movimientos' %}">Volver a tesorería</a>
+    <a class="btn btn-ghost" href="{% url 'tesoreria:historial_conciliaciones' %}">Historial de conciliaciones</a>
   </form>
 
   {% if candidatos is not None %}
   <section class="card" style="margin-top:12px">
     <header class="card-head"><h2>Posibles coincidencias</h2><span class="chip">{{ cantidad }} encontrada{{ cantidad|pluralize }}</span></header>
-    <p class="preview-note">Que coincidan el importe y la fecha no demuestra que sea la misma operación. Revisa concepto, fecha y sustento; esta búsqueda no marca ni modifica movimientos y no crea pagos.</p>
+    <p class="preview-note">Que coincidan el importe y la fecha no demuestra que sea la misma operación. Para confirmar, revisa el extracto y usa su referencia única. Solo se permite vincular una operación del banco con un movimiento del ERP; no se crean pagos.</p>
     {% if candidatos %}
     <table class="tabla-doc">
-      <thead><tr><th>Fecha ERP</th><th>Tipo</th><th>Concepto</th><th>Referencia interna</th><th class="der">Importe</th></tr></thead>
+      <thead><tr><th>Fecha ERP</th><th>Tipo</th><th>Concepto</th><th>Referencia interna</th><th class="der">Importe</th>{% if puede_escribir %}<th>Confirmar</th>{% endif %}</tr></thead>
       <tbody>{% for m in candidatos %}
-      <tr><td>{{ m.fecha|date:"d/m/Y" }}</td><td>{{ m.get_tipo_display }}</td><td>{{ m.concepto }}{% if m.conciliado %} <span class="chip">Marcado previamente</span>{% endif %}</td><td>{{ m.origen_tipo|default:"—" }}{% if m.origen_id %} #{{ m.origen_id }}{% endif %}</td><td class="num der">{{ m.importe|floatformat:2 }}</td></tr>
+      <tr><td>{{ m.fecha|date:"d/m/Y" }}</td><td>{{ m.get_tipo_display }}</td><td>{{ m.concepto }}{% if m.conciliado %} <span class="chip">Marcado previamente</span>{% endif %}</td><td>{{ m.origen_tipo|default:"—" }}{% if m.origen_id %} #{{ m.origen_id }}{% endif %}</td><td class="num der">{{ m.importe|floatformat:2 }}</td>
+      {% if puede_escribir %}<td>{% if not m.conciliado %}
+        <form method="post" action="{% url 'tesoreria:confirmar_conciliacion' %}" class="form">
+          {% csrf_token %}
+          <input type="hidden" name="cuenta" value="{{ datos_bancarios.cuenta.pk }}">
+          <input type="hidden" name="fecha" value="{{ datos_bancarios.fecha|date:'Y-m-d' }}">
+          <input type="hidden" name="tipo" value="{{ datos_bancarios.tipo }}">
+          <input type="hidden" name="importe" value="{{ datos_bancarios.importe|unlocalize }}">
+          <input type="hidden" name="movimiento_id" value="{{ m.pk }}">
+          <label class="field"><span>Referencia bancaria única</span><input name="referencia" maxlength="100" required></label>
+          <label><input type="checkbox" name="confirmo" required> Revisé esta operación en el extracto</label>
+          <button class="btn btn-ghost" type="submit">Confirmar conciliación</button>
+        </form>
+      {% endif %}</td>{% endif %}</tr>
       {% endfor %}</tbody>
     </table>
     {% if cantidad > 100 %}<p class="preview-note">Se muestran las primeras 100 coincidencias; revisa la cuenta y los datos de búsqueda.</p>{% endif %}

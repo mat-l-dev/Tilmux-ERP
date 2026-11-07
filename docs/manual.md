@@ -181,14 +181,16 @@ Desde **Tesorería** puedes consultar los movimientos y sus sumas por cuenta,
 filtrar el historial y abrir sus páginas. El neto es la suma de movimientos
 registrados, no el saldo del banco: puede faltar el saldo inicial o haber
 movimientos pendientes de registrar. No mezcla cuentas ni monedas y conviene
-verificar la moneda de los registros anteriores. La conciliación bancaria de
-movimientos todavía no tiene un flujo propio.
+verificar la moneda de los registros anteriores.
 
 **Comparar con el banco** busca posibles movimientos por cuenta en soles, tipo,
 importe y una ventana de tres días antes o después de la fecha del extracto.
-Puede devolver varias coincidencias: revisa el concepto y el sustento. Esta
-búsqueda no importa el extracto, no marca movimientos como conciliados y no
-registra pagos; la conciliación completa sigue pendiente.
+Puede devolver varias coincidencias: revisa el concepto y el sustento. La
+búsqueda no cambia datos. Si confirmas una coincidencia, indica la referencia
+única real del banco: el vínculo y el usuario quedan en el historial y puedes
+revertirlo indicando el motivo. Por ahora solo admite una operación del banco
+por movimiento del ERP y cuentas en soles. No importa extractos ni registra
+pagos; las marcas anteriores sin referencia deben revisarse por separado.
 
 ## Ventas
 

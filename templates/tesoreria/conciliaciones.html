@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block titulo %}Historial de conciliaciones{% endblock %}
+{% block titulo_pagina %}Historial de conciliaciones{% endblock %}
+{% block contenido %}
+<section class="card">
+  <header class="card-head"><h2>Conciliaciones bancarias</h2><a class="btn btn-ghost" href="{% url 'tesoreria:comparar_banco' %}">Comparar otra operación</a></header>
+  <p class="preview-note">Se muestran las conciliaciones guardadas en este flujo. Las marcas anteriores sin referencia no aparecen aquí y requieren revisión.</p>
+  {% if pagina.object_list %}
+  <div class="tabla-scroll"><table class="tabla-doc">
+    <thead><tr><th>Banco</th><th>Movimiento ERP</th><th>Referencia</th><th>Registro</th><th>Estado</th><th>Acción</th></tr></thead>
+    <tbody>{% for c in pagina %}
+    <tr>
+      <td>{{ c.cuenta.nombre }} · {{ c.fecha_banco|date:"d/m/Y" }} · {{ c.get_tipo_display }} {{ c.importe|floatformat:2 }}</td>
+      <td>{{ c.movimiento.fecha|date:"d/m/Y" }} · {{ c.movimiento.concepto }}</td>
+      <td>{{ c.referencia }}</td>
+      <td>{{ c.creado|date:"d/m/Y H:i" }} · {{ c.creado_por.username|default:"Usuario no disponible" }}</td>
+      <td>{% if c.activa %}Activa{% else %}Revertida · {{ c.revertido|date:"d/m/Y H:i" }} · {{ c.revertido_por.username|default:"Usuario no disponible" }}<br>Motivo: {{ c.motivo_reversion }}{% endif %}</td>
+      <td>{% if c.activa and puede_escribir %}<form method="post" action="{% url 'tesoreria:revertir_conciliacion' c.pk %}" class="form">
+        {% csrf_token %}<label class="field"><span>Motivo</span><input name="motivo" maxlength="1000" required></label><button class="btn btn-ghost" type="submit">Revertir</button>
+      </form>{% endif %}</td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  {% if pagina.has_other_pages %}<nav class="filtro" aria-label="Páginas de conciliaciones">
+    {% if pagina.has_previous %}<a class="btn btn-ghost" href="?pagina={{ pagina.previous_page_number }}">Anterior</a>{% endif %}
+    <span>Página {{ pagina.number }} de {{ pagina.paginator.num_pages }}</span>
+    {% if pagina.has_next %}<a class="btn btn-ghost" href="?pagina={{ pagina.next_page_number }}">Siguiente</a>{% endif %}
+  </nav>{% endif %}
+  {% else %}<p class="muted">Todavía no hay conciliaciones guardadas.</p>{% endif %}
+  <a class="btn btn-ghost" href="{% url 'tesoreria:movimientos' %}">Volver a tesorería</a>
+</section>
+{% endblock %}
