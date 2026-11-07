@@ -13,7 +13,7 @@
       <tr>
         <td>{{ h.fecha|date:"d/m/Y H:i" }}</td>
         <td>{{ h.accion }}</td>
-        <td class="muted">{{ h.detalle }}</td>
+        <td class="muted">{% if h.accion == 'PROVISION' %}Gasto devengado registrado sin comprobante.{% else %}{{ h.detalle }}{% endif %}</td>
         <td>{{ h.usuario|default:"—" }}</td>
       </tr>
       {% endfor %}

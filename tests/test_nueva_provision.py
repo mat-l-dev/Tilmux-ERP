@@ -49,6 +49,9 @@ class NuevaProvisionTest(BaseContable):
                 empresa=self.empresa, tipo="GASTO", documento_id=provision.pk, usuario=self.usuario, accion="PROVISION"
             ).exists()
         )
+        detalle = self.client.get(reverse("compras:detalle_gasto", args=[provision.pk]))
+        self.assertContains(detalle, "Gasto devengado registrado sin comprobante")
+        self.assertNotContains(detalle, self.datos["operacion"])
         self.assertEqual(calcular(self.empresa, 2026, 11), antes)
         respuesta = self.client.post(self.url, self.datos)
         self.assertRedirects(respuesta, reverse("compras:detalle_gasto", args=[provision.pk]))
