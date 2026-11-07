@@ -44,6 +44,7 @@ from inventario.models import CapaFIFO, MovimientoStock
 from ventas.models import NotaCredito, NotaDebito, Venta
 
 from .casillas import calcular
+from .conciliacion_documentos import totales_documentales
 from .sire import ArchivoInvalido, leer_filas, sumar, validar_contexto
 from .utils import FiltroReporteError, filtros_seguros, rango
 
@@ -707,8 +708,8 @@ def conciliacion_archivo(request):
                 nombre_archivo = archivo.name
                 datos = calcular(empresa, anio, mes)
                 if registro == "ventas":
-                    sistema_base = datos["ventas_base"]
-                    sistema_igv = datos["ventas_igv"]
+                    sistema_base = datos["ventas_base"] - datos["descuentos_base"]
+                    sistema_igv = datos["ventas_igv"] - datos["descuentos_igv"]
                     sistema_no_gravado = Decimal("0")
                     etiqueta = "RVIE · ventas"
                 else:
@@ -716,6 +717,8 @@ def conciliacion_archivo(request):
                     sistema_igv = datos["compras_igv"]
                     sistema_no_gravado = datos["no_gravado"]
                     etiqueta = "RCE · compras"
+
+                documentales = totales_documentales(empresa=empresa, anio=anio, mes=mes, registro=registro)
 
                 resultado = {
                     "registro": registro,
@@ -726,23 +729,29 @@ def conciliacion_archivo(request):
                     "sunat_base": totales["base"],
                     "sunat_igv": totales["igv"],
                     "sunat_total": totales["total"],
+                    "tiene_total": totales["tiene_total"],
                     "sistema_base": sistema_base,
                     "sistema_igv": sistema_igv,
                     "sistema_no_gravado": sistema_no_gravado,
-                    "sistema_total": sistema_base
-                    + sistema_igv
-                    + sistema_no_gravado,
+                    "sistema_total": documentales["total"],
+                    "documentos_sin_credito": documentales["sin_credito"],
+                    "documentos_incompletos": documentales["incompletos"],
+                    "otras_monedas": documentales["otras_monedas"],
+                    "total_comparable": totales["tiene_total"] and not documentales["otras_monedas"],
                 }
                 resultado["dif_base"] = (
-                    resultado["sistema_base"] - resultado["sunat_base"]
-                ).quantize(Decimal("0.01"))
+                    (resultado["sistema_base"] - resultado["sunat_base"]).quantize(Decimal("0.01"))
+                    if not documentales["otras_monedas"] else None
+                )
                 resultado["dif_igv"] = (
-                    resultado["sistema_igv"] - resultado["sunat_igv"]
-                ).quantize(Decimal("0.01"))
+                    (resultado["sistema_igv"] - resultado["sunat_igv"]).quantize(Decimal("0.01"))
+                    if not documentales["otras_monedas"] else None
+                )
                 resultado["dif_total"] = (
-                    resultado["sistema_total"] - resultado["sunat_total"]
-                ).quantize(Decimal("0.01"))
-                resultado["cuadra"] = all(
+                    (resultado["sistema_total"] - resultado["sunat_total"]).quantize(Decimal("0.01"))
+                    if resultado["total_comparable"] else None
+                )
+                resultado["cuadra"] = resultado["total_comparable"] and not documentales["incompletos"] and all(
                     valor == 0
                     for valor in (
                         resultado["dif_base"],

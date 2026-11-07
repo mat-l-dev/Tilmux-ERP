@@ -408,11 +408,16 @@ crédito se restan solas porque la estructura del RVIE las exige con signo
 negativo; si afectan a un periodo anterior, vienen en las columnas de descuento
 y también se restan. La fila de totales se ignora para no contar dos veces.
 
-El resultado muestra base, IGV y total del sistema y de SUNAT, con la
-diferencia (sistema menos SUNAT). Una diferencia positiva significa que el ERP
-tiene más que la propuesta: revisa si esos comprobantes están en el RCE o si
-están duplicados. Una negativa, que SUNAT tiene un comprobante que el ERP no
-registró.
+El resultado separa base e IGV de la estimación tributaria del total documental.
+Este último incluye las boletas con serie y número aunque no otorguen crédito,
+para compararlas con una propuesta que el usuario haya complementado. Una
+diferencia de totales es una señal para revisar los documentos; no identifica
+por sí sola cuál falta ni demuestra un error tributario. Los documentos en otra
+moneda impiden comparar los totales hasta revisar su tratamiento.
+
+La coincidencia de importes no verifica cada comprobante ni demuestra que SUNAT
+haya aceptado o generado el RCE. Si la boleta se incorpora en SUNAT, descarga
+de nuevo el archivo resultante para contrastarlo; el ERP no modifica la propuesta.
 
 El archivo no se guarda ni se envía a SUNAT: se lee en el equipo y se descarta.
 

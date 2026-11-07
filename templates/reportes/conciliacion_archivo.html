@@ -41,7 +41,7 @@
   <header class="card-head">
     <h2>{{ resultado.etiqueta }} · {{ mes }}/{{ anio }}</h2>
     <span class="chip {% if resultado.cuadra %}chip-ok{% else %}chip-warn{% endif %}">
-      {% if resultado.cuadra %}Totales coinciden{% else %}Con diferencias{% endif %}
+      {% if resultado.cuadra %}Importes coinciden{% else %}Requiere revisión{% endif %}
     </span>
   </header>
 
@@ -70,7 +70,7 @@
         <td class="num der">{{ resultado.sistema_base|floatformat:2 }}</td>
         <td class="num der">{{ resultado.sunat_base|floatformat:2 }}</td>
         <td class="num der">
-          <span class="{% if resultado.dif_base %}chip chip-warn{% else %}chip chip-ok{% endif %}">{{ resultado.dif_base|floatformat:2 }}</span>
+          {% if resultado.otras_monedas %}No comparable{% else %}<span class="{% if resultado.dif_base %}chip chip-warn{% else %}chip chip-ok{% endif %}">{{ resultado.dif_base|floatformat:2 }}</span>{% endif %}
         </td>
       </tr>
       <tr>
@@ -78,7 +78,7 @@
         <td class="num der">{{ resultado.sistema_igv|floatformat:2 }}</td>
         <td class="num der">{{ resultado.sunat_igv|floatformat:2 }}</td>
         <td class="num der">
-          <span class="{% if resultado.dif_igv %}chip chip-warn{% else %}chip chip-ok{% endif %}">{{ resultado.dif_igv|floatformat:2 }}</span>
+          {% if resultado.otras_monedas %}No comparable{% else %}<span class="{% if resultado.dif_igv %}chip chip-warn{% else %}chip chip-ok{% endif %}">{{ resultado.dif_igv|floatformat:2 }}</span>{% endif %}
         </td>
       </tr>
       {% if resultado.registro == "compras" %}
@@ -90,11 +90,13 @@
       </tr>
       {% endif %}
       <tr>
-        <td>Total</td>
+        <td>Total documental</td>
         <td class="num der">{{ resultado.sistema_total|floatformat:2 }}</td>
-        <td class="num der">{{ resultado.sunat_total|floatformat:2 }}</td>
+        <td class="num der">{% if resultado.tiene_total %}{{ resultado.sunat_total|floatformat:2 }}{% else %}No disponible{% endif %}</td>
         <td class="num der">
+          {% if resultado.total_comparable %}
           <span class="{% if resultado.dif_total %}chip chip-warn{% else %}chip chip-ok{% endif %}">{{ resultado.dif_total|floatformat:2 }}</span>
+          {% else %}No comparable{% endif %}
         </td>
       </tr>
     </tbody>
@@ -103,14 +105,17 @@
   <p class="preview-note">
     «Sistema» es lo que sale de tus registros para el periodo. La diferencia es
     Sistema menos SUNAT: si es positiva, el ERP tiene más que la propuesta; si es
-    negativa, te falta un comprobante. En compras, una diferencia en la base o en
-    el IGV suele ser una factura no registrada o un gasto sin comprobante.
+    negativa, SUNAT muestra un importe mayor. La diferencia por sí sola no identifica
+    el comprobante ni demuestra un error tributario: revisa cada documento.
   </p>
-  <p class="preview-note">
-    La comparación usa las casillas 107 y 108: las boletas y los documentos sin
-    crédito no suman. Si la propuesta los incluye, aparecerá una diferencia que
-    no es un error de declaración.
-  </p>
+  {% if resultado.registro == "compras" %}<p class="preview-note">
+    En compras, el total documental incluye boletas y facturas con serie y número del período,
+    aunque no otorguen crédito. De ese total, S/ {{ resultado.documentos_sin_credito|floatformat:2 }}
+    corresponden a documentos no incluidos en la estimación tributaria. No se suman al crédito fiscal.
+    El período se estima por fecha de emisión cuando no se ha indicado la anotación.
+    {% if resultado.documentos_incompletos %}Hay {{ resultado.documentos_incompletos }} documento(s) con datos o clasificación que requieren revisión; los que no tienen serie o número se excluyeron del total.{% endif %}
+  </p>{% endif %}
+  {% if resultado.otras_monedas %}<p class="preview-note">Hay {{ resultado.otras_monedas }} documento(s) en otra moneda. El total en soles es parcial y no se compara hasta disponer de un tratamiento de moneda verificable.</p>{% endif %}
 </section>
 {% endif %}
 

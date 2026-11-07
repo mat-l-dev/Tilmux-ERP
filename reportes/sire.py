@@ -251,4 +251,4 @@ def sumar(filas: list[list]) -> dict:
         totales["total"] += total
         filas_contadas += 1
 
-    return {"filas": filas_contadas, "columnas": nombres, **totales}
+    return {"filas": filas_contadas, "columnas": nombres, "tiene_total": bool(cols_total), **totales}
