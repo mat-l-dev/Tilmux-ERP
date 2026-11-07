@@ -45,6 +45,7 @@ class RevisionTributariaTest(TestCase):
         self.client.force_login(self.usuario)
         periodo = {"periodo": "2026-10"}
         respuesta = self.client.get(reverse("reportes:registro_compras"), periodo)
+        self.assertContains(respuesta, "Incluido en estimación")
         filas = {f["documento"]: f for f in respuesta.context["filas"]}
         self.assertFalse(filas["B001-1"]["credito"])
         self.assertFalse(filas["B001-1"]["pendiente"])
