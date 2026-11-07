@@ -126,6 +126,7 @@ class NuevaProvisionTest(BaseContable):
         detalle = self.client.get(reverse("compras:detalle_gasto", args=[factura.pk]))
         self.assertContains(detalle, "Saldo pendiente")
         self.assertContains(detalle, "Registrar pago")
+        self.assertContains(detalle, "Ver cuentas de las provisiones vinculadas")
         listado = self.client.get(reverse("compras:lista"), {"estado_pago": "por_pagar"})
         self.assertContains(listado, "F001-20")
         for importe in ("10", "18"):

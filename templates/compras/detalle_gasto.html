@@ -16,7 +16,7 @@
         <div><dt>Tipo</dt><dd>{{ gasto.get_tipo_doc_display }}</dd></div>
         <div><dt>Comprobante</dt><dd>{% if gasto.serie or gasto.numero %}{{ gasto.serie }}-{{ gasto.numero }}{% else %}Sin comprobante{% endif %}</dd></div>
         <div><dt>Concepto</dt><dd>{{ gasto.glosa|default:"—" }}</dd></div>
-        <div><dt>Cuenta contable</dt><dd>{{ gasto.cuenta.codigo }} · {{ gasto.cuenta.nombre }}</dd></div>
+        <div><dt>Cuenta contable</dt><dd>{% if deuda_provision %}Ver cuentas de las provisiones vinculadas{% else %}{{ gasto.cuenta.codigo }} · {{ gasto.cuenta.nombre }}{% endif %}</dd></div>
         <div><dt>Medio de pago</dt><dd>{% if gasto.medio %}{{ gasto.medio.nombre }}{% elif pagos_gasto %}Ver pagos registrados{% elif es_pendiente %}Aún sin pagos{% else %}No indicado{% endif %}</dd></div>
         {% if not gasto.provision %}
         <div><dt>Estimación tributaria de compras</dt><dd>{% if gasto.con_credito %}Incluido{% else %}No incluido{% endif %}</dd></div>
@@ -30,6 +30,7 @@
       </dl>
       {% if gasto.gasto_origen %}<p class="preview-note">Esta provisión está vinculada al <a href="{% url 'compras:detalle_gasto' gasto.gasto_origen.pk %}">comprobante {{ gasto.gasto_origen.serie }}-{{ gasto.gasto_origen.numero }}</a>. Consulta allí su estado de pago.</p>{% elif gasto.provision %}<p class="preview-note">Provisión sin comprobante vinculado.</p>{% endif %}
       {% if provisiones %}<p class="preview-note">Provisiones vinculadas: {% for p in provisiones %}<a href="{% url 'compras:detalle_gasto' p.pk %}">{{ p.glosa|default:"Ver provisión" }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}.</p>{% endif %}
+      {% if deuda_provision %}<p class="preview-note">El gasto y la deuda se reconocieron en las provisiones vinculadas. Los asientos de pago aparecen abajo cuando se registran.</p>{% endif %}
       {% if es_pendiente %}<p>Saldo pendiente: <strong>S/ {{ saldo_pendiente|floatformat:2 }}</strong></p>{% endif %}
       {% if not gasto.provision %}<p class="preview-note">Estas opciones muestran lo registrado en el ERP; no verifican por sí solas el tratamiento tributario ni la aceptación del comprobante.</p>{% endif %}
     </section>
@@ -44,7 +45,7 @@
         {% for linea in asiento.lineas.all %}<tr><td>{{ linea.cuenta.codigo }} · {{ linea.cuenta.nombre }}</td><td>{{ linea.glosa }}</td><td class="num der">{{ linea.debe|floatformat:2 }}</td><td class="num der">{{ linea.haber|floatformat:2 }}</td></tr>{% endfor %}
       </tbody></table></div>
     </section>
-    {% empty %}<p class="preview-note">{% if deuda_provision %}El gasto y la deuda se reconocieron en las provisiones vinculadas; consulta sus asientos desde los enlaces anteriores.{% else %}No se encontró un asiento vinculado a este gasto.{% endif %}</p>{% endfor %}
+    {% empty %}{% if not deuda_provision %}<p class="preview-note">No se encontró un asiento vinculado a este gasto.</p>{% endif %}{% endfor %}
     {% if movimientos %}
     <section class="card"><header class="card-head"><h2>Movimientos de tesorería vinculados</h2></header>
       <div class="tabla-scroll"><table class="tabla-doc"><thead><tr><th>Fecha</th><th>Cuenta</th><th>Concepto</th><th class="der">Importe</th></tr></thead><tbody>

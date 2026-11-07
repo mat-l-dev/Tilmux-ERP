@@ -80,7 +80,7 @@
       {% with c=fila.registro %}
       <tr>
         <td>{{ fila.fecha|date:"d/m/Y" }}{% if fecha_por == 'anotacion' and not c.fecha_anotacion %}<br><span class="muted">Estimada por emisión</span>{% elif fecha_por == 'devengo' and fila.clase == 'gasto' and not c.fecha_devengado %}<br><span class="muted">Según emisión</span>{% elif fecha_por == 'devengo' and fila.clase == 'compra' %}<br><span class="muted">Emisión</span>{% endif %}</td>
-        <td>{% if fila.clase == 'compra' %}Mercadería{% elif c.provision %}Provisión{% else %}Gasto{% endif %}</td>
+        <td>{% if fila.clase == 'compra' %}Mercadería{% elif c.provision %}Provisión{% if c.gasto_origen_id %}<br><span class="muted">Comprobante vinculado</span>{% endif %}{% else %}Gasto{% endif %}</td>
         <td>{% if fila.clase == 'compra' %}<a href="{% url 'compras:detalle' c.pk %}">{% if c.serie or c.numero %}{{ c.serie }}-{{ c.numero }}{% else %}Sin comprobante{% endif %}</a>{% else %}<a href="{% url 'compras:detalle_gasto' c.pk %}">{% if c.serie or c.numero %}{{ c.serie }}-{{ c.numero }}{% else %}Sin comprobante{% endif %}</a>{% endif %}</td>
         <td>{{ c.proveedor.nombre }}</td>
         <td>{{ c.glosa|default:"—" }}</td>
