@@ -87,6 +87,7 @@ class NuevaProvisionTest(BaseContable):
             "igv": "0",
             "cuenta": self.datos["cuenta"],
             "medio": self.bbva.pk,
+            "canal": "TRANSFERENCIA",
             "glosa": "Comisión facturada",
             "provisiones": [provision.pk],
         }

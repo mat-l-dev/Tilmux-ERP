@@ -231,7 +231,7 @@ def nuevo_gasto(request):
                     tipo_doc=datos["tipo_doc"], serie=datos["serie"].strip().upper(),
                     numero=datos["numero"].strip(), base=datos["base"], igv=datos["igv"],
                     total=datos["base"] + datos["igv"], cuenta=datos["cuenta"],
-                    medio=datos["medio"], glosa=datos["glosa"],
+                    medio=datos["medio"], canal=datos["canal"], glosa=datos["glosa"],
                     con_credito=datos["con_credito"], deducible=datos["deducible"],
                     provisiones_ids=[p.pk for p in datos["provisiones"]],
                 )
@@ -786,6 +786,7 @@ def importar_preview(request):
                         glosa=f"{datos['tipo']} {datos['serie']}-{datos['numero']}",
                         con_credito=formulario.cleaned_data["con_credito"],
                         deducible=formulario.cleaned_data["deducible"],
+                        canal=formulario.cleaned_data["canal"],
                     )
                     HistorialDocumento.objects.create(
                         empresa=empresa, tipo=HistorialDocumento.Tipo.GASTO, documento_id=gasto.pk,

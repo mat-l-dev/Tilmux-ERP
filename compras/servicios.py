@@ -181,6 +181,7 @@ def registrar_gasto(
     total,
     cuenta,
     medio=None,
+    canal="TRANSFERENCIA",
     glosa: str = "",
     origen_tipo: str = "",
     origen_id: int | None = None,
@@ -208,6 +209,8 @@ def registrar_gasto(
         raise CompraError("El gasto no cuadra: base más IGV no da el total.")
     if not provision and medio is None:
         raise CompraError("El gasto necesita una cuenta de tesorería.")
+    if not provision and canal not in {opcion[0] for opcion in MovimientoTesoreria._meta.get_field("canal").choices}:
+        raise CompraError("Selecciona un canal de pago válido.")
     if cuenta is None:
         raise CompraError("El gasto necesita una cuenta contable.")
     if gasto_origen is not None and not provision:
@@ -340,6 +343,7 @@ def registrar_gasto(
         tipo="EGRESO",
         importe=total,
         concepto=glosa or f"Gasto {documento}",
+        canal=canal,
         origen_tipo=origen_tipo or "GASTO",
         origen_id=origen_id or gasto.pk,
     )

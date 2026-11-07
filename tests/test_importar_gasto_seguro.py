@@ -43,7 +43,7 @@ class ImportarGastoSeguroTest(TestCase):
         sesion.save()
 
     def datos(self):
-        return {"cuenta": self.cuenta.pk, "medio": self.medio.pk, "pago_confirmado": "on"}
+        return {"cuenta": self.cuenta.pk, "medio": self.medio.pk, "canal": "TRANSFERENCIA", "pago_confirmado": "on"}
 
     def test_requiere_confirmacion_de_pago(self):
         datos = self.datos()
@@ -119,10 +119,12 @@ class ImportarGastoContableTest(BaseContable):
         sesion.save()
         respuesta = self.client.post(reverse("compras:importar_preview"), {
             "cuenta": Cuenta.objects.get(version="2026", codigo="6391").pk,
-            "medio": self.bbva.pk, "pago_confirmado": "on",
+            "medio": self.bbva.pk, "canal": "YAPE", "pago_confirmado": "on",
         })
         self.assertEqual(respuesta.status_code, 302)
         gasto = Gasto.objects.get(empresa=self.empresa, serie="F002", numero="12")
         self.assertFalse(gasto.con_credito)
-        self.assertTrue(MovimientoTesoreria.objects.filter(origen_tipo="GASTO", origen_id=gasto.pk).exists())
+        self.assertTrue(
+            MovimientoTesoreria.objects.filter(origen_tipo="GASTO", origen_id=gasto.pk, canal="YAPE").exists()
+        )
         self.assertTrue(self.empresa.historial.filter(tipo="GASTO", documento_id=gasto.pk, usuario=usuario).exists())

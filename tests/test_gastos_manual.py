@@ -36,6 +36,7 @@ class GastoManualTest(BaseContable):
             "igv": "18.00",
             "cuenta": Cuenta.objects.get(version="2026", codigo="6391").pk,
             "medio": self.bbva.pk,
+            "canal": "TARJETA",
             "glosa": "Comisión de prueba",
             "con_credito": "on",
         }
@@ -46,13 +47,23 @@ class GastoManualTest(BaseContable):
         self.assertRedirects(respuesta, reverse("compras:detalle_gasto", args=[gasto.pk]))
         self.assertTrue(Asiento.objects.filter(empresa=self.empresa, origen_tipo="GASTO", origen_id=gasto.pk).exists())
         self.assertTrue(
-            MovimientoTesoreria.objects.filter(empresa=self.empresa, origen_tipo="GASTO", origen_id=gasto.pk).exists()
+            MovimientoTesoreria.objects.filter(
+                empresa=self.empresa, origen_tipo="GASTO", origen_id=gasto.pk, canal="TARJETA"
+            ).exists()
         )
         self.assertTrue(
             HistorialDocumento.objects.filter(
                 empresa=self.empresa, tipo="GASTO", documento_id=gasto.pk, usuario=self.usuario, accion="REGISTRO"
             ).exists()
         )
+
+    def test_requiere_canal_y_no_registra_sin_elegirlo(self):
+        datos = self.datos()
+        datos.pop("canal")
+        respuesta = self.client.post(reverse("compras:nuevo_gasto"), datos)
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn("canal", respuesta.context["formulario"].errors)
+        self.assertFalse(Gasto.objects.filter(serie="F001", numero="123").exists())
 
     def test_no_registra_factura_sin_numero(self):
         datos = self.datos()

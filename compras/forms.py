@@ -52,6 +52,8 @@ class GastoPagadoForm(forms.Form):
     igv = forms.DecimalField(max_digits=18, decimal_places=2, min_value=0, label="IGV", initial=0)
     cuenta = forms.ModelChoiceField(queryset=Cuenta.objects.none(), label="Cuenta de gasto")
     medio = forms.ModelChoiceField(queryset=CuentaTesoreria.objects.none(), label="Cuenta desde la que se pagó")
+    canal = forms.ChoiceField(choices=[("", "Selecciona un canal"), *CuentaTesoreria.Canal.choices],
+                              label="Cómo se pagó")
     glosa = forms.CharField(max_length=255, label="Concepto")
     con_credito = forms.BooleanField(
         required=False, label="Incluir en la estimación tributaria de compras", initial=False
@@ -118,6 +120,7 @@ class GastoPendienteForm(GastoPagadoForm):
     def __init__(self, *args, empresa, **kwargs):
         super().__init__(*args, empresa=empresa, **kwargs)
         self.fields.pop("medio")
+        self.fields.pop("canal")
         self.fields["fecha"].label = "Fecha del comprobante y del gasto"
         self.fields["tipo_doc"].choices = [c for c in Gasto.TipoDoc.choices if c[0] != Gasto.TipoDoc.OTRO]
         self.fields["provisiones"].label = "Gastos devengados que respalda este comprobante (opcional)"
@@ -145,6 +148,8 @@ class PagoGastoForm(forms.Form):
 class ImportarGastoForm(forms.Form):
     cuenta = forms.ModelChoiceField(queryset=Cuenta.objects.none(), label="Cuenta del gasto")
     medio = forms.ModelChoiceField(queryset=CuentaTesoreria.objects.none(), label="Cuenta desde la que se pagó")
+    canal = forms.ChoiceField(choices=[("", "Selecciona un canal"), *CuentaTesoreria.Canal.choices],
+                              label="Cómo se pagó")
     con_credito = forms.BooleanField(required=False, label="Incluir en la estimación tributaria de compras")
     deducible = forms.BooleanField(required=False, label="Sustenta costo o gasto tributario")
     pago_confirmado = forms.BooleanField(

@@ -110,7 +110,8 @@ sea una cuenta activa en soles de la empresa con cuenta contable vinculada.
 **Registrar gasto pagado.** Desde la lista de compras puedes registrar comisiones
 y otros gastos pagados en soles cuando la fecha del documento y la del pago
 coinciden. El registro crea el gasto, el asiento y la salida de tesorería en una
-misma operación. Si marcas su inclusión tributaria, el sistema considera todo
+misma operación. Indica la cuenta y el canal real del pago; también se solicita
+al registrar un gasto pagado desde XML. Si marcas su inclusión tributaria, el sistema considera todo
 el IGV como crédito o, si no tiene IGV, el valor como compra no gravada; revisa
 primero que corresponda.
 
