@@ -103,7 +103,13 @@ def lista(request):
         comprobantes_pendientes = Asiento.objects.filter(
             empresa=empresa, origen_tipo="GASTO_PENDIENTE", estado=Asiento.Estado.CONFIRMADO,
         ).values("origen_id")
-        gastos = gastos.filter(pk__in=comprobantes_pendientes, estado=Gasto.Estado.REGISTRADO, provision=False)
+        deudas_provisionadas = HistorialDocumento.objects.filter(
+            empresa=empresa, tipo="GASTO", accion="DEUDA_PROVISION",
+        ).values("documento_id")
+        gastos = gastos.filter(
+            Q(pk__in=comprobantes_pendientes) | Q(pk__in=deudas_provisionadas),
+            estado=Gasto.Estado.REGISTRADO, provision=False,
+        )
         compras = compras.none()
 
     def indices(queryset, clase):
@@ -133,6 +139,9 @@ def lista(request):
         empresa=empresa, origen_tipo="GASTO_PENDIENTE", origen_id__in=ids_gastos,
         estado=Asiento.Estado.CONFIRMADO,
     ).values_list("origen_id", flat=True))
+    gastos_con_deuda.update(HistorialDocumento.objects.filter(
+        empresa=empresa, tipo="GASTO", accion="DEUDA_PROVISION", documento_id__in=ids_gastos,
+    ).values_list("documento_id", flat=True))
     importes_pagados = {
         item["gasto_id"]: item["total"] for item in PagoGasto.objects.filter(
             gasto_id__in=gastos_con_deuda, gasto__empresa=empresa,
@@ -266,12 +275,13 @@ def nuevo_gasto_pendiente(request):
 def pagar_gasto_pendiente(request, pk):
     empresa = empresa_actual(request)
     gasto = get_object_or_404(Gasto, pk=pk, empresa=empresa)
-    if request.method == "GET" and (
-        gasto.estado != Gasto.Estado.REGISTRADO or not Asiento.objects.filter(
-            empresa=empresa, origen_tipo="GASTO_PENDIENTE", origen_id=gasto.pk,
-            estado=Asiento.Estado.CONFIRMADO,
-        ).exists()
-    ):
+    origen_pendiente = Asiento.objects.filter(
+        empresa=empresa, origen_tipo="GASTO_PENDIENTE", origen_id=gasto.pk,
+        estado=Asiento.Estado.CONFIRMADO,
+    ).exists() or HistorialDocumento.objects.filter(
+        empresa=empresa, tipo="GASTO", documento_id=gasto.pk, accion="DEUDA_PROVISION",
+    ).exists()
+    if request.method == "GET" and (gasto.estado != Gasto.Estado.REGISTRADO or not origen_pendiente):
         messages.error(request, "Este gasto no tiene un saldo habilitado para registrar pagos aquí.")
         return redirect("compras:detalle_gasto", gasto.pk)
     pagado = gasto.pagos.aggregate(total=Sum("importe"))["total"] or Decimal("0")
@@ -308,8 +318,13 @@ def detalle_gasto(request, pk: int):
         Q(origen_tipo="GASTO", origen_id=gasto.pk) | Q(origen_tipo="PAGO_GASTO", origen_id__in=pago_ids),
         empresa=empresa,
     ).select_related("cuenta")
-    es_pendiente = Asiento.objects.filter(empresa=empresa, origen_tipo="GASTO_PENDIENTE", origen_id=gasto.pk,
-                                          estado=Asiento.Estado.CONFIRMADO).exists()
+    deuda_provision = HistorialDocumento.objects.filter(
+        empresa=empresa, tipo="GASTO", documento_id=gasto.pk, accion="DEUDA_PROVISION",
+    ).exists()
+    es_pendiente = deuda_provision or Asiento.objects.filter(
+        empresa=empresa, origen_tipo="GASTO_PENDIENTE", origen_id=gasto.pk,
+        estado=Asiento.Estado.CONFIRMADO,
+    ).exists()
     historial = HistorialDocumento.objects.filter(
         empresa=empresa, tipo="GASTO", documento_id=gasto.pk
     ).order_by("-fecha")[:10]
@@ -317,7 +332,7 @@ def detalle_gasto(request, pk: int):
     return render(request, "compras/detalle_gasto.html", {
         "gasto": gasto, "asientos": asientos, "movimientos": movimientos,
         "historial": historial, "provisiones": provisiones, "pagos_gasto": pagos,
-        "es_pendiente": es_pendiente,
+        "es_pendiente": es_pendiente, "deuda_provision": deuda_provision,
         "saldo_pendiente": gasto.total - sum((p.importe for p in pagos), Decimal("0")),
     })
 

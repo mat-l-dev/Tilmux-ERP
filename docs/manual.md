@@ -118,8 +118,11 @@ primero que corresponda.
 pagado, registra el comprobante en soles con este botón. La fecha del gasto y la
 del comprobante deben coincidir. En su detalle verás el saldo y podrás registrar
 uno o varios pagos, cada uno con su fecha real y cuenta. Cuando el saldo llega a
-cero, el gasto figura como pagado. Este formulario no vincula provisiones previas:
-si el gasto ya se registró como provisión, no lo vuelvas a ingresar por aquí.
+cero, el gasto figura como pagado. Si ya registraste provisiones del mismo
+proveedor, puedes seleccionarlas cuando no haya IGV y sumen exactamente el
+comprobante. El sistema verifica su respaldo, vincula el comprobante sin volver
+a contabilizar el gasto y permite pagos posteriores. Las provisiones históricas
+sin respaldo verificable, diferencias de importe o IGV requieren revisión.
 
 Para proteger el costo PEPS, no se puede ingresar una entrada o salida con fecha
 anterior a una salida ya registrada del mismo producto. Si necesitas corregir
@@ -185,14 +188,15 @@ Al registrar un gasto pagado puedes seleccionar las provisiones pendientes del
 mismo proveedor. Si suman exactamente el total y tanto ellas como el comprobante
 no tienen IGV, el sistema vincula los documentos y cancela la 4212 sin volver a
 registrar el gasto. Revisa la selección: si no seleccionas provisiones, se
-registra un gasto nuevo. No admite pagos parciales ni diferencias o IGV. Los
+registra un gasto nuevo. Este flujo no admite pagos parciales ni diferencias o IGV. Los
 vínculos históricos por sí solos no implican que se haya liquidado la deuda.
 
 Para registrar una obligación por bienes o servicios ya recibidos y aún sin
 comprobante, usa **Compras → Registrar gasto devengado**. El formulario admite
 soles sin IGV y crea el gasto y la deuda, sin pago ni crédito fiscal. Un segundo
 envío de la misma operación no vuelve a registrarla. Al recibir el comprobante,
-la liquidación sigue limitada a los casos indicados en el párrafo anterior.
+el vínculo está limitado a importes sin IGV e iguales a las provisiones; para
+pagos posteriores usa el flujo de gasto por pagar explicado arriba.
 
 **Fecha devengado y anotación.** El devengo identifica el período económico del
 gasto. Desde el detalle de una compra confirmada o de un gasto puedes indicar la

@@ -118,9 +118,13 @@ class GastoPendienteForm(GastoPagadoForm):
     def __init__(self, *args, empresa, **kwargs):
         super().__init__(*args, empresa=empresa, **kwargs)
         self.fields.pop("medio")
-        self.fields.pop("provisiones")
         self.fields["fecha"].label = "Fecha del comprobante y del gasto"
         self.fields["tipo_doc"].choices = [c for c in Gasto.TipoDoc.choices if c[0] != Gasto.TipoDoc.OTRO]
+        self.fields["provisiones"].label = "Gastos devengados que respalda este comprobante (opcional)"
+        self.fields["provisiones"].help_text = (
+            "Solo gastos del mismo proveedor, sin IGV y que sumen exactamente el comprobante. "
+            "La cuenta de gasto indicada arriba no se usa si vinculas provisiones."
+        )
 
 
 class PagoGastoForm(forms.Form):

@@ -7,12 +7,13 @@ from django.db import transaction
 from django.db.models import Sum
 
 from contabilidad.models import Asiento, Cuenta
-from contabilidad.servicios import postear_lineas
+from contabilidad.servicios import periodo_de, postear_lineas
 from core.models import Empresa, HistorialDocumento
 from tesoreria.models import MovimientoTesoreria
 from tesoreria.servicios import anotar
 
 from .comprobantes import ruc_valido
+from .liquidacion import preparar_provisiones, validar_provisiones_vinculadas
 from .models_gasto import Gasto, PagoGasto
 from .servicios import CompraError, validar_comprobante
 
@@ -31,7 +32,7 @@ def importe_valido(valor, *, permite_cero=False):
 
 @transaction.atomic
 def registrar_pendiente(*, empresa, proveedor, fecha, tipo_doc, serie, numero, base, igv,
-                        cuenta, glosa, con_credito, deducible, usuario):
+                        cuenta, glosa, con_credito, deducible, usuario, provisiones=()):
     Empresa.objects.select_for_update().get(pk=empresa.pk)
     serie, numero = serie.strip().upper(), numero.strip()
     if tipo_doc not in (Gasto.TipoDoc.FACTURA, Gasto.TipoDoc.BOLETA) or not serie or not numero:
@@ -49,22 +50,42 @@ def registrar_pendiente(*, empresa, proveedor, fecha, tipo_doc, serie, numero, b
     base, igv = importe_valido(base), importe_valido(igv, permite_cero=True)
     total = importe_valido(base + igv)
     validar_comprobante(empresa=empresa, proveedor=proveedor, tipo_doc=tipo_doc, serie=serie, numero=numero)
+    provisiones = preparar_provisiones(
+        empresa=empresa, proveedor=proveedor, fecha=fecha, igv=igv, total=total,
+        ids=[item.pk for item in provisiones],
+    )
     cuentas = {c.codigo: c for c in Cuenta.objects.filter(version="2026", codigo__in=["4212", "40111"])}
     if "4212" not in cuentas or (con_credito and igv and "40111" not in cuentas):
         raise CompraError("Faltan cuentas contables necesarias para registrar el gasto.")
     gasto = Gasto.objects.create(
-        empresa=empresa, proveedor=proveedor, fecha=fecha, fecha_devengado=fecha,
+        empresa=empresa, proveedor=proveedor, fecha=fecha, fecha_devengado=None if provisiones else fecha,
         tipo_doc=tipo_doc, serie=serie, numero=numero, base=base, igv=igv, total=total,
         cuenta=cuenta, glosa=glosa.strip(), con_credito=con_credito, deducible=deducible,
         estado=Gasto.Estado.REGISTRADO, creado_por=usuario,
     )
-    cero = Decimal("0")
-    lineas = [(cuenta, base if con_credito else total, cero, "Gasto")]
-    if con_credito and igv:
-        lineas.append((cuentas["40111"], igv, cero, "IGV"))
-    lineas.append((cuentas["4212"], cero, total, "Cuenta por pagar"))
-    postear_lineas(empresa=empresa, fecha=fecha, tipo="PROVISION_GASTO", glosa=glosa,
-                   lineas=lineas, origen_tipo="GASTO_PENDIENTE", origen_id=gasto.pk, usuario=usuario)
+    if provisiones:
+        periodo_de(empresa, fecha)
+        for provision in provisiones:
+            provision.gasto_origen = gasto
+            provision.save(update_fields=["gasto_origen"])
+        validar_provisiones_vinculadas(gasto=gasto, provisiones=provisiones)
+        for provision in provisiones:
+            HistorialDocumento.objects.create(
+                empresa=empresa, tipo="GASTO", documento_id=provision.pk, usuario=usuario,
+                accion="VINCULACION", detalle=f"Vinculada al comprobante {serie}-{numero}, pendiente de pago.",
+            )
+        HistorialDocumento.objects.create(
+            empresa=empresa, tipo="GASTO", documento_id=gasto.pk, usuario=usuario,
+            accion="DEUDA_PROVISION", detalle="Comprobante vinculado a provisiones; pendiente de pago.",
+        )
+    else:
+        cero = Decimal("0")
+        lineas = [(cuenta, base if con_credito else total, cero, "Gasto")]
+        if con_credito and igv:
+            lineas.append((cuentas["40111"], igv, cero, "IGV"))
+        lineas.append((cuentas["4212"], cero, total, "Cuenta por pagar"))
+        postear_lineas(empresa=empresa, fecha=fecha, tipo="PROVISION_GASTO", glosa=glosa,
+                       lineas=lineas, origen_tipo="GASTO_PENDIENTE", origen_id=gasto.pk, usuario=usuario)
     HistorialDocumento.objects.create(empresa=empresa, tipo="GASTO", documento_id=gasto.pk,
                                       usuario=usuario, accion="REGISTRO", detalle="Gasto pendiente de pago.")
     return gasto
@@ -83,15 +104,23 @@ def pagar_gasto(*, empresa, gasto_id, fecha, importe, cuenta, operacion, usuario
         return anterior, False
     origen = Asiento.objects.filter(empresa=empresa, origen_tipo="GASTO_PENDIENTE", origen_id=gasto.pk,
                                     estado=Asiento.Estado.CONFIRMADO)
-    if gasto.provision or gasto.estado != Gasto.Estado.REGISTRADO or origen.count() != 1:
+    marca_provision = HistorialDocumento.objects.filter(
+        empresa=empresa, tipo="GASTO", documento_id=gasto.pk, accion="DEUDA_PROVISION",
+    ).count()
+    if (gasto.provision or gasto.estado != Gasto.Estado.REGISTRADO
+            or (origen.count(), marca_provision) not in ((1, 0), (0, 1))):
         raise CompraError("Este gasto no admite pagos desde este flujo.")
     if MovimientoTesoreria.objects.filter(empresa=empresa, origen_tipo="GASTO", origen_id=gasto.pk).exists():
         raise CompraError("El gasto tiene un movimiento anterior que debe revisarse.")
     pagos = gasto.pagos.all()
-    lineas_deuda = origen.get().lineas.filter(cuenta__version="2026", cuenta__codigo="4212")
-    totales = lineas_deuda.aggregate(debe=Sum("debe"), haber=Sum("haber"))
-    if (totales["haber"] or Decimal("0")) - (totales["debe"] or Decimal("0")) != gasto.total:
-        raise CompraError("El asiento original de la deuda necesita revisión.")
+    if marca_provision:
+        provisiones = list(gasto.provisiones.select_for_update().order_by("pk"))
+        validar_provisiones_vinculadas(gasto=gasto, provisiones=provisiones)
+    else:
+        lineas_deuda = origen.get().lineas.filter(cuenta__version="2026", cuenta__codigo="4212")
+        totales = lineas_deuda.aggregate(debe=Sum("debe"), haber=Sum("haber"))
+        if (totales["haber"] or Decimal("0")) - (totales["debe"] or Decimal("0")) != gasto.total:
+            raise CompraError("El asiento original de la deuda necesita revisión.")
     for pago_anterior in pagos:
         if (Asiento.objects.filter(empresa=empresa, origen_tipo="PAGO_GASTO", origen_id=pago_anterior.pk,
                                    estado=Asiento.Estado.CONFIRMADO).count() != 1
