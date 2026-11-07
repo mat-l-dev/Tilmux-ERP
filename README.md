@@ -39,7 +39,7 @@ Abrir http://127.0.0.1:8000
 | `sembrar_base` | Unidades, series y cuentas de tesorería |
 | `sembrar_reglas` | Las 15 reglas contables |
 | `sembrar_productos` | Los dos SKUs iniciales |
-| `importar_excel` | Importa las 23 operaciones del Excel de TILMUX |
+| `importar_excel` | Suspendido: el importador histórico requiere actualizar y verificar sus asociaciones antes de usarlo |
 | `actualizar_tipo_cambio` | Descarga el tipo de cambio diario de SUNAT |
 
 ## Comprobantes electrónicos
@@ -48,9 +48,9 @@ En **Compras → Importar XML** se sube una factura, boleta o guía de SUNAT.
 El sistema extrae RUC, serie, número, base, IGV y total, y propone el gasto para
 confirmarlo. El archivo no se guarda.
 
-Regla aplicada: una **boleta de venta** no otorga crédito fiscal ni sustenta
-gasto para efecto tributario, así que se registra por el total. Una **factura**
-separa base e IGV y sí genera crédito.
+En el flujo disponible, una **boleta de venta** se registra sin crédito fiscal.
+Una **factura** puede incluirse en la estimación tributaria tras revisar el
+caso; el sistema no verifica por sí solo todos los requisitos ante SUNAT.
 
 ## Uso diario
 

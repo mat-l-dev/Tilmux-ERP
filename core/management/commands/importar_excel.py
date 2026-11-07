@@ -42,7 +42,7 @@ def fecha_de(valor) -> date:
 
 
 class Command(BaseCommand):
-    help = "Importa las 23 operaciones del Excel de TILMUX."
+    help = "Importador histórico de Excel suspendido hasta actualizar su validación."
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -50,8 +50,14 @@ class Command(BaseCommand):
             default=str(Path(settings.BASE_DIR) / "Archivos" / "TILMUX – Contabilidad 2026.xlsx"),
         )
 
-    @transaction.atomic
     def handle(self, *args, **options):
+        raise CommandError(
+            "La importación histórica está suspendida: contiene asociaciones antiguas de productos y comprobantes "
+            "que deben verificarse antes de volver a utilizarla. No se han modificado datos."
+        )
+
+    @transaction.atomic
+    def _importar_legado(self, *args, **options):
         if Asiento.objects.exists():
             raise CommandError(
                 "Ya existen asientos. La importación solo corre sobre un libro vacío."
