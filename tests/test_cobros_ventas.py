@@ -8,6 +8,7 @@ from contabilidad.models import Asiento
 from contabilidad.servicios import ContabilidadError
 from core.models import Periodo
 from tesoreria.models import MovimientoTesoreria
+from ventas.asignacion_cobros import asignar_cobro
 from ventas.models import CuotaVenta, NotaCredito, Venta, VentaLinea
 from ventas.servicios import VentaError, confirmar, emitir_nota_credito
 from ventas.servicios_cobro import cobrar_venta, saldo_pendiente
@@ -95,6 +96,63 @@ class CobrosVentaTest(BaseContable):
         with self.assertRaisesMessage(VentaError, "notas que requieren revisión"):
             self.cobrar("10", cuota=self.venta.cuotas.get())
         self.assertFalse(self.venta.cobros.exists())
+
+    def test_asigna_cobro_existente_sin_crear_otro_movimiento(self):
+        usuario = get_user_model().objects.create_user(username="asignador")
+        cobro = self.cobrar("50")
+        cuota = self.venta.cuotas.get()
+        movimientos = MovimientoTesoreria.objects.count()
+        asientos = Asiento.objects.count()
+        self.assertTrue(asignar_cobro(venta=self.venta, cobro_id=cobro.pk, cuota_id=cuota.pk, usuario=usuario))
+        self.assertFalse(asignar_cobro(venta=self.venta, cobro_id=cobro.pk, cuota_id=cuota.pk, usuario=usuario))
+        cobro.refresh_from_db()
+        self.assertEqual(cobro.cuota_id, cuota.pk)
+        self.assertEqual(saldo_pendiente(self.venta), Decimal("68"))
+        self.assertEqual(MovimientoTesoreria.objects.count(), movimientos)
+        self.assertEqual(Asiento.objects.count(), asientos)
+        self.assertTrue(self.empresa.historial.filter(tipo="VENTA", documento_id=self.venta.pk,
+                                                       accion="ASIGNAR_CUOTA", usuario=usuario).exists())
+
+    def test_no_asigna_con_nota_periodo_cerrado_o_movimiento_inconsistente(self):
+        usuario = get_user_model().objects.create_user(username="revisor")
+        cobro = self.cobrar("50")
+        cuota = self.venta.cuotas.get()
+        kwargs = {"venta": self.venta, "cobro_id": cobro.pk, "cuota_id": cuota.pk, "usuario": usuario}
+        movimiento = MovimientoTesoreria.objects.get(origen_tipo="COBRO_VENTA", origen_id=cobro.pk)
+        movimiento.importe = Decimal("49")
+        movimiento.save(update_fields=["importe"])
+        with self.assertRaisesMessage(VentaError, "movimiento de este cobro necesita revisión"):
+            asignar_cobro(**kwargs)
+        movimiento.importe = Decimal("50")
+        movimiento.save(update_fields=["importe"])
+        periodo = Periodo.objects.get(empresa=self.empresa, anio=2026, mes=11)
+        periodo.estado = Periodo.Estado.CERRADO
+        periodo.save(update_fields=["estado"])
+        with self.assertRaisesMessage(VentaError, "período del cobro está cerrado"):
+            asignar_cobro(**kwargs)
+        periodo.estado = Periodo.Estado.ABIERTO
+        periodo.save(update_fields=["estado"])
+        NotaCredito.objects.create(venta=self.venta, fecha=self.venta.fecha, serie="FC01", numero="1",
+                                   motivo="Ajuste", total=10)
+        with self.assertRaisesMessage(VentaError, "venta tiene notas"):
+            asignar_cobro(**kwargs)
+        cobro.refresh_from_db()
+        self.assertIsNone(cobro.cuota_id)
+
+    def test_pantalla_exige_confirmacion_para_asignar(self):
+        usuario = get_user_model().objects.create_superuser(username="asignador_web", password="test")
+        self.client.force_login(usuario)
+        cobro = self.cobrar("50")
+        cuota = self.venta.cuotas.get()
+        url = reverse("ventas:asignar_cuota", args=[self.venta.pk, cobro.pk])
+        self.assertContains(self.client.get(url), "no registra otra entrada de dinero")
+        self.assertEqual(self.client.post(url, {"cuota": cuota.pk}).status_code, 200)
+        cobro.refresh_from_db()
+        self.assertIsNone(cobro.cuota_id)
+        respuesta = self.client.post(url, {"cuota": cuota.pk, "confirmado": "on"})
+        self.assertRedirects(respuesta, reverse("ventas:detalle", args=[self.venta.pk]))
+        cobro.refresh_from_db()
+        self.assertEqual(cobro.cuota_id, cuota.pk)
 
     def test_rechaza_cobro_retroactivo_excesivo_o_cuenta_inactiva(self):
         for importe, opciones in [("119", {}), ("1", {"fecha": date(2026, 11, 19)})]:

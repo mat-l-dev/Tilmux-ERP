@@ -77,7 +77,7 @@
       {% else %}<p>Saldo pendiente: S/ {{ saldo_credito|floatformat:2 }}</p>{% endif %}
       <p class="muted">Calculado con las notas y cobros vinculados. Revisa los cobros históricos que no estén vinculados a esta venta.</p>
       <div class="tabla-scroll" tabindex="0" role="region" aria-label="Cobros de la venta"><table class="tabla-doc"><thead><tr><th>Fecha</th><th>Cuenta</th><th>Canal</th><th>Cuota</th><th class="der">Importe</th></tr></thead><tbody>
-      {% for cobro in cobros_detalle %}<tr><td>{{ cobro.fecha|date:"d/m/Y" }}</td><td>{{ cobro.cuenta.nombre }}</td><td>{{ cobro.canal }}</td><td>{% if cobro.cuota_id %}{{ cobro.cuota.numero }}{% else %}Sin asignar{% endif %}</td><td class="num der">{{ cobro.importe|floatformat:2 }}</td></tr>{% empty %}<tr><td colspan="5">Sin cobros vinculados.</td></tr>{% endfor %}
+      {% for cobro in cobros_detalle %}<tr><td>{{ cobro.fecha|date:"d/m/Y" }}</td><td>{{ cobro.cuenta.nombre }}</td><td>{{ cobro.canal }}</td><td>{% if cobro.cuota_id %}{{ cobro.cuota.numero }}{% else %}Sin asignar<br><a href="{% url 'ventas:asignar_cuota' venta.pk cobro.pk %}">Asignar cuota</a>{% endif %}</td><td class="num der">{{ cobro.importe|floatformat:2 }}</td></tr>{% empty %}<tr><td colspan="5">Sin cobros vinculados.</td></tr>{% endfor %}
       </tbody></table></div>
       {% if saldo_credito > 0 %}<a class="btn btn-primary" href="{% url 'ventas:cobrar' venta.pk %}">Registrar cobro</a>{% endif %}
     </section>

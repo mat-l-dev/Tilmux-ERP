@@ -31,9 +31,10 @@ from core.permisos import requiere_escritura
 from inventario.servicios import StockError
 from reportes.casillas import casillas_documento
 
+from .asignacion_cobros import asignar_cobro
 from .cuentas_cobrar import cuentas_por_cobrar
-from .forms import CabeceraVentaForm, CobroVentaForm, CuotasVentaFormSet
-from .models import NotaCredito, NotaCreditoLinea, NotaDebito, Venta, VentaLinea
+from .forms import AsignarCobroForm, CabeceraVentaForm, CobroVentaForm, CuotasVentaFormSet
+from .models import CobroVenta, NotaCredito, NotaCreditoLinea, NotaDebito, Venta, VentaLinea
 from .servicios import (
     MOTIVOS_CREDITO_IMPLEMENTADOS,
     VentaError,
@@ -532,6 +533,26 @@ def cobrar(request, pk: int):
             return redirect("ventas:detalle", venta.pk)
     return render(request, "ventas/cobrar.html", {
         "venta": venta, "formulario": formulario, "saldo": saldo_pendiente(venta)
+    })
+
+
+@login_required
+@requiere_escritura
+def asignar_cuota(request, pk: int, cobro_id: int):
+    venta = get_object_or_404(Venta, pk=pk, empresa=empresa_actual(request))
+    cobro = get_object_or_404(CobroVenta.objects.select_related("cuenta"), pk=cobro_id, venta=venta)
+    formulario = AsignarCobroForm(request.POST if request.method == "POST" else None, venta=venta)
+    if request.method == "POST" and formulario.is_valid():
+        try:
+            creado = asignar_cobro(venta=venta, cobro_id=cobro.pk, cuota_id=formulario.cleaned_data["cuota"].pk,
+                                   usuario=request.user)
+        except VentaError as exc:
+            formulario.add_error(None, str(exc))
+        else:
+            messages.success(request, "Cobro asignado a la cuota." if creado else "El cobro ya estaba asignado.")
+            return redirect("ventas:detalle", venta.pk)
+    return render(request, "ventas/asignar_cuota.html", {
+        "venta": venta, "cobro": cobro, "formulario": formulario,
     })
 
 

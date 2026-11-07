@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block titulo %}Asignar cobro a cuota{% endblock %}
+{% block titulo_pagina %}Asignar cobro a cuota{% endblock %}
+{% block contenido %}
+<div class="doc"><div class="doc-main"><form method="post" class="card form">{% csrf_token %}
+  <header class="card-head"><h2>Venta {{ venta.serie }}-{{ venta.numero }}</h2></header>
+  <dl class="datos"><div><dt>Fecha del cobro</dt><dd>{{ cobro.fecha|date:"d/m/Y" }}</dd></div><div><dt>Cuenta</dt><dd>{{ cobro.cuenta.nombre }}</dd></div><div><dt>Importe</dt><dd>S/ {{ cobro.importe|floatformat:2 }}</dd></div></dl>
+  <p class="preview-note">Selecciona una cuota solo si puedes identificar a cuál corresponde el cobro. Esta acción no registra otra entrada de dinero. Por ahora, el importe completo debe caber en una sola cuota.</p>
+  <p class="preview-note">Si hay notas, un período cerrado o diferencias en el respaldo contable, el caso requiere revisión antes de asignar.</p>
+  {% if formulario.non_field_errors %}<div class="message error">{{ formulario.non_field_errors }}</div>{% endif %}
+  <div class="grid-fields">{% for campo in formulario %}<label class="field"><span>{{ campo.label }}</span>{{ campo }}{% if campo.errors %}<span class="message error">{{ campo.errors|join:", " }}</span>{% endif %}</label>{% endfor %}</div>
+  <button class="btn btn-primary" type="submit">Asignar cobro</button> <a class="btn btn-ghost" href="{% url 'ventas:detalle' venta.pk %}">Cancelar</a>
+</form></div></div>
+{% endblock %}

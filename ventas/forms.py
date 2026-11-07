@@ -88,6 +88,18 @@ class CobroVentaForm(forms.Form):
         )
 
 
+class AsignarCobroForm(forms.Form):
+    cuota = CuotaCobroChoiceField(queryset=CuotaVenta.objects.none(), label="Cuota a la que corresponde")
+    confirmado = forms.BooleanField(label="Confirmo que comprobé a qué cuota corresponde este cobro")
+
+    def __init__(self, *args, venta, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["cuota"].queryset = CuotaVenta.objects.filter(venta=venta).annotate(
+            asignado=Coalesce(Sum("cobros_asignados__importe"), Value(Decimal("0")),
+                              output_field=DecimalField(max_digits=18, decimal_places=2)),
+        )
+
+
 class CuotaVentaForm(forms.Form):
     vencimiento = forms.DateField(label="Vencimiento", widget=forms.DateInput(attrs={"type": "date"}))
     importe = forms.DecimalField(label="Importe", max_digits=18, decimal_places=2, min_value=Decimal("0.01"))
