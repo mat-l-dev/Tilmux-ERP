@@ -7,6 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
+        ('core', '0007_proteger_tablas_erp'),
         ('ventas', '0008_cuotaventa'),
     ]
 

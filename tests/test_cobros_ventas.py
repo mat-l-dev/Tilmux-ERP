@@ -8,7 +8,7 @@ from contabilidad.models import Asiento
 from contabilidad.servicios import ContabilidadError
 from core.models import Periodo
 from tesoreria.models import MovimientoTesoreria
-from ventas.models import CuotaVenta, Venta, VentaLinea
+from ventas.models import CuotaVenta, NotaCredito, Venta, VentaLinea
 from ventas.servicios import VentaError, confirmar, emitir_nota_credito
 from ventas.servicios_cobro import cobrar_venta, saldo_pendiente
 
@@ -88,6 +88,13 @@ class CobrosVentaTest(BaseContable):
         with self.assertRaisesMessage(VentaError, "cobros sin asignar"):
             self.cobrar("10", cuota=self.venta.cuotas.get())
         self.assertEqual(self.venta.cobros.count(), 1)
+
+    def test_nota_de_credito_impide_inferir_la_asignacion_a_cuotas(self):
+        NotaCredito.objects.create(venta=self.venta, fecha=self.venta.fecha, serie="FC01", numero="1",
+                                   motivo="Ajuste", total=10)
+        with self.assertRaisesMessage(VentaError, "notas que requieren revisión"):
+            self.cobrar("10", cuota=self.venta.cuotas.get())
+        self.assertFalse(self.venta.cobros.exists())
 
     def test_rechaza_cobro_retroactivo_excesivo_o_cuenta_inactiva(self):
         for importe, opciones in [("119", {}), ("1", {"fecha": date(2026, 11, 19)})]:
