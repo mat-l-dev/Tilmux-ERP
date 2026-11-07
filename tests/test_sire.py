@@ -115,6 +115,12 @@ class SireCsvTest(SimpleTestCase):
             with self.subTest(valor=valor), self.assertRaises(ArchivoInvalido):
                 sumar(leer_filas(Archivo("rce.csv", contenido.encode("utf-8"))))
 
+    def test_rechaza_filas_incompletas_y_totales_ausentes(self):
+        for fila in ("100,18\n", "100,18,\n"):
+            contenido = "BI Gravada,IGV,Importe Total\n" + fila
+            with self.subTest(fila=fila), self.assertRaisesRegex(ArchivoInvalido, "fila 2"):
+                sumar(leer_filas(Archivo("rce.csv", contenido.encode("utf-8"))))
+
     def test_no_confunde_credito_mixto_con_compra_gravada_ordinaria(self):
         cabecera = (
             "BI Gravado DG,IGV / IPM DG,BI Gravado DGNG,IGV / IPM DGNG,"

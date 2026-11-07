@@ -216,11 +216,17 @@ def sumar(filas: list[list]) -> dict:
     totales = {"base": Decimal("0"), "igv": Decimal("0"), "total": Decimal("0")}
     filas_contadas = 0
 
-    for fila in filas[cabecera + 1 :]:
+    for numero_fila, fila in enumerate(filas[cabecera + 1 :], start=cabecera + 2):
         if not any(celda not in (None, "") for celda in fila):
             continue
         if _es_fila_total(fila):
             continue
+
+        requeridas = usadas + columnas_mixtas
+        if requeridas and len(fila) <= max(requeridas):
+            raise ArchivoInvalido(
+                f"La fila {numero_fila} está incompleta: faltan columnas de importes. Descarga de nuevo el archivo."
+            )
 
         if any(_numero_validado(fila[i]) not in (None, Decimal("0")) for i in columnas_mixtas if i < len(fila)):
             raise ArchivoInvalido(
@@ -231,6 +237,10 @@ def sumar(filas: list[list]) -> dict:
         base = _suma(fila, cols_base) + _suma(fila, cols_dscto_base)
         igv = _suma(fila, cols_igv) + _suma(fila, cols_dscto_igv)
         total = _suma(fila, cols_total)
+        if cols_total and (base != 0 or igv != 0) and all(
+            _numero_validado(fila[i]) is None for i in cols_total
+        ):
+            raise ArchivoInvalido(f"La fila {numero_fila} tiene base o IGV, pero no tiene importe total.")
         if not cols_total:
             total = base + igv
         if base == 0 and igv == 0 and total == 0:
