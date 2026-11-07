@@ -29,6 +29,7 @@
   </label>
   <button class="btn btn-ghost" type="submit">Buscar</button>
 </form>
+{% if errores_filtro %}<div class="message error">{% for error in errores_filtro %}<div>{{ error }}</div>{% endfor %}</div>{% endif %}
 
 <section class="card">
   <header class="card-head">

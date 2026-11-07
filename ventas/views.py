@@ -20,6 +20,7 @@ from contabilidad.models import Asiento
 from contabilidad.servicios import ContabilidadError
 from core.context import empresa_actual
 from core.contexto import usuario_actual
+from core.filtros import periodo_mes
 from core.models import HistorialDocumento
 from core.permisos import requiere_escritura
 from inventario.servicios import StockError
@@ -136,10 +137,15 @@ def lista(request):
         if empresa
         else Venta.objects.none()
     )
-    periodo = request.GET.get("periodo", "")
-    if periodo and "-" in periodo:
-        anio, mes = (int(p) for p in periodo.split("-", 1))
-        consulta = consulta.filter(fecha__year=anio, fecha__month=mes)
+    errores_filtro = []
+    try:
+        periodo = periodo_mes(request.GET.get("periodo", ""))
+    except ValueError as exc:
+        errores_filtro.append(str(exc))
+        consulta = consulta.none()
+    else:
+        if periodo:
+            consulta = consulta.filter(fecha__year=periodo.year, fecha__month=periodo.month)
 
     busqueda = request.GET.get("q", "").strip()
     if busqueda:
@@ -153,7 +159,11 @@ def lista(request):
 
     producto_id = request.GET.get("producto", "")
     if producto_id:
-        consulta = consulta.filter(lineas__producto_id=producto_id).distinct()
+        if not producto_id.isascii() or not producto_id.isdecimal() or len(producto_id) > 18 or int(producto_id) < 1:
+            errores_filtro.append("Selecciona un producto válido.")
+            consulta = consulta.none()
+        else:
+            consulta = consulta.filter(lineas__producto_id=int(producto_id)).distinct()
     pagina = Paginator(consulta, 25).get_page(request.GET.get("page"))
     return render(
         request,
@@ -164,6 +174,7 @@ def lista(request):
             "q": busqueda,
             "producto_id": producto_id,
             "productos": Producto.objects.filter(activo=True),
+            "errores_filtro": errores_filtro,
         },
     )
 

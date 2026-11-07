@@ -61,6 +61,36 @@ class ListadoComprasTest(TestCase):
         self.assertContains(respuesta, "F002-456")
         self.assertNotContains(respuesta, "F001-123")
 
+    def test_filtra_y_muestra_la_fecha_segun_el_criterio_elegido(self):
+        self.gasto.fecha_devengado = date(2026, 9, 30)
+        self.gasto.fecha_anotacion = date(2026, 11, 4)
+        self.gasto.save(update_fields=["fecha_devengado", "fecha_anotacion"])
+        self.compra.fecha_anotacion = date(2026, 11, 5)
+        self.compra.save(update_fields=["fecha_anotacion"])
+        url = reverse("compras:lista")
+        devengo = self.client.get(url, {"fecha_por": "devengo", "periodo": "2026-09"})
+        self.assertContains(devengo, "F002-456")
+        self.assertContains(devengo, "30/09/2026")
+        self.assertNotContains(devengo, "F001-123")
+        anotacion = self.client.get(url, {"fecha_por": "anotacion", "periodo": "2026-11"})
+        self.assertContains(anotacion, "F001-123")
+        self.assertContains(anotacion, "F002-456")
+        self.assertContains(anotacion, "04/11/2026")
+        self.assertContains(anotacion, "05/11/2026")
+        emision = self.client.get(url, {"fecha_por": "emision", "periodo": "2026-10"})
+        self.assertContains(emision, "F001-123")
+        self.assertContains(emision, "F002-456")
+
+    def test_fechas_estimadas_y_periodos_invalidos_no_ocultan_la_aclaracion(self):
+        url = reverse("compras:lista")
+        estimada = self.client.get(url, {"fecha_por": "anotacion", "periodo": "2026-10"})
+        self.assertContains(estimada, "Estimada por emisión", count=2)
+        for periodo in ("2026-13", "no-es-fecha", "2026-1"):
+            respuesta = self.client.get(url, {"periodo": periodo})
+            self.assertEqual(respuesta.status_code, 200)
+            self.assertContains(respuesta, "período")
+            self.assertNotContains(respuesta, "F002-456")
+
     def test_detalle_gasto_muestra_informacion_sin_acceso_a_otra_empresa(self):
         respuesta = self.client.get(reverse("compras:detalle_gasto", args=[self.gasto.pk]))
         self.assertContains(respuesta, "Comisión de plataforma")

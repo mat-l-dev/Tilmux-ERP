@@ -10,6 +10,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db import IntegrityError, transaction
 from django.db.models import CharField, F, Q, Value
+from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -22,6 +23,7 @@ from contabilidad.moneda import SinTipoCambio, a_soles
 from contabilidad.servicios import ContabilidadError
 from core.context import empresa_actual
 from core.contexto import usuario_actual
+from core.filtros import periodo_mes
 from core.models import Empresa, HistorialDocumento, Periodo
 from core.permisos import requiere_escritura
 from documentos.xml_cpe import Guia, XMLInvalido, leer
@@ -47,15 +49,27 @@ def lista(request):
     empresa = empresa_actual(request)
     compras = Compra.objects.filter(empresa=empresa) if empresa else Compra.objects.none()
     gastos = Gasto.objects.filter(empresa=empresa) if empresa else Gasto.objects.none()
-    periodo = request.GET.get("periodo", "")
-    if periodo:
-        try:
-            fecha = date.fromisoformat(f"{periodo}-01")
-        except ValueError:
-            periodo = ""
-        else:
-            compras = compras.filter(fecha__year=fecha.year, fecha__month=fecha.month)
-            gastos = gastos.filter(fecha__year=fecha.year, fecha__month=fecha.month)
+    criterio_fecha = request.GET.get("fecha_por", "emision")
+    if criterio_fecha not in {"emision", "devengo", "anotacion"}:
+        criterio_fecha = "emision"
+    fecha_compra = Coalesce("fecha_anotacion", "fecha") if criterio_fecha == "anotacion" else F("fecha")
+    fecha_gasto = (
+        Coalesce("fecha_anotacion", "fecha") if criterio_fecha == "anotacion"
+        else Coalesce("fecha_devengado", "fecha") if criterio_fecha == "devengo"
+        else F("fecha")
+    )
+    compras = compras.annotate(fecha_listado=fecha_compra)
+    gastos = gastos.annotate(fecha_listado=fecha_gasto)
+    error_filtro = None
+    try:
+        periodo = periodo_mes(request.GET.get("periodo", ""))
+    except ValueError as exc:
+        error_filtro = str(exc)
+        compras, gastos = compras.none(), gastos.none()
+    else:
+        if periodo:
+            compras = compras.filter(fecha_listado__year=periodo.year, fecha_listado__month=periodo.month)
+            gastos = gastos.filter(fecha_listado__year=periodo.year, fecha_listado__month=periodo.month)
 
     busqueda = request.GET.get("q", "").strip()
     if busqueda:
@@ -76,7 +90,7 @@ def lista(request):
     def indices(queryset, clase):
         return queryset.order_by().annotate(
             registro_id=F("pk"), clase=Value(clase, output_field=CharField())
-        ).values("fecha", "registro_id", "clase")
+        ).values("fecha_listado", "registro_id", "clase")
 
     if tipo == "compra":
         consulta = indices(compras, "compra")
@@ -85,7 +99,7 @@ def lista(request):
     else:
         consulta = indices(compras, "compra").union(indices(gastos, "gasto"), all=True)
     pagina = Paginator(
-        consulta.order_by("-fecha", "-clase", "-registro_id"), 25
+        consulta.order_by("-fecha_listado", "-clase", "-registro_id"), 25
     ).get_page(request.GET.get("page"))
     indices_pagina = list(pagina.object_list)
     ids_compras = [i["registro_id"] for i in indices_pagina if i["clase"] == "compra"]
@@ -99,6 +113,7 @@ def lista(request):
     pagina.object_list = [
         {
             "clase": i["clase"],
+            "fecha": i["fecha_listado"],
             "registro": (compras_pagina if i["clase"] == "compra" else gastos_pagina)[i["registro_id"]],
         }
         for i in indices_pagina
@@ -106,7 +121,8 @@ def lista(request):
     return render(
         request,
         "compras/lista.html",
-        {"compras": pagina, "page_obj": pagina, "q": busqueda, "tipo": tipo},
+        {"compras": pagina, "page_obj": pagina, "q": busqueda, "tipo": tipo,
+         "fecha_por": criterio_fecha, "error_filtro": error_filtro},
     )
 
 

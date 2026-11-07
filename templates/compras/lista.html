@@ -6,6 +6,14 @@
 {% block contenido %}
 <form method="get" class="filtro">
   <label class="field" style="min-width:190px">
+    <span>Fecha para consultar</span>
+    <select name="fecha_por" data-autosubmit>
+      <option value="emision" {% if fecha_por == 'emision' %}selected{% endif %}>Emisión</option>
+      <option value="devengo" {% if fecha_por == 'devengo' %}selected{% endif %}>Devengo del gasto</option>
+      <option value="anotacion" {% if fecha_por == 'anotacion' %}selected{% endif %}>Anotación tributaria</option>
+    </select>
+  </label>
+  <label class="field" style="min-width:190px">
     <span>Mes</span>
     <select name="periodo" data-autosubmit>
       <option value="">Todos</option>
@@ -28,6 +36,7 @@
   </label>
   <button class="btn btn-ghost" type="submit">Buscar</button>
 </form>
+{% if error_filtro %}<div class="message error">{{ error_filtro }}</div>{% endif %}
 
 <section class="card">
   <header class="card-head">
@@ -40,12 +49,13 @@
   </header>
 
   <p class="preview-note">Las provisiones se muestran como tales; no son facturas adicionales.</p>
+  {% if fecha_por == 'anotacion' %}<p class="preview-note">Si no se registró la anotación, se usa la emisión como estimación. Contrasta el período con el RCE.</p>{% elif fecha_por == 'devengo' %}<p class="preview-note">Si el gasto no tiene fecha de devengo, se usa la emisión. Para mercadería se muestra la fecha del comprobante.</p>{% endif %}
   {% if compras %}
   <div class="tabla-scroll">
   <table class="tabla-doc">
     <thead>
       <tr>
-        <th>Fecha</th>
+        <th>{% if fecha_por == 'anotacion' %}Fecha de anotación{% elif fecha_por == 'devengo' %}Fecha económica{% else %}Fecha de emisión{% endif %}</th>
         <th>Tipo</th>
         <th>Comprobante</th>
         <th>Proveedor</th>
@@ -58,7 +68,7 @@
       {% for fila in compras %}
       {% with c=fila.registro %}
       <tr>
-        <td>{{ c.fecha|date:"d/m/Y" }}</td>
+        <td>{{ fila.fecha|date:"d/m/Y" }}{% if fecha_por == 'anotacion' and not c.fecha_anotacion %}<br><span class="muted">Estimada por emisión</span>{% elif fecha_por == 'devengo' and fila.clase == 'gasto' and not c.fecha_devengado %}<br><span class="muted">Según emisión</span>{% elif fecha_por == 'devengo' and fila.clase == 'compra' %}<br><span class="muted">Emisión</span>{% endif %}</td>
         <td>{% if fila.clase == 'compra' %}Mercadería{% elif c.provision %}Provisión{% else %}Gasto{% endif %}</td>
         <td>{% if fila.clase == 'compra' %}<a href="{% url 'compras:detalle' c.pk %}">{% if c.serie or c.numero %}{{ c.serie }}-{{ c.numero }}{% else %}Sin comprobante{% endif %}</a>{% else %}<a href="{% url 'compras:detalle_gasto' c.pk %}">{% if c.serie or c.numero %}{{ c.serie }}-{{ c.numero }}{% else %}Sin comprobante{% endif %}</a>{% endif %}</td>
         <td>{{ c.proveedor.nombre }}</td>

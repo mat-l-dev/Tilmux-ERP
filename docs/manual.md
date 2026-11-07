@@ -62,6 +62,11 @@ separado para no confundirlas con facturas adicionales.
 (con su descripción) y, si hubo flete o aduana, los costos de internamiento. Se
 prorratean por valor y el costo unitario final los incluye.
 
+En el listado de compras y gastos puedes consultar por fecha de emisión,
+devengo del gasto o anotación tributaria. Si no hay fecha de devengo o anotación
+se usa la emisión y se indica en la fila; en mercadería el criterio de devengo
+muestra la fecha de emisión. La anotación estimada debe contrastarse con el RCE.
+
 Si no sabes si el precio incluye IGV, usa el interruptor **Los precios incluyen
 IGV**; el sistema separa base e impuesto.
 
@@ -108,8 +113,8 @@ una compra de mercadería y un gasto separado; ese caso requiere revisión.
 
 **Corregir datos.** En una compra confirmada puedes completar serie, número,
 tipo, glosa y descripciones desde **Corregir datos**. Los importes, la fecha y el
-RUC no se editan en una compra confirmada: si están mal, usa una nota de crédito
-del proveedor o **Anular compra** (solo si no tiene pagos ni stock consumido).
+RUC no se editan en una compra confirmada: si están mal, revisa el comprobante
+con el proveedor. La anulación de compras confirmadas aún está deshabilitada.
 Al corregir serie, número o glosa, el sistema actualiza también la glosa del
 asiento y del movimiento de tesorería vinculados.
 
