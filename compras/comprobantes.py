@@ -45,9 +45,7 @@ def buscar_comprobante(*, empresa, proveedor, tipo_doc, serie, numero, compra_id
         return None
 
     filtros = {"empresa": empresa, "proveedor": proveedor, "tipo_doc": tipo_doc}
-    compras = Compra.objects.filter(**filtros).exclude(
-        estado__in=[Compra.Estado.BORRADOR, Compra.Estado.PENDIENTE]
-    )
+    compras = Compra.objects.filter(**filtros, estado=Compra.Estado.CONFIRMADA)
     if compra_id is not None:
         compras = compras.exclude(pk=compra_id)
     gastos = Gasto.objects.filter(**filtros, provision=False)

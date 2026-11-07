@@ -88,6 +88,17 @@ class ComprobantesDuplicadosTest(TestCase):
         self.assertEqual(buscar_comprobante(proveedor=self.proveedor, **datos), "compra")
         self.assertIsNone(buscar_comprobante(proveedor=otra, **datos))
 
+    def test_registro_revertido_no_impide_registrar_comprobante_correcto(self):
+        compra = Compra.objects.create(
+            empresa=self.empresa, proveedor=self.proveedor, fecha=date(2026, 10, 1),
+            tipo_doc="FACTURA", serie="F001", numero="0007", estado=Compra.Estado.ANULADA,
+        )
+        datos = dict(empresa=self.empresa, proveedor=self.proveedor, tipo_doc="FACTURA", serie="F001", numero="7")
+        self.assertIsNone(buscar_comprobante(**datos))
+        compra.estado = Compra.Estado.CONFIRMADA
+        compra.save(update_fields=["estado"])
+        self.assertEqual(buscar_comprobante(**datos), "compra")
+
     def test_provision_no_cuenta_como_factura_ya_recibida(self):
         Gasto.objects.create(
             empresa=self.empresa,
