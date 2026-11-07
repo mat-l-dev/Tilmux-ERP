@@ -18,6 +18,10 @@
         <div><dt>Concepto</dt><dd>{{ gasto.glosa|default:"—" }}</dd></div>
         <div><dt>Cuenta contable</dt><dd>{{ gasto.cuenta.codigo }} · {{ gasto.cuenta.nombre }}</dd></div>
         <div><dt>Medio de pago</dt><dd>{% if gasto.medio %}{{ gasto.medio.nombre }}{% elif pagos_gasto %}Ver pagos registrados{% elif es_pendiente %}Aún sin pagos{% else %}No indicado{% endif %}</dd></div>
+        {% if not gasto.provision %}
+        <div><dt>Estimación tributaria de compras</dt><dd>{% if gasto.con_credito %}Incluido{% else %}No incluido{% endif %}</dd></div>
+        <div><dt>Sustenta costo o gasto tributario</dt><dd>{% if gasto.deducible %}Marcado{% else %}No marcado{% endif %}</dd></div>
+        {% endif %}
       </dl>
       <dl class="totales totales-inline">
         <div><dt>Base</dt><dd class="num">{{ gasto.base|floatformat:2 }}</dd></div>
@@ -27,6 +31,7 @@
       {% if gasto.gasto_origen %}<p class="preview-note">Esta provisión está vinculada a <a href="{% url 'compras:detalle_gasto' gasto.gasto_origen.pk %}">la factura {{ gasto.gasto_origen.serie }}-{{ gasto.gasto_origen.numero }}</a>.</p>{% elif gasto.provision %}<p class="preview-note">Provisión sin factura vinculada.</p>{% endif %}
       {% if provisiones %}<p class="preview-note">Provisiones vinculadas: {% for p in provisiones %}<a href="{% url 'compras:detalle_gasto' p.pk %}">{{ p.glosa|default:"Ver provisión" }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}.</p>{% endif %}
       {% if es_pendiente %}<p>Saldo pendiente: <strong>S/ {{ saldo_pendiente|floatformat:2 }}</strong></p>{% endif %}
+      {% if not gasto.provision %}<p class="preview-note">Estas opciones muestran lo registrado en el ERP; no verifican por sí solas el tratamiento tributario ni la aceptación del comprobante.</p>{% endif %}
     </section>
     {% if pagos_gasto %}<section class="card"><header class="card-head"><h2>Pagos registrados</h2></header>
       <table class="tabla-doc"><thead><tr><th>Fecha</th><th>Cuenta</th><th>Importe</th></tr></thead><tbody>

@@ -29,3 +29,14 @@ class FiltrosVentaTest(TestCase):
             self.assertNotContains(respuesta, "F001-123")
             self.assertTrue(respuesta.context["errores_filtro"])
         self.assertContains(self.client.get(url, {"periodo": "2026-10"}), "F001-123")
+
+    def test_lista_distingue_resultados_filtrados_y_muestra_condicion(self):
+        self.client.force_login(self.usuario)
+        url = reverse("ventas:lista")
+        listado = self.client.get(url, {"periodo": "2026-10"})
+        self.assertContains(listado, "Contado")
+        self.assertContains(listado, "PEN")
+        self.assertContains(listado, "Limpiar filtros")
+        vacio = self.client.get(url, {"q": "cliente-inexistente"})
+        self.assertContains(vacio, "No hay ventas para los filtros elegidos")
+        self.assertNotContains(vacio, "F001-123")

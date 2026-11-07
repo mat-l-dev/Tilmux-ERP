@@ -53,6 +53,8 @@ class ListadoComprasTest(TestCase):
         self.assertContains(respuesta, "F001-123")
         self.assertContains(respuesta, "F002-456")
         self.assertContains(respuesta, "Comisión de plataforma")
+        self.assertContains(respuesta, "¿Qué opción debo elegir?")
+        self.assertContains(respuesta, "Limpiar filtros")
         self.assertNotContains(respuesta, "F003-789")
         self.assertContains(respuesta, reverse("compras:detalle_gasto", args=[self.gasto.pk]))
 
@@ -94,6 +96,8 @@ class ListadoComprasTest(TestCase):
     def test_detalle_gasto_muestra_informacion_sin_acceso_a_otra_empresa(self):
         respuesta = self.client.get(reverse("compras:detalle_gasto", args=[self.gasto.pk]))
         self.assertContains(respuesta, "Comisión de plataforma")
+        self.assertContains(respuesta, "Estimación tributaria de compras")
+        self.assertContains(respuesta, "no verifican por sí solas")
         otro = Gasto.objects.exclude(empresa=self.empresa).get()
         self.assertEqual(self.client.get(reverse("compras:detalle_gasto", args=[otro.pk])).status_code, 404)
 

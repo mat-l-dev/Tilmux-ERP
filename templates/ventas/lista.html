@@ -28,23 +28,25 @@
     </select>
   </label>
   <button class="btn btn-ghost" type="submit">Buscar</button>
+  <a class="btn btn-ghost" href="{% url 'ventas:lista' %}">Limpiar filtros</a>
 </form>
 {% if errores_filtro %}<div class="message error">{% for error in errores_filtro %}<div>{{ error }}</div>{% endfor %}</div>{% endif %}
 
 <section class="card">
-  <header class="card-head">
-    <h2>Comprobantes emitidos</h2>
-    <div><a class="btn btn-ghost" href="{% url 'ventas:cuentas_cobrar' %}">Cuentas por cobrar</a>
+  <header class="card-head listado-cabecera">
+    <div><h2>Ventas</h2><p class="muted listado-subtitulo">{{ page_obj.paginator.count }} registro{{ page_obj.paginator.count|pluralize }} en esta consulta</p></div>
+    <div class="acciones-head listado-acciones"><a class="btn btn-ghost" href="{% url 'ventas:cuentas_cobrar' %}">Cuentas por cobrar</a>
     <a class="btn btn-primary" href="{% url 'ventas:nueva' %}">Nueva venta</a></div>
   </header>
 
   {% if ventas %}
-  <table class="tabla-doc">
+  <div class="tabla-scroll" tabindex="0" role="region" aria-label="Listado de ventas"><table class="tabla-doc">
     <thead>
       <tr>
         <th>Fecha</th>
         <th>Comprobante</th>
         <th>Cliente</th>
+        <th>Condición</th>
         <th class="der">Total</th>
         <th>Estado</th>
       </tr>
@@ -55,14 +57,15 @@
         <td>{{ v.fecha|date:"d/m/Y" }}</td>
         <td><a href="{% url 'ventas:detalle' v.pk %}">{{ v.serie }}-{{ v.numero }}</a></td>
         <td>{{ v.cliente_nombre|default:"Consumidor final" }}</td>
-        <td class="num der">{{ v.total }}</td>
+        <td>{{ v.get_condicion_display }}</td>
+        <td class="num der">{{ v.moneda }} {{ v.total|floatformat:2 }}</td>
         <td><span class="chip {% if v.estado == 'CONFIRMADA' %}chip-ok{% endif %}">{{ v.get_estado_display }}</span></td>
       </tr>
       {% endfor %}
     </tbody>
-  </table>
+  </table></div>
   {% else %}
-  <p class="muted">Todavía no hay ventas registradas.</p>
+  <p class="muted">No hay ventas para los filtros elegidos. Prueba con otro mes o limpia los filtros.</p>
   {% endif %}
 
   {% if page_obj.has_other_pages %}

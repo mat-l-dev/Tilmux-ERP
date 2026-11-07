@@ -42,13 +42,14 @@
     </select>
   </label>
   <button class="btn btn-ghost" type="submit">Buscar</button>
+  <a class="btn btn-ghost" href="{% url 'compras:lista' %}">Limpiar filtros</a>
 </form>
 {% if error_filtro %}<div class="message error">{{ error_filtro }}</div>{% endif %}
 
 <section class="card">
-  <header class="card-head">
-    <h2>Compras y gastos</h2>
-    <div class="acciones-head">
+  <header class="card-head listado-cabecera">
+    <div><h2>Compras y gastos</h2><p class="muted listado-subtitulo">{{ page_obj.paginator.count }} registro{{ page_obj.paginator.count|pluralize }} en esta consulta</p></div>
+    <div class="acciones-head listado-acciones">
       <a class="btn btn-ghost" href="{% url 'compras:importar' %}">Importar XML</a>
       <a class="btn btn-ghost" href="{% url 'compras:nuevo_gasto' %}">Registrar gasto pagado</a>
       <a class="btn btn-ghost" href="{% url 'compras:nuevo_gasto_pendiente' %}">Registrar gasto por pagar</a>
@@ -57,11 +58,11 @@
     </div>
   </header>
 
-  <p class="preview-note">Las provisiones se muestran como tales; no son facturas adicionales.</p>
+  <p class="preview-note">Las provisiones se muestran como tales; no son facturas adicionales. <a href="{% url 'core:guia' %}#elegir">¿Qué opción debo elegir?</a></p>
   {% if estado_pago %}<p class="preview-note">Este filtro muestra gastos con comprobante registrados en el flujo de pagos parciales. Las provisiones y compras de mercadería se consultan por separado.</p>{% endif %}
   {% if fecha_por == 'anotacion' %}<p class="preview-note">Si no se registró la anotación, se usa la emisión como estimación. Contrasta el período con el RCE.</p>{% elif fecha_por == 'devengo' %}<p class="preview-note">Si el gasto no tiene fecha de devengo, se usa la emisión. Para mercadería se muestra la fecha del comprobante.</p>{% endif %}
   {% if compras %}
-  <div class="tabla-scroll">
+  <div class="tabla-scroll" tabindex="0" role="region" aria-label="Listado de compras y gastos">
   <table class="tabla-doc">
     <thead>
       <tr>
