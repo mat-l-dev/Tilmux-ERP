@@ -115,3 +115,14 @@ class CuentasPorCobrarTest(TestCase):
         respuesta = self.client.get(url, {"fecha": "2026-01-07"})
         self.assertNotContains(respuesta, "F001-1")
         self.assertContains(self.client.get(url, {"fecha": "2026-01-07", "estado": "todos"}), "F001-1")
+
+    def test_detalle_moneda_extranjera_no_ofrece_cobro_en_soles(self):
+        self.venta.moneda = "USD"
+        self.venta.save(update_fields=["moneda"])
+        user = get_user_model().objects.create_superuser(username="admin", password="test")
+        self.client.force_login(user)
+        respuesta = self.client.get(reverse("ventas:detalle", args=[self.venta.pk]))
+        self.assertContains(respuesta, "Moneda del comprobante")
+        self.assertContains(respuesta, "Saldo pendiente: USD")
+        self.assertContains(respuesta, "este flujo solo admite soles")
+        self.assertNotContains(respuesta, reverse("ventas:cobrar", args=[self.venta.pk]))

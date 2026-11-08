@@ -14,8 +14,9 @@
       <dl class="datos">
         <div><dt>Fecha</dt><dd>{{ venta.fecha|date:"d/m/Y" }}</dd></div>
         <div><dt>Tipo</dt><dd>{{ venta.get_tipo_doc_display }}</dd></div>
-        <div><dt>Cliente</dt><dd>{{ venta.cliente_nombre|default:"Consumidor final" }}</dd></div>
+        <div><dt>Cliente</dt><dd>{% if venta.cliente_nombre %}{{ venta.cliente_nombre }}{% elif venta.cliente %}{{ venta.cliente.nombre }}{% else %}Consumidor final{% endif %}</dd></div>
         <div><dt>Condición</dt><dd>{{ venta.get_condicion_display }}</dd></div>
+        <div><dt>Moneda del comprobante</dt><dd>{{ venta.moneda }}</dd></div>
       </dl>
 
       <div class="tabla-scroll">
@@ -29,7 +30,7 @@
             <th class="der">Base</th>
             <th class="der">IGV</th>
             <th class="der">Total</th>
-            <th class="der">Costo</th>
+            <th class="der">Costo (PEN)</th>
           </tr>
         </thead>
         <tbody>
@@ -52,7 +53,7 @@
       <dl class="totales totales-inline">
         <div><dt>Base</dt><dd class="num">{{ venta.subtotal|floatformat:2 }}</dd></div>
         <div><dt>IGV</dt><dd class="num">{{ venta.igv|floatformat:2 }}</dd></div>
-        <div><dt>Costo de venta</dt><dd class="num">{{ venta.costo_venta|floatformat:2 }}</dd></div>
+        <div><dt>Costo de venta (PEN)</dt><dd class="num">{{ venta.costo_venta|floatformat:2 }}</dd></div>
         <div class="total"><dt>Total</dt><dd class="num">{{ venta.total|floatformat:2 }}</dd></div>
       </dl>
     </section>
@@ -73,13 +74,13 @@
     {% if saldo_credito is not None %}
     <section class="card">
       <header class="card-head"><h2>Cobros de la venta</h2></header>
-      {% if saldo_credito < 0 %}<p>Saldo a favor del cliente: S/ {{ saldo_favor|floatformat:2 }}. Requiere revisión.</p>
-      {% else %}<p>Saldo pendiente: S/ {{ saldo_credito|floatformat:2 }}</p>{% endif %}
+      {% if saldo_credito < 0 %}<p>Saldo negativo: {{ venta.moneda }} {{ saldo_favor|floatformat:2 }}. Requiere revisar los documentos y cobros.</p>
+      {% else %}<p>Saldo pendiente: {{ venta.moneda }} {{ saldo_credito|floatformat:2 }}</p>{% endif %}
       <p class="muted">Calculado con las notas y cobros vinculados. Revisa los cobros históricos que no estén vinculados a esta venta.</p>
       <div class="tabla-scroll" tabindex="0" role="region" aria-label="Cobros de la venta"><table class="tabla-doc"><thead><tr><th>Fecha</th><th>Cuenta</th><th>Canal</th><th>Cuota</th><th class="der">Importe</th></tr></thead><tbody>
-      {% for cobro in cobros_detalle %}<tr><td>{{ cobro.fecha|date:"d/m/Y" }}</td><td>{{ cobro.cuenta.nombre }}</td><td>{{ cobro.canal }}</td><td>{% if cobro.cuota_id %}{{ cobro.cuota.numero }}{% else %}Sin asignar<br><a href="{% url 'ventas:asignar_cuota' venta.pk cobro.pk %}">Asignar cuota</a>{% endif %}</td><td class="num der">{{ cobro.importe|floatformat:2 }}</td></tr>{% empty %}<tr><td colspan="5">Sin cobros vinculados.</td></tr>{% endfor %}
+      {% for cobro in cobros_detalle %}<tr><td>{{ cobro.fecha|date:"d/m/Y" }}</td><td>{{ cobro.cuenta.nombre }}</td><td>{{ cobro.canal }}</td><td>{% if cobro.cuota_id %}{{ cobro.cuota.numero }}{% else %}Sin asignar{% if venta.moneda == "PEN" %}<br><a href="{% url 'ventas:asignar_cuota' venta.pk cobro.pk %}">Asignar cuota</a>{% endif %}{% endif %}</td><td class="num der">{{ cobro.importe|floatformat:2 }}</td></tr>{% empty %}<tr><td colspan="5">Sin cobros vinculados.</td></tr>{% endfor %}
       </tbody></table></div>
-      {% if saldo_credito > 0 %}<a class="btn btn-primary" href="{% url 'ventas:cobrar' venta.pk %}">Registrar cobro</a>{% endif %}
+      {% if venta.moneda != "PEN" %}<p class="preview-note">El registro y la asignación de cobros para ventas en moneda extranjera requieren revisión; este flujo solo admite soles.</p>{% elif saldo_credito > 0 %}<a class="btn btn-primary" href="{% url 'ventas:cobrar' venta.pk %}">Registrar cobro</a>{% endif %}
     </section>
     {% endif %}
 

@@ -15,7 +15,7 @@
     <thead><tr><th>Venta</th><th>Cliente</th><th>Primer vencimiento pactado</th><th class="der">Total</th><th class="der">Saldo documentado</th><th>Situación</th></tr></thead>
     <tbody>{% for v in cuentas %}<tr>
       <td><a href="{% url 'ventas:detalle' v.pk %}">{{ v.serie }}-{{ v.numero }}</a><br><span class="muted">{{ v.fecha|date:"d/m/Y" }}</span></td>
-      <td>{{ v.cliente_nombre|default:v.cliente.nombre|default:"Consumidor final" }}</td><td>{{ v.primer_vencimiento|date:"d/m/Y"|default:"Sin cuotas" }}</td>
+      <td>{% if v.cliente_nombre %}{{ v.cliente_nombre }}{% elif v.cliente %}{{ v.cliente.nombre }}{% else %}Consumidor final{% endif %}</td><td>{{ v.primer_vencimiento|date:"d/m/Y"|default:"Sin cuotas" }}</td>
       <td class="num der">{{ v.moneda }} {{ v.total|floatformat:2 }}</td><td class="num der">{{ v.moneda }} {{ v.saldo_documentado|floatformat:2 }}</td>
       <td>{% if v.saldo_documentado > 0 %}<span class="chip chip-warn">Pendiente</span>{% elif v.saldo_documentado < 0 %}<span class="chip chip-warn">Saldo negativo · revisar</span>{% elif not v.requiere_revision %}<span class="chip chip-ok">Sin saldo</span>{% endif %}{% if v.requiere_revision %}<span class="chip chip-warn">Revisar cobro anterior</span>{% endif %}</td>
     </tr>{% empty %}<tr><td colspan="6">No hay ventas para esta consulta.</td></tr>{% endfor %}</tbody>
