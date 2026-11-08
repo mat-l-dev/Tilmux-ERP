@@ -45,6 +45,7 @@ from ventas.models import NotaCredito, NotaDebito, Venta
 
 from .casillas import calcular
 from .conciliacion_documentos import totales_documentales
+from .conciliacion_rce import comparar_rce
 from .sire import ArchivoInvalido, leer_filas, moneda_verificada_soles, sumar, validar_contexto
 from .utils import FiltroReporteError, filtros_seguros, rango
 
@@ -787,7 +788,22 @@ def conciliacion_archivo(request):
                         )
                     )
                 )
+                if registro == "compras":
+                    resultado["documentos"] = comparar_rce(filas=filas, empresa=empresa, anio=anio, mes=mes)
+                    comparacion = resultado["documentos"]
+                    if comparacion and any(comparacion[campo] for campo in (
+                        "solo_archivo", "solo_sistema", "diferentes", "ambiguos", "omitidos_archivo",
+                        "omitidos_sistema",
+                    )):
+                        resultado["cuadra"] = False
 
+    documentos = resultado.get("documentos") if resultado else None
+    grupos_documentos = [
+        ("Solo en el ERP", documentos["solo_sistema"]),
+        ("Solo en la propuesta", documentos["solo_archivo"]),
+        ("Fechas o importes diferentes", documentos["diferentes"]),
+        ("Identificación duplicada: revisar", documentos["ambiguos"]),
+    ] if documentos else []
     return render(
         request,
         "reportes/conciliacion_archivo.html",
@@ -798,5 +814,6 @@ def conciliacion_archivo(request):
             "resultado": resultado,
             "error": error,
             "nombre_archivo": nombre_archivo,
+            "grupos_documentos": grupos_documentos,
         },
     )

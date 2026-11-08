@@ -50,7 +50,7 @@
     {{ resultado.filas }} comprobante{{ resultado.filas|pluralize }} leído{{ resultado.filas|pluralize }}.
     Columnas detectadas: {{ resultado.columnas|join:", " }}.
   </p>
-  <p class="preview-note">La comparación es por importes totales; no confirma que cada comprobante coincida.</p>
+  <p class="preview-note">Los totales no demuestran por sí solos que cada comprobante coincida. Revisa también el detalle documental cuando esté disponible.</p>
   {% if not resultado.contexto_archivo.ruc or not resultado.contexto_archivo.periodo %}
   <p class="preview-note">No se pudo verificar automáticamente el RUC o el período del archivo. Confírmalos antes de usar esta comparación.</p>
   {% endif %}
@@ -118,6 +118,21 @@
   {% if resultado.otras_monedas %}<p class="preview-note">Hay {{ resultado.otras_monedas }} documento(s) en otra moneda. El total en soles es parcial y no se compara hasta disponer de un tratamiento de moneda verificable.</p>{% endif %}
   {% if not resultado.moneda_verificada %}<p class="preview-note">No se pudo verificar que todas las filas del archivo estén en soles; se requiere revisar la columna de moneda antes de comparar importes.</p>{% endif %}
 </section>
+{% if resultado.registro == "compras" %}
+<section class="card" style="margin-top:12px">
+  <header class="card-head"><h2>Revisión por comprobante</h2></header>
+  {% if resultado.documentos %}
+  <p class="preview-note">Compara facturas y boletas en soles identificables por RUC del emisor, tipo, serie y número. El período del ERP usa la fecha de anotación o, si no se indicó, la emisión. La coincidencia revisa fecha de emisión e importe total; no verifica aceptación ni crédito fiscal.</p>
+  <p>{{ resultado.documentos.coinciden }} coincidente(s) · {{ resultado.documentos.solo_sistema|length }} sin identificar en archivo · {{ resultado.documentos.solo_archivo|length }} sin identificar en ERP · {{ resultado.documentos.diferentes|length }} con diferencias · {{ resultado.documentos.ambiguos|length }} duplicado(s) por revisar.</p>
+  {% if resultado.documentos.omitidos_archivo or resultado.documentos.omitidos_sistema %}<p class="preview-note"><strong>Comparación incompleta:</strong> {{ resultado.documentos.omitidos_archivo }} fila(s) del archivo y {{ resultado.documentos.omitidos_sistema }} documento(s) del ERP no se pudieron comparar por tipo, datos o moneda.</p>{% endif %}
+  {% for titulo, filas in grupos_documentos %}
+    {% if filas %}<h3>{{ titulo }}</h3><div class="tabla-scroll" tabindex="0" role="region" aria-label="{{ titulo }}"><table class="tabla-doc"><thead><tr><th>Emisor</th><th>Comprobante</th><th>ERP: fecha / total</th><th>Archivo: fecha / total</th></tr></thead><tbody>
+    {% for fila in filas %}<tr><td>{{ fila.ruc }}</td><td>{{ fila.tipo }} {{ fila.documento }}</td><td>{% if fila.sistema %}<a href="{{ fila.sistema.url }}">{{ fila.sistema.fecha|date:"d/m/Y" }} · S/ {{ fila.sistema.total|floatformat:2 }}</a>{% else %}—{% endif %}</td><td>{% if fila.archivo %}{{ fila.archivo.fecha|date:"d/m/Y" }} · S/ {{ fila.archivo.total|floatformat:2 }}{% else %}—{% endif %}</td></tr>{% endfor %}
+    </tbody></table></div>{% endif %}
+  {% endfor %}
+  {% else %}<p class="preview-note">Este archivo no contiene todas las columnas reconocidas para comparar comprobantes. La comparación anterior es solo por importes.</p>{% endif %}
+</section>
+{% endif %}
 {% endif %}
 
 <section class="card" style="margin-top:12px">
@@ -128,11 +143,11 @@
     <li>Entra a SUNAT con Clave SOL y abre <strong>SIRE</strong>.</li>
     <li>Elige <strong>Registro de Ventas (RVIE)</strong> o <strong>Registro de Compras (RCE)</strong> del periodo.</li>
     <li>Descarga la propuesta en Excel o CSV.</li>
-    <li>Súbela aquí. No se envía nada a SUNAT: el archivo se lee en tu equipo.</li>
+    <li>Súbela aquí. El servidor del ERP procesa el archivo y no lo envía a SUNAT.</li>
   </ol>
   <p class="preview-note">
-    El lector busca las columnas por su nombre (base imponible, IGV, total), así
-    que funciona aunque SUNAT cambie el orden. No guardamos el archivo.
+    El lector busca columnas por su nombre y admite cambios de orden; otros cambios
+    de formato pueden requerir revisión. El ERP no conserva el archivo como documento.
   </p>
 </section>
 {% endblock %}

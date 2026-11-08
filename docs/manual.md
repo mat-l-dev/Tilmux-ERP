@@ -434,11 +434,10 @@ puedes subir el archivo que descarga SUNAT en lugar de copiar las casillas a man
 2. Descarga la propuesta en Excel o CSV.
 3. En el ERP elige año, mes y registro, adjunta el archivo y pulsa **Conciliar**.
 
-El lector busca las columnas por su nombre (base imponible, IGV, importe total),
-así que no depende del orden ni de que SUNAT cambie la plantilla. Las notas de
-crédito se restan solas porque la estructura del RVIE las exige con signo
-negativo; si afectan a un periodo anterior, vienen en las columnas de descuento
-y también se restan. La fila de totales se ignora para no contar dos veces.
+El lector busca columnas por su nombre y admite cambios de orden. Una plantilla
+con nombres o estructuras distintos requiere revisión. Los importes de notas y
+descuentos conservan el signo leído del archivo; contrástalos con el registro.
+La fila de totales se ignora para no contar dos veces.
 
 El resultado separa base e IGV de la estimación tributaria del total documental.
 Este último incluye las boletas con serie y número aunque no otorguen crédito,
@@ -447,11 +446,16 @@ diferencia de totales es una señal para revisar los documentos; no identifica
 por sí sola cuál falta ni demuestra un error tributario. Los documentos en otra
 moneda impiden comparar los totales hasta revisar su tratamiento.
 
-La coincidencia de importes no verifica cada comprobante ni demuestra que SUNAT
-haya aceptado o generado el RCE. Si la boleta se incorpora en SUNAT, descarga
-de nuevo el archivo resultante para contrastarlo; el ERP no modifica la propuesta.
+Cuando reconoce las columnas del RCE, el ERP compara además facturas y boletas
+individuales en soles por emisor, tipo, serie y número, y muestra diferencias de
+fecha o total, duplicados y documentos que no pudo identificar. Las notas,
+rangos y otras monedas quedan fuera de esa comparación individual. El resultado
+no demuestra aceptación ni generación del registro por SUNAT. Si incorporas
+la boleta en SUNAT, descarga de nuevo el archivo resultante para contrastarlo;
+el ERP no modifica la propuesta.
 
-El archivo no se guarda ni se envía a SUNAT: se lee en el equipo y se descarta.
+El servidor del ERP procesa el archivo y no lo envía a SUNAT ni lo conserva como
+documento del ERP; la plataforma puede usar archivos temporales durante la carga.
 
 
 ## Normativa aplicada

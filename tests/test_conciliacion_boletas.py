@@ -83,6 +83,47 @@ class ConciliacionBoletasTest(TestCase):
         self.assertTrue(resultado["cuadra"])
         self.assertEqual(calcular(self.empresa, 2026, 10)["compras_igv"], 0)
 
+    def test_compara_identidad_aunque_los_totales_coincidan(self):
+        cabecera = ("RUC,Periodo,Tipo CP/Doc.,Serie del CDP,Nro CP o Doc. Nro Inicial (Rango),"
+                    "Nro Final (Rango),Tipo Doc Identidad,Nro Doc Identidad,Fecha de emisión,"
+                    "BI Gravado DG,IGV / IPM DG,Total CP,Moneda\n")
+        factura = "20123456789,202610,01,F001,00000001,,6,20100000001,01/10/2026,0,0,43.00,PEN\n"
+        otra_boleta = "20123456789,202610,03,B002,00393302,,6,20100000001,31/10/2026,0,0,198.04,PEN\n"
+        respuesta = self.conciliar(cabecera + factura + otra_boleta)
+        resultado = respuesta.context["resultado"]
+        self.assertEqual(resultado["dif_total"], 0)
+        self.assertFalse(resultado["cuadra"])
+        self.assertEqual(resultado["documentos"]["coinciden"], 1)
+        self.assertEqual(len(resultado["documentos"]["solo_sistema"]), 1)
+        self.assertEqual(len(resultado["documentos"]["solo_archivo"]), 1)
+        self.assertContains(respuesta, "B001-393302")
+        self.assertContains(respuesta, "B002-393302")
+        self.assertEqual(calcular(self.empresa, 2026, 10)["compras_igv"], 0)
+
+    def test_comparacion_detecta_fecha_importe_y_duplicados(self):
+        cabecera = ("RUC,Periodo,Tipo CP/Doc.,Serie del CDP,Nro CP o Doc. Nro Inicial (Rango),"
+                    "Nro Final (Rango),Tipo Doc Identidad,Nro Doc Identidad,Fecha de emisión,"
+                    "BI Gravado DG,IGV / IPM DG,Total CP,Moneda\n")
+        factura = "20123456789,202610,01,F001,1,,6,20100000001,02/10/2026,0,0,42.00,PEN\n"
+        boleta = "20123456789,202610,03,B001,393302,,6,20100000001,31/10/2026,0,0,198.04,PEN\n"
+        respuesta = self.conciliar(cabecera + factura + boleta + boleta)
+        documentos = respuesta.context["resultado"]["documentos"]
+        self.assertEqual(len(documentos["diferentes"]), 1)
+        self.assertEqual(len(documentos["ambiguos"]), 1)
+        self.assertFalse(respuesta.context["resultado"]["cuadra"])
+        self.assertContains(respuesta, "Identificación duplicada")
+
+    def test_tipo_no_admitido_no_se_da_por_comparado(self):
+        cabecera = ("RUC,Periodo,Tipo CP/Doc.,Serie del CDP,Nro CP o Doc. Nro Inicial (Rango),"
+                    "Nro Final (Rango),Tipo Doc Identidad,Nro Doc Identidad,Fecha de emisión,"
+                    "BI Gravado DG,IGV / IPM DG,Total CP,Moneda\n")
+        nota = "20123456789,202610,07,FC01,1,,6,20100000001,02/10/2026,0,0,10.00,PEN\n"
+        sin_ruc = "20123456789,202610,03,B001,1,,1,20100000001,02/10/2026,0,0,10.00,PEN\n"
+        rango = "20123456789,202610,03,B001,2,5,6,20100000001,02/10/2026,0,0,10.00,PEN\n"
+        respuesta = self.conciliar(cabecera + nota + sin_ruc + rango)
+        self.assertEqual(respuesta.context["resultado"]["documentos"]["omitidos_archivo"], 3)
+        self.assertContains(respuesta, "Comparación incompleta")
+
     def test_sin_columna_de_total_no_afirma_conciliacion_documental(self):
         contenido = "RUC,Periodo,BI Gravada,IGV\n20123456789,202610,0,0\n"
         respuesta = self.conciliar(contenido)

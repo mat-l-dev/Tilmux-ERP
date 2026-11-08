@@ -81,9 +81,9 @@
     <li>Descarga la propuesta correspondiente desde SUNAT y comprueba empresa y período.</li>
     <li>En el ERP abre <a href="{% url 'reportes:conciliacion' %}">Conciliación SUNAT</a> y luego <strong>Conciliar con la propuesta del SIRE</strong>.</li>
     <li>Selecciona año, mes y registro: <strong>RCE</strong> para compras o <strong>RVIE</strong> para ventas. Carga el archivo y pulsa <strong>Conciliar</strong>.</li>
-    <li>Revisa los totales y los avisos de moneda, RUC o período. Si hay diferencias, compara los comprobantes y sus fechas individualmente antes de decidir una corrección.</li>
+    <li>Revisa los totales y los avisos de moneda, RUC o período. En el RCE, consulta también la revisión individual cuando el ERP reconozca las columnas.</li>
   </ol>
-  <p>La comparación es por totales; que coincidan no prueba que cada documento coincida. El total documental puede incluir boletas sin crédito fiscal. El ERP no modifica la propuesta ni envía la declaración a SUNAT.</p>
+  <p>La comparación individual admite facturas y boletas identificables en soles y muestra lo que no pudo revisar. Que coincidan los totales no demuestra aceptación por SUNAT ni crédito fiscal. El total documental puede incluir boletas sin crédito fiscal. El ERP no modifica la propuesta ni envía la declaración a SUNAT.</p>
 </section>
 
 <section class="card" id="fechas">
