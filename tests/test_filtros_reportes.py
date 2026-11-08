@@ -55,3 +55,7 @@ class FiltrosReportesTest(TestCase):
         self.assertEqual(respuesta.status_code, 200)
         self.assertEqual(respuesta.context["desde"], date(2026, 10, 1))
         self.assertEqual(respuesta.context["hasta"], date(2026, 10, 31))
+        self.assertIsNone(respuesta.context["c303"])
+        self.assertIsNone(respuesta.context["c304"])
+        self.assertContains(respuesta, "No verificado")
+        self.assertContains(respuesta, "No determinado")

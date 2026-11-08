@@ -287,7 +287,7 @@ anulación o devolución total requiere acreditar toda la venta sin notas previa
 |---|---|
 | Balance de comprobación | Saldo inicial, movimientos del período y saldos de cierre por cuenta |
 | Libro mayor | Saldo inicial y movimientos con saldo corrido por cuenta |
-| Registro de ventas | Ventas y notas, con exportación CSV |
+| Registro de ventas | Ventas y notas, con totales separados por moneda y exportación CSV |
 | Registro de compras | Compras y gastos, con exportación CSV; no incluye provisiones |
 | IGV y RER | IGV del mes y renta del 1,5 % |
 | Estados financieros | Situación, resultados, cambios y flujo |
@@ -297,6 +297,10 @@ El balance y el mayor consideran los asientos confirmados anteriores al rango
 para calcular el saldo inicial. Los movimientos corresponden al rango elegido;
 un saldo positivo en el mayor es deudor y uno negativo, acreedor. Estos reportes
 son consultas del ERP y no constituyen por sí solos libros electrónicos enviados.
+El registro de ventas agrupa los importes por la moneda registrada sin hacer una
+conversión tributaria. Su CSV es un archivo de revisión, no un archivo validado
+para importar directamente a SUNAT; los documentos sin tipo de identidad conocido
+dejan el campo vacío en lugar de asumir que se trata de un DNI.
 
 ## Impuestos
 
@@ -343,7 +347,7 @@ La tabla del reporte **IGV y RER** sigue las casillas del formulario:
 | 145 | Saldo a favor del periodo anterior |
 | 184 | IGV a pagar o saldo a favor |
 | 301 / 312 | Ingresos netos y renta RER (1,5 %) |
-| 303 / 304 | Saldo a favor anterior y renta a pagar |
+| 303 / 304 | Saldo a favor anterior y renta a pagar; pendientes de contrastar con la declaración anterior |
 
 En el detalle de cada compra o venta hay una tarjeta **PDT 621** con las casillas
 que aporta ese comprobante. Una compra sin RUC, serie o número no suma en

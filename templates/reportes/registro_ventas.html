@@ -17,7 +17,7 @@
   </header>
 
   {% if filas %}
-  <table class="tabla-doc">
+  <div class="tabla-scroll" tabindex="0" role="region" aria-label="Registro de ventas"><table class="tabla-doc">
     <thead>
       <tr>
         <th>Fecha</th>
@@ -25,6 +25,7 @@
         <th>Serie y número</th>
         <th>Modifica a</th>
         <th>Cliente</th>
+        <th>Moneda</th>
         <th class="der">Base</th>
         <th class="der">IGV</th>
         <th class="der">Total</th>
@@ -38,6 +39,7 @@
         <td>{{ f.documento }}</td>
         <td class="muted">{{ f.referencia|default:"—" }}</td>
         <td>{{ f.cliente }}</td>
+        <td>{{ f.moneda|default:"Sin indicar" }}</td>
         <td class="num der">{{ f.base|floatformat:2 }}</td>
         <td class="num der">{{ f.igv|floatformat:2 }}</td>
         <td class="num der">{{ f.total|floatformat:2 }}</td>
@@ -45,17 +47,18 @@
       {% endfor %}
     </tbody>
     <tfoot>
-      <tr>
-        <td colspan="5"><strong>Totales del periodo</strong></td>
-        <td class="num der"><strong>{{ base|floatformat:2 }}</strong></td>
-        <td class="num der"><strong>{{ igv|floatformat:2 }}</strong></td>
-        <td class="num der"><strong>{{ total|floatformat:2 }}</strong></td>
-      </tr>
+      {% for resumen in totales_por_moneda %}<tr>
+        <td colspan="5"><strong>Totales de toda la consulta</strong></td><td>{{ resumen.moneda }}</td>
+        <td class="num der"><strong>{{ resumen.base|floatformat:2 }}</strong></td>
+        <td class="num der"><strong>{{ resumen.igv|floatformat:2 }}</strong></td>
+        <td class="num der"><strong>{{ resumen.total|floatformat:2 }}</strong></td>
+      </tr>{% endfor %}
     </tfoot>
-  </table>
+  </table></div>
   <p class="preview-note">
     Las notas de crédito restan y las de débito suman, igual que en el RVIE.
-    Cada nota indica a qué comprobante modifica.
+    Cada nota indica a qué comprobante modifica. Los totales agrupan los importes registrados por moneda,
+    sin convertirlos; las operaciones en moneda extranjera requieren revisión tributaria.
   </p>
   {% if page_obj.has_other_pages %}
   <nav class="paginacion">

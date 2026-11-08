@@ -44,6 +44,7 @@ from inventario.models import CapaFIFO, MovimientoStock
 from ventas.models import NotaCredito, NotaDebito, Venta
 
 from .casillas import calcular
+from .clientes import nombre_cliente
 from .conciliacion_documentos import totales_documentales
 from .conciliacion_rce import comparar_rce
 from .sire import ArchivoInvalido, leer_filas, moneda_verificada_soles, sumar, validar_contexto, verificar_registro
@@ -186,14 +187,15 @@ def registro_ventas(request):
             empresa=empresa,
             estado=Venta.Estado.CONFIRMADA,
             fecha__range=(desde, hasta),
-        ).order_by("fecha", "serie", "numero"):
+        ).select_related("cliente").order_by("fecha", "serie", "numero"):
             filas.append(
                 {
                     "fecha": venta.fecha,
                     "tipo": venta.get_tipo_doc_display(),
                     "documento": f"{venta.serie}-{venta.numero}",
                     "referencia": "",
-                    "cliente": venta.cliente_nombre or "Consumidor final",
+                    "cliente": nombre_cliente(venta),
+                    "moneda": venta.moneda,
                     "base": venta.subtotal,
                     "igv": venta.igv,
                     "total": venta.total,
@@ -202,14 +204,15 @@ def registro_ventas(request):
 
         for nota in NotaCredito.objects.filter(
             venta__empresa=empresa, fecha__range=(desde, hasta)
-        ).select_related("venta"):
+        ).select_related("venta", "venta__cliente"):
             filas.append(
                 {
                     "fecha": nota.fecha,
                     "tipo": "Nota de crédito (07)",
                     "documento": f"{nota.serie}-{nota.numero}",
                     "referencia": f"{nota.venta.serie}-{nota.venta.numero}",
-                    "cliente": nota.venta.cliente_nombre or "Consumidor final",
+                    "cliente": nombre_cliente(nota.venta),
+                    "moneda": nota.venta.moneda,
                     "base": -nota.base,
                     "igv": -nota.igv,
                     "total": -nota.total,
@@ -218,14 +221,15 @@ def registro_ventas(request):
 
         for nota in NotaDebito.objects.filter(
             venta__empresa=empresa, fecha__range=(desde, hasta)
-        ).select_related("venta"):
+        ).select_related("venta", "venta__cliente"):
             filas.append(
                 {
                     "fecha": nota.fecha,
                     "tipo": "Nota de débito (08)",
                     "documento": f"{nota.serie}-{nota.numero}",
                     "referencia": f"{nota.venta.serie}-{nota.venta.numero}",
-                    "cliente": nota.venta.cliente_nombre or "Consumidor final",
+                    "cliente": nombre_cliente(nota.venta),
+                    "moneda": nota.venta.moneda,
                     "base": nota.base,
                     "igv": nota.igv,
                     "total": nota.total,
@@ -234,9 +238,13 @@ def registro_ventas(request):
 
     filas.sort(key=lambda f: (f["fecha"], f["documento"]))
 
-    base = sum((f["base"] for f in filas), Decimal("0"))
-    igv = sum((f["igv"] for f in filas), Decimal("0"))
-    total = sum((f["total"] for f in filas), Decimal("0"))
+    totales = {}
+    for fila in filas:
+        moneda = fila["moneda"] or "Sin moneda"
+        acumulado = totales.setdefault(moneda, {"moneda": moneda, "base": Decimal("0"),
+                                                 "igv": Decimal("0"), "total": Decimal("0")})
+        for campo in ("base", "igv", "total"):
+            acumulado[campo] += fila[campo]
     pagina = Paginator(filas, 25).get_page(request.GET.get("page"))
 
     contexto = {
@@ -244,9 +252,7 @@ def registro_ventas(request):
         "page_obj": pagina,
         "desde": desde,
         "hasta": hasta,
-        "base": base,
-        "igv": igv,
-        "total": total,
+        "totales_por_moneda": list(totales.values()),
     }
     return render(request, "reportes/registro_ventas.html", contexto)
 
@@ -444,8 +450,8 @@ def impuestos(request):
         "c184_abs": abs(c184),
         "c301": base_renta,
         "c312": renta,
-        "c303": Decimal("0"),
-        "c304": renta,
+        "c303": None,
+        "c304": None,
         "renta": renta,
         "ir_por_pagar": ir_por_pagar,
         "asiento": asiento,

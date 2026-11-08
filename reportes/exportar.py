@@ -23,6 +23,7 @@ from compras.models_gasto import Gasto
 from core.context import empresa_actual
 from ventas.models import NotaCredito, NotaDebito, Venta
 
+from .clientes import nombre_cliente, tipo_identidad_cliente
 from .eeff import construir
 from .pdf_eeff import generar as generar_pdf
 from .utils import filtros_seguros, rango
@@ -93,7 +94,7 @@ def ventas(request):
             empresa=empresa,
             estado=Venta.Estado.CONFIRMADA,
             fecha__range=(desde, hasta),
-        ).order_by("fecha", "serie", "numero"):
+        ).select_related("cliente").order_by("fecha", "serie", "numero"):
             filas.append(
                 [
                     _periodo(venta.fecha),
@@ -102,9 +103,9 @@ def ventas(request):
                     venta.serie,
                     venta.numero,
                     "",
-                    "06" if venta.cliente and venta.cliente.tipo_doc == "RUC" else "01",
+                    tipo_identidad_cliente(venta),
                     venta.cliente.numero_doc if venta.cliente else "",
-                    venta.cliente_nombre or "Consumidor final",
+                    nombre_cliente(venta),
                     _importe(venta.subtotal),
                     _importe(venta.igv),
                     _importe(venta.total),
@@ -124,9 +125,9 @@ def ventas(request):
                     nota.serie,
                     nota.numero,
                     f"{venta.serie}-{venta.numero}",
-                    "06" if venta.cliente and venta.cliente.tipo_doc == "RUC" else "01",
+                    tipo_identidad_cliente(venta),
                     venta.cliente.numero_doc if venta.cliente else "",
-                    venta.cliente_nombre or "Consumidor final",
+                    nombre_cliente(venta),
                     _importe(-nota.base),
                     _importe(-nota.igv),
                     _importe(-nota.total),
@@ -146,9 +147,9 @@ def ventas(request):
                     nota.serie,
                     nota.numero,
                     f"{venta.serie}-{venta.numero}",
-                    "06" if venta.cliente and venta.cliente.tipo_doc == "RUC" else "01",
+                    tipo_identidad_cliente(venta),
                     venta.cliente.numero_doc if venta.cliente else "",
-                    venta.cliente_nombre or "Consumidor final",
+                    nombre_cliente(venta),
                     _importe(nota.base),
                     _importe(nota.igv),
                     _importe(nota.total),
