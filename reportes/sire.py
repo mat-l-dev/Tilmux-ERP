@@ -23,6 +23,7 @@ EXCLUIR = (
     "retenci",
     "percepci",
     "detracci",
+    "ivap",
 )
 
 
@@ -62,7 +63,7 @@ def leer_filas(archivo) -> list[list]:
         muestra = texto[:5000]
         delimitador = None
         for linea in texto.splitlines()[:60]:
-            for candidato in (";", ","):
+            for candidato in ("|", ";", ","):
                 columnas = _columnas([_normalizar(celda) for celda in next(csv.reader([linea], delimiter=candidato))])
                 if any(base != igv for base in columnas[0] for igv in columnas[1]):
                     delimitador = candidato
@@ -70,7 +71,7 @@ def leer_filas(archivo) -> list[list]:
             if delimitador:
                 break
         if delimitador is None:
-            delimitador = ";" if muestra.count(";") > muestra.count(",") else ","
+            delimitador = max(("|", ";", ","), key=muestra.count)
         return [fila for fila in csv.reader(io.StringIO(texto), delimiter=delimitador)]
 
     raise ArchivoInvalido("Sube la propuesta en formato .xlsx o .csv.")
@@ -177,10 +178,10 @@ def validar_contexto(filas: list[list], *, ruc: str, anio: int, mes: int) -> dic
 def verificar_registro(filas: list[list], *, registro: str) -> bool:
     """Reconoce solo cabeceras distintivas; no infiere el registro por el nombre del archivo."""
     cabecera, *_ = _cabecera(filas)
-    titulos = {_normalizar(celda) for celda in filas[cabecera]}
-    rce = {"bi gravado dg", "igv / ipm dg"} <= titulos
+    titulos = {_normalizar(celda).replace(" /", "/").replace("/ ", "/") for celda in filas[cabecera]}
+    rce = {"bi gravado dg", "igv/ipm dg"} <= titulos
     rvie = ("valor facturado exportación" in titulos or "valor facturado exportacion" in titulos) and (
-        "dscto bi" in titulos and "dscto igv / ipm" in titulos
+        "dscto bi" in titulos and "dscto igv/ipm" in titulos
     )
     if rce and rvie:
         raise ArchivoInvalido("El archivo mezcla columnas distintivas de RCE y RVIE. Revisa el archivo.")
@@ -232,6 +233,7 @@ def sumar(filas: list[list]) -> dict:
         for indice, titulo in enumerate(titulos)
         if _normalizar(titulo).split() and _normalizar(titulo).split()[-1] in {"dgng", "dng"}
     ]
+    columnas_ivap = [indice for indice, titulo in enumerate(titulos) if "ivap" in _normalizar(titulo)]
     usadas = sorted(set(cols_base + cols_igv + cols_total + cols_dscto_base + cols_dscto_igv))
     nombres = [titulos[i] for i in usadas if i < len(titulos)]
 
@@ -244,7 +246,7 @@ def sumar(filas: list[list]) -> dict:
         if _es_fila_total(fila):
             continue
 
-        requeridas = usadas + columnas_mixtas
+        requeridas = usadas + columnas_mixtas + columnas_ivap
         if requeridas and len(fila) <= max(requeridas):
             raise ArchivoInvalido(
                 f"La fila {numero_fila} está incompleta: faltan columnas de importes. Descarga de nuevo el archivo."
@@ -254,6 +256,11 @@ def sumar(filas: list[list]) -> dict:
             raise ArchivoInvalido(
                 "El archivo contiene compras destinadas a operaciones mixtas o no gravadas. "
                 "Esta conciliación aún no calcula esas casillas; revísalas en el RCE y el 621."
+            )
+        if any(_numero_validado(fila[i]) not in (None, Decimal("0")) for i in columnas_ivap if i < len(fila)):
+            raise ArchivoInvalido(
+                "El archivo contiene operaciones con IVAP. Esta conciliación aún no calcula ese impuesto; "
+                "revísalas en SUNAT."
             )
 
         base = _suma(fila, cols_base) + _suma(fila, cols_dscto_base)

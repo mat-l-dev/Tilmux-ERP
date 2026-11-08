@@ -440,13 +440,16 @@ En **Reportes → Conciliación SUNAT → Conciliar con la propuesta del SIRE**
 puedes subir el archivo que descarga SUNAT en lugar de copiar las casillas a mano.
 
 1. En SUNAT, abre **SIRE** y elige **RVIE** (ventas) o **RCE** (compras).
-2. Descarga la propuesta en Excel o CSV.
+2. Descarga la propuesta en Excel, CSV o texto. Si viene en ZIP, extrae primero
+   el archivo de texto; el ERP admite texto separado por barras, comas o punto y coma.
 3. En el ERP elige año, mes y registro, adjunta el archivo y pulsa **Conciliar**.
 
 El lector busca columnas por su nombre y admite cambios de orden. Una plantilla
 con nombres o estructuras distintos requiere revisión. Los importes de notas y
 descuentos conservan el signo leído del archivo; contrástalos con el registro.
 La fila de totales se ignora para no contar dos veces.
+Las operaciones con IVAP o compras destinadas a operaciones mixtas o no gravadas
+se bloquean en esta comparación porque el ERP aún no calcula esas casillas.
 El ERP intenta identificar si el archivo es RCE o RVIE por columnas distintivas:
 si detecta el registro contrario, rechaza la comparación; si no puede
 identificarlo, muestra un aviso y no da la comparación por verificada.

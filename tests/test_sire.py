@@ -61,6 +61,7 @@ class SireCsvTest(SimpleTestCase):
         ambiguo = [["BI Gravada", "IGV", "Total CP"]]
         self.assertTrue(verificar_registro(rce, registro="compras"))
         self.assertTrue(verificar_registro(rvie, registro="ventas"))
+        self.assertTrue(verificar_registro([[v.replace(" / ", "/") for v in rvie[0]]], registro="ventas"))
         self.assertFalse(verificar_registro(ambiguo, registro="ventas"))
         with self.assertRaisesRegex(ArchivoInvalido, "no coincide"):
             verificar_registro(rce, registro="ventas")
@@ -139,6 +140,24 @@ class SireCsvTest(SimpleTestCase):
         resultado = sumar(leer_filas(Archivo("rce.csv", contenido.encode("utf-8"))))
         self.assertEqual(resultado["base"], Decimal("60.00"))
         self.assertEqual(resultado["igv"], Decimal("10.80"))
+
+    def test_lee_archivo_texto_sunat_separado_por_barras(self):
+        contenido = (
+            "Periodo|BI Gravada|IGV / IPM|BI Grav IVAP|IVAP|Total CP\n"
+            "202610|598.31|107.69|0|0|706.00\n"
+            "202610|598.31|107.69|0|0|706.00\n"
+        )
+        resultado = sumar(leer_filas(Archivo("registro.txt", contenido.encode("utf-8"))))
+        self.assertEqual(resultado["filas"], 2)
+        self.assertEqual(resultado["base"], Decimal("1196.62"))
+        self.assertEqual(resultado["igv"], Decimal("215.38"))
+        self.assertEqual(resultado["total"], Decimal("1412.00"))
+
+    def test_operacion_ivap_no_se_confunde_con_base_gravada_de_igv(self):
+        cabecera = "BI Gravada|IGV / IPM|BI Grav IVAP|IVAP|Total CP\n"
+        for linea in ("0|0|100|0|100\n", "0|0|0|4|4\n"):
+            with self.subTest(linea=linea), self.assertRaisesRegex(ArchivoInvalido, "IVAP"):
+                sumar(leer_filas(Archivo("registro.txt", (cabecera + linea).encode("utf-8"))))
 
     def test_rechaza_importes_invalidos_en_lugar_de_silenciarlos(self):
         for valor in ("incorrecto", "NaN", "Infinity"):
