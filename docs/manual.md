@@ -438,6 +438,9 @@ El lector busca columnas por su nombre y admite cambios de orden. Una plantilla
 con nombres o estructuras distintos requiere revisión. Los importes de notas y
 descuentos conservan el signo leído del archivo; contrástalos con el registro.
 La fila de totales se ignora para no contar dos veces.
+El ERP intenta identificar si el archivo es RCE o RVIE por columnas distintivas:
+si detecta el registro contrario, rechaza la comparación; si no puede
+identificarlo, muestra un aviso y no da la comparación por verificada.
 
 El resultado separa base e IGV de la estimación tributaria del total documental.
 Este último incluye las boletas con serie y número aunque no otorguen crédito,

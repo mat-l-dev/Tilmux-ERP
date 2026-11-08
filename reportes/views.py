@@ -46,7 +46,7 @@ from ventas.models import NotaCredito, NotaDebito, Venta
 from .casillas import calcular
 from .conciliacion_documentos import totales_documentales
 from .conciliacion_rce import comparar_rce
-from .sire import ArchivoInvalido, leer_filas, moneda_verificada_soles, sumar, validar_contexto
+from .sire import ArchivoInvalido, leer_filas, moneda_verificada_soles, sumar, validar_contexto, verificar_registro
 from .utils import FiltroReporteError, filtros_seguros, rango
 
 CERO = Decimal("0")
@@ -721,6 +721,7 @@ def conciliacion_archivo(request):
             try:
                 filas = leer_filas(archivo)
                 contexto_archivo = validar_contexto(filas, ruc=empresa.ruc, anio=anio, mes=mes)
+                registro_verificado = verificar_registro(filas, registro=registro)
                 totales = sumar(filas)
                 archivo_en_soles = moneda_verificada_soles(filas)
             except ArchivoInvalido as exc:
@@ -747,6 +748,7 @@ def conciliacion_archivo(request):
                     "filas": totales["filas"],
                     "columnas": totales["columnas"],
                     "contexto_archivo": contexto_archivo,
+                    "registro_verificado": registro_verificado,
                     "sunat_base": totales["base"],
                     "sunat_igv": totales["igv"],
                     "sunat_total": totales["total"],
@@ -777,6 +779,7 @@ def conciliacion_archivo(request):
                 )
                 resultado["cuadra"] = (
                     resultado["total_comparable"]
+                    and resultado["registro_verificado"]
                     and all(contexto_archivo.values())
                     and not documentales["incompletos"]
                     and all(

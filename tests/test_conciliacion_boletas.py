@@ -80,7 +80,8 @@ class ConciliacionBoletasTest(TestCase):
         resultado = respuesta.context["resultado"]
         self.assertEqual(resultado["dif_total"], 0)
         self.assertEqual(resultado["dif_igv"], 0)
-        self.assertTrue(resultado["cuadra"])
+        self.assertFalse(resultado["cuadra"])
+        self.assertContains(respuesta, "No se pudo identificar automáticamente")
         self.assertEqual(calcular(self.empresa, 2026, 10)["compras_igv"], 0)
 
     def test_compara_identidad_aunque_los_totales_coincidan(self):
@@ -99,6 +100,9 @@ class ConciliacionBoletasTest(TestCase):
         self.assertContains(respuesta, "B001-393302")
         self.assertContains(respuesta, "B002-393302")
         self.assertEqual(calcular(self.empresa, 2026, 10)["compras_igv"], 0)
+        respuesta = self.conciliar(cabecera + factura + otra_boleta.replace("B002", "B001"))
+        self.assertTrue(respuesta.context["resultado"]["cuadra"])
+        self.assertEqual(respuesta.context["resultado"]["documentos"]["coinciden"], 2)
 
     def test_comparacion_detecta_fecha_importe_y_duplicados(self):
         cabecera = ("RUC,Periodo,Tipo CP/Doc.,Serie del CDP,Nro CP o Doc. Nro Inicial (Rango),"
@@ -180,7 +184,8 @@ class ConciliacionBoletasTest(TestCase):
         self.assertEqual(resultado["dif_base"], 0)
         self.assertEqual(resultado["dif_igv"], 0)
         self.assertEqual(resultado["dif_total"], 0)
-        self.assertTrue(resultado["cuadra"])
+        self.assertFalse(resultado["cuadra"])
+        self.assertContains(respuesta, "No se pudo identificar automáticamente")
 
     def test_moneda_ausente_o_dolar_no_se_presenta_como_conciliada(self):
         for contenido in (

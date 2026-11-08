@@ -12,7 +12,7 @@ from django.http import HttpResponse
 from django.test import RequestFactory, SimpleTestCase
 from openpyxl import Workbook
 
-from reportes.sire import ArchivoInvalido, leer_filas, sumar, validar_contexto
+from reportes.sire import ArchivoInvalido, leer_filas, sumar, validar_contexto, verificar_registro
 from reportes.views import conciliacion_archivo
 
 
@@ -55,6 +55,37 @@ Total;;;;;;765,25;137,75;903,00
 
 
 class SireCsvTest(SimpleTestCase):
+    def test_reconoce_registro_solo_con_columnas_distintivas(self):
+        rce = [["BI Gravado DG", "IGV / IPM DG", "Total CP"]]
+        rvie = [["Valor Facturado Exportación", "BI Gravada", "Dscto BI", "IGV / IPM", "Dscto IGV / IPM"]]
+        ambiguo = [["BI Gravada", "IGV", "Total CP"]]
+        self.assertTrue(verificar_registro(rce, registro="compras"))
+        self.assertTrue(verificar_registro(rvie, registro="ventas"))
+        self.assertFalse(verificar_registro(ambiguo, registro="ventas"))
+        with self.assertRaisesRegex(ArchivoInvalido, "no coincide"):
+            verificar_registro(rce, registro="ventas")
+        with self.assertRaisesRegex(ArchivoInvalido, "no coincide"):
+            verificar_registro(rvie, registro="compras")
+        with self.assertRaisesRegex(ArchivoInvalido, "mezcla"):
+            verificar_registro([rce[0] + rvie[0]], registro="compras")
+
+    def test_tipo_de_registro_incorrecto_no_llega_a_la_comparacion(self):
+        archivo = SimpleUploadedFile(
+            "propuesta.csv", b"RUC,Periodo,BI Gravado DG,IGV / IPM DG,Total CP\n20123456789,202610,100,18,118\n"
+        )
+        solicitud = RequestFactory().post(
+            "/reportes/conciliacion/", {"anio": "2026", "mes": "10", "registro": "ventas", "archivo": archivo}
+        )
+        solicitud.user = SimpleNamespace(is_authenticated=True)
+        with (
+            patch("reportes.views.empresa_actual", return_value=SimpleNamespace(ruc="20123456789")),
+            patch("reportes.views.calcular") as calcular_reporte,
+            patch("reportes.views.render", return_value=HttpResponse()) as renderizar,
+        ):
+            conciliacion_archivo(solicitud)
+        self.assertIn("tipo de registro", renderizar.call_args.args[2]["error"])
+        calcular_reporte.assert_not_called()
+
     def test_verifica_ruc_y_periodo_de_la_propuesta(self):
         contenido = (
             "RUC,Periodo,BI Gravado DG,IGV / IPM DG,Total CP\n"

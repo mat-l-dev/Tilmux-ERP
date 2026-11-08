@@ -174,6 +174,22 @@ def validar_contexto(filas: list[list], *, ruc: str, anio: int, mes: int) -> dic
     return verificado
 
 
+def verificar_registro(filas: list[list], *, registro: str) -> bool:
+    """Reconoce solo cabeceras distintivas; no infiere el registro por el nombre del archivo."""
+    cabecera, *_ = _cabecera(filas)
+    titulos = {_normalizar(celda) for celda in filas[cabecera]}
+    rce = {"bi gravado dg", "igv / ipm dg"} <= titulos
+    rvie = ("valor facturado exportación" in titulos or "valor facturado exportacion" in titulos) and (
+        "dscto bi" in titulos and "dscto igv / ipm" in titulos
+    )
+    if rce and rvie:
+        raise ArchivoInvalido("El archivo mezcla columnas distintivas de RCE y RVIE. Revisa el archivo.")
+    detectado = "compras" if rce else "ventas" if rvie else None
+    if detectado and detectado != registro:
+        raise ArchivoInvalido("El tipo de registro del archivo no coincide con el seleccionado (RCE o RVIE).")
+    return detectado is not None
+
+
 def moneda_verificada_soles(filas: list[list]) -> bool:
     """Solo confirma soles si todas las filas identifican explícitamente PEN."""
     cabecera, *_ = _cabecera(filas)

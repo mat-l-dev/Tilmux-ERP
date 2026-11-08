@@ -54,6 +54,7 @@
   {% if not resultado.contexto_archivo.ruc or not resultado.contexto_archivo.periodo %}
   <p class="preview-note">No se pudo verificar automáticamente el RUC o el período del archivo. Confírmalos antes de usar esta comparación.</p>
   {% endif %}
+  {% if not resultado.registro_verificado %}<p class="preview-note">No se pudo identificar automáticamente si el archivo es RCE o RVIE. Confirma el registro en SUNAT; los importes se muestran para revisión.</p>{% endif %}
 
   <table class="tabla-doc">
     <thead>
