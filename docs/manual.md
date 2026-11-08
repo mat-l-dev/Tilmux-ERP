@@ -319,12 +319,16 @@ renta de meses anteriores que aún no se paga.
 
 ### Pagar el IGV
 
-En **Impuestos**, la tarjeta **IGV por pagar** muestra el IGV del periodo
-(casilla 184), lo ya pagado en el libro y lo pendiente. Si hay saldo pendiente,
-aparece el formulario **Registrar pago de IGV**:
+En **Impuestos**, la tarjeta **IGV por pagar** muestra el cálculo interno del
+período, lo ya registrado como pagado y el pendiente estimado. Contrasta la
+casilla 184, los saldos anteriores y el redondeo con la declaración antes de
+usar el formulario **Registrar pago de IGV efectuado**. El ERP no hace el pago
+ni envía la declaración a SUNAT; el formulario solo registra un pago real.
 
 - Fecha del pago y cuenta de tesorería.
-- Importe total o parcial; no se permite superar el saldo pendiente.
+- Importe total o parcial realmente pagado; el sistema no permite superar su
+  pendiente estimado. Si la declaración muestra otro importe, revisa la
+  diferencia antes de registrar la operación.
 - El sistema crea el asiento D 40111 / H banco, el movimiento de tesorería y el
   registro de historial.
 

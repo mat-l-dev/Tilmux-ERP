@@ -19,9 +19,9 @@
     <span class="kpi-note">Base {{ compras_base|floatformat:2 }}</span>
   </article>
   <article class="kpi">
-    <span class="kpi-label">{% if c184 < 0 %}IGV a favor{% else %}IGV por pagar{% endif %}</span>
+    <span class="kpi-label">{% if c184 < 0 %}IGV a favor estimado{% else %}IGV por pagar estimado{% endif %}</span>
     <span class="kpi-value num">S/ {{ c184_abs|floatformat:2 }}</span>
-    <span class="kpi-note">PDT 621 · Libro: S/ {{ igv_por_pagar_abs|floatformat:2 }}</span>
+    <span class="kpi-note">Estimación interna · Libro: S/ {{ igv_por_pagar_abs|floatformat:2 }}</span>
   </article>
   <article class="kpi">
     <span class="kpi-label">Renta RER del mes</span>
@@ -85,10 +85,11 @@
   </header>
 
   <dl class="totales">
-    <div><dt>IGV del periodo (casilla 184)</dt><dd class="num">{{ c184|floatformat:2 }}</dd></div>
+    <div><dt>Resultado estimado para casilla 184</dt><dd class="num">{{ c184|floatformat:2 }}</dd></div>
     <div><dt>Pagado en el libro</dt><dd class="num">{{ igv_pagado|floatformat:2 }}</dd></div>
-    <div class="total"><dt>Pendiente de pago</dt><dd class="num">{{ igv_pendiente|floatformat:2 }}</dd></div>
+    <div class="total"><dt>Pendiente estimado según el libro</dt><dd class="num">{{ igv_pendiente|floatformat:2 }}</dd></div>
   </dl>
+  <p class="preview-note">Estos valores no son la declaración presentada. Compara los saldos y el redondeo con el 621 y el comprobante real. El ERP limita el registro al pendiente estimado; si SUNAT muestra otro importe, revisa la diferencia antes de registrar el pago.</p>
 
   {% if puede_pagar_igv %}
   <form method="post" action="{% url 'reportes:pagar_igv' %}" class="filtro" style="margin-top:14px">
@@ -99,20 +100,20 @@
       <input type="date" name="fecha" value="{{ hoy|date:'Y-m-d' }}" required>
     </label>
     <label>Importe
-      <input type="number" name="importe" step="0.01" min="0.01" value="{{ igv_pendiente|stringformat:'0.2f' }}" required>
+      <input type="number" name="importe" step="0.01" min="0.01" required>
     </label>
     <label>Medio
       <select name="medio" required>
         {% for medio in medios %}<option value="{{ medio.pk }}">{{ medio.nombre }}</option>{% endfor %}
       </select>
     </label>
-    <button class="btn btn-primary" type="submit">Registrar pago de IGV</button>
+    <button class="btn btn-primary" type="submit">Registrar pago de IGV efectuado</button>
   </form>
-  <p class="preview-note">La fecha de pago debe pertenecer a un período contable abierto.</p>
+  <p class="preview-note">Esta acción registra un pago ya efectuado; no paga ni declara ante SUNAT. Indica el importe y la fecha reales de la constancia. La fecha debe pertenecer a un período contable abierto.</p>
   {% elif c184 > 0 %}
-  <p class="preview-note">El IGV de este periodo ya está pagado en el libro.</p>
+  <p class="preview-note">Los pagos registrados alcanzan el pendiente estimado del período. Confirma el estado en SUNAT.</p>
   {% else %}
-  <p class="preview-note">Este periodo no tiene IGV por pagar.</p>
+  <p class="preview-note">El cálculo interno no muestra IGV por pagar para este período. Confirma el resultado en SUNAT.</p>
   {% endif %}
 </section>
 {% endif %}

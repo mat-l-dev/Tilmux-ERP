@@ -311,6 +311,10 @@ class PagoIGV(BaseContable):
         self.assertEqual(respuesta.status_code, 200)
         self.assertContains(respuesta, "Registrar pago de IGV")
         self.assertContains(respuesta, reverse("reportes:pagar_igv"))
+        self.assertContains(respuesta, "no paga ni declara ante SUNAT")
+        self.assertContains(respuesta, "Pendiente estimado según el libro")
+        self.assertContains(respuesta, '<input type="number" name="importe" step="0.01" min="0.01" required>',
+                            html=True)
 
 
 class PresentacionEEFF(TestCase):
