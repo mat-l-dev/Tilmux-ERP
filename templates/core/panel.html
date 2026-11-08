@@ -67,8 +67,8 @@
 <section class="grid-2">
   <article class="card rise" style="--i:2">
     <header class="card-head">
-      <h2>Estado del sistema</h2>
-      <span class="chip chip-ok">Operativo</span>
+      <h2>Resumen de la empresa</h2>
+      <span class="chip">Información actual</span>
     </header>
     <ul class="checklist">
       <li>
@@ -87,15 +87,15 @@
         <svg class="icon {% if pendientes_count %}muted{% else %}ok{% endif %}"><use href="#i-reloj"></use></svg>
         <span>
           {% if pendientes_count %}
-          <a href="{% url 'core:pendientes' %}">{{ pendientes_count }} comprobante{{ pendientes_count|pluralize }} por completar</a>
+          <a href="{% url 'core:pendientes' %}">{{ pendientes_count }} compra{{ pendientes_count|pluralize }} o venta{{ pendientes_count|pluralize }} por completar</a>
           {% else %}
-          Sin comprobantes pendientes
+          Sin compras ni ventas detectadas por completar
           {% endif %}
         </span>
       </li>
       <li>
         <svg class="icon muted"><use href="#i-reloj"></use></svg>
-        <span>Respaldo diario programado</span>
+        <span>Verifica que los respaldos automáticos se ejecuten y puedan restaurarse</span>
       </li>
     </ul>
   </article>

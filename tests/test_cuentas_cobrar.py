@@ -111,6 +111,7 @@ class CuentasPorCobrarTest(TestCase):
         self.assertContains(respuesta, "Saldo negativo · revisar")
         self.assertContains(respuesta, "F001-1")
         self.assertNotContains(respuesta, "F001-2")
+        self.assertContains(self.client.get(reverse("ventas:lista"), {"q": "Cliente vinculado"}), "Cliente vinculado")
         NotaDebito.objects.create(venta=self.venta, fecha=date(2026, 1, 7), serie="FD01", numero="3", total=2)
         respuesta = self.client.get(url, {"fecha": "2026-01-07"})
         self.assertNotContains(respuesta, "F001-1")

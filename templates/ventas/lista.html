@@ -56,7 +56,7 @@
       <tr>
         <td>{{ v.fecha|date:"d/m/Y" }}</td>
         <td><a href="{% url 'ventas:detalle' v.pk %}">{{ v.serie }}-{{ v.numero }}</a></td>
-        <td>{{ v.cliente_nombre|default:"Consumidor final" }}</td>
+        <td>{% if v.cliente_nombre %}{{ v.cliente_nombre }}{% elif v.cliente %}{{ v.cliente.nombre }}{% else %}Consumidor final{% endif %}</td>
         <td>{{ v.get_condicion_display }}</td>
         <td class="num der">{{ v.moneda }} {{ v.total|floatformat:2 }}</td>
         <td><span class="chip {% if v.estado == 'CONFIRMADA' %}chip-ok{% endif %}">{{ v.get_estado_display }}</span></td>

@@ -5,6 +5,7 @@
 
 {% block contenido %}
 <section class="card">
+  <p class="preview-note">Esta lista revisa datos incompletos de compras y borradores de ventas. Para gastos y obligaciones de pago, consulta Compras y Tesorería.</p>
   <header class="card-head">
     <h2>Pendientes</h2>
     <span class="chip">{{ items|length }} comprobante{{ items|length|pluralize }}</span>
@@ -41,7 +42,7 @@
     RUC, serie y número.
   </p>
   {% else %}
-  <p class="muted">Todo completo: no hay comprobantes pendientes.</p>
+  <p class="muted">No se detectaron compras ni ventas por completar en esta revisión.</p>
   {% endif %}
 </section>
 {% endblock %}

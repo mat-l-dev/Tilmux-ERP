@@ -62,6 +62,13 @@ class PanelPeriodosTest(TestCase):
         self.assertEqual(respuesta.context["variacion"], Decimal("18.8"))
         self.assertEqual(respuesta.context["serie_meses"][-1]["valor"], Decimal("95"))
         self.assertContains(respuesta, "no es saldo bancario conciliado")
+        self.assertContains(respuesta, "Verifica que los respaldos automáticos")
+        self.assertNotContains(respuesta, "Respaldo diario programado")
+
+    def test_pendientes_explica_alcance_de_la_revision(self):
+        respuesta = self.client.get(reverse("core:pendientes"))
+        self.assertContains(respuesta, "Esta lista revisa datos incompletos de compras")
+        self.assertContains(respuesta, "consulta Compras y Tesorería")
 
     def test_octubre_no_incluye_movimientos_posteriores(self):
         respuesta = self.client.get(reverse("core:panel"), {"periodo": "2026-10"})
