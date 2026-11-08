@@ -197,7 +197,7 @@ def cuentas_cobrar(request):
     empresa = empresa_actual(request)
     consulta = cuentas_por_cobrar(empresa=empresa, fecha=fecha) if fecha and empresa else Venta.objects.none()
     if estado == "pendientes" and fecha and empresa:
-        consulta = consulta.filter(Q(saldo_documentado__gt=0) | Q(requiere_revision=True))
+        consulta = consulta.filter(~Q(saldo_documentado=0) | Q(requiere_revision=True))
     pagina = Paginator(consulta, 25).get_page(request.GET.get("page"))
     return render(request, "ventas/cuentas_cobrar.html", {
         "cuentas": pagina, "page_obj": pagina, "fecha": fecha_texto, "estado": estado, "error": error,

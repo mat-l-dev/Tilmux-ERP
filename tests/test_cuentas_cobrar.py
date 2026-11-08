@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
-from catalogo.models import CuentaTesoreria
+from catalogo.models import CuentaTesoreria, Tercero
 from core.models import Empresa
 from tesoreria.models import MovimientoTesoreria
 from ventas.cuentas_cobrar import cuentas_por_cobrar
@@ -92,3 +92,26 @@ class CuentasPorCobrarTest(TestCase):
         response = self.client.get(url, {"fecha": "2026-01-05"})
         self.assertContains(response, "Revisar cobro anterior")
         self.assertContains(self.client.get(url, {"fecha": "incorrecta"}), "fecha de corte válida")
+
+    def test_saldo_negativo_y_cliente_vinculado_son_visibles_en_filtro_inicial(self):
+        cliente = Tercero.objects.create(rol="CLIENTE", tipo_doc="RUC", numero_doc="20123456789",
+                                         nombre="Cliente vinculado")
+        self.venta.cliente = cliente
+        self.venta.save(update_fields=["cliente"])
+        NotaCredito.objects.create(venta=self.venta, fecha=date(2026, 1, 6), serie="FC01", numero="3",
+                                   motivo="Ajuste", total=50)
+        user = get_user_model().objects.create_superuser(username="admin", password="test")
+        self.client.force_login(user)
+        url = reverse("ventas:cuentas_cobrar")
+        respuesta = self.client.get(url, {"fecha": "2026-01-05"})
+        self.assertContains(respuesta, "Pendiente")
+        self.assertNotContains(respuesta, "Saldo negativo · revisar")
+        respuesta = self.client.get(url, {"fecha": "2026-01-06"})
+        self.assertContains(respuesta, "Cliente vinculado")
+        self.assertContains(respuesta, "Saldo negativo · revisar")
+        self.assertContains(respuesta, "F001-1")
+        self.assertNotContains(respuesta, "F001-2")
+        NotaDebito.objects.create(venta=self.venta, fecha=date(2026, 1, 7), serie="FD01", numero="3", total=2)
+        respuesta = self.client.get(url, {"fecha": "2026-01-07"})
+        self.assertNotContains(respuesta, "F001-1")
+        self.assertContains(self.client.get(url, {"fecha": "2026-01-07", "estado": "todos"}), "F001-1")
