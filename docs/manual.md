@@ -314,6 +314,13 @@ El reporte de impuestos se consulta por un mes completo y, por defecto, muestra
 el mes actual. Los demás reportes permiten elegir un mes o un rango de fechas;
 las exportaciones usan el mismo período que se muestra en pantalla.
 
+En **Comparar saldo anterior de IGV**, ingresa el saldo a favor de la casilla 184
+de la declaración presentada del mes anterior como importe positivo. Si no hubo
+saldo a favor, ingresa cero. El ERP lo compara con el saldo del libro y muestra
+la diferencia. La consulta es temporal: no verifica ni guarda el dato, no cambia
+los asientos ni recalcula el impuesto o el límite del registro de pagos. Ante
+una diferencia, contrasta la declaración y sus importes antes de continuar.
+
 La tarjeta **Renta RER por pagar** muestra el saldo de la 40171, es decir, la
 renta de meses anteriores que aún no se paga.
 

@@ -77,6 +77,28 @@
   {% endif %}
 </section>
 
+{% if empresa_activa %}
+<section class="card" style="margin-top:12px">
+  <header class="card-head"><h2>Comparar saldo anterior de IGV</h2></header>
+  <p class="preview-note">Consulta la casilla 184 de la declaración presentada de {{ mes_anterior|date:"m/Y" }}. Si indica un saldo a favor, ingrésalo para compararlo con el libro. Si no hubo saldo a favor, escribe cero.</p>
+  <form method="post" action="?periodo={{ desde|date:'Y-m' }}" class="filtro">
+    {% csrf_token %}
+    <label class="field"><span>{{ formulario_saldo.saldo_declarado.label }}</span>{{ formulario_saldo.saldo_declarado }}<small>{{ formulario_saldo.saldo_declarado.help_text }}</small></label>
+    <button type="submit" class="btn btn-ghost">Comparar</button>
+  </form>
+  {% if formulario_saldo.errors %}<div class="message error">{{ formulario_saldo.saldo_declarado.errors }}</div>{% endif %}
+  {% if comparacion_saldo %}
+  <dl class="datos">
+    <div><dt>Declaración ingresada</dt><dd>S/ {{ comparacion_saldo.declarado|floatformat:2 }}</dd></div>
+    <div><dt>Saldo estimado desde el libro</dt><dd>S/ {{ comparacion_saldo.libro|floatformat:2 }}</dd></div>
+    <div><dt>Declarado menos libro</dt><dd>S/ {{ comparacion_saldo.diferencia|floatformat:2 }}</dd></div>
+  </dl>
+  {% if comparacion_saldo.diferencia %}<p class="preview-note"><strong>Hay una diferencia por revisar.</strong> Contrasta el 621 y el tratamiento de los céntimos antes de declarar o registrar un pago.</p>{% else %}<p class="preview-note">Los importes ingresados coinciden; esto no verifica la declaración en SUNAT.</p>{% endif %}
+  {% endif %}
+  <p class="preview-note">Comparación temporal: no guarda ni verifica el dato ingresado, no modifica asientos y no cambia la estimación ni el límite del formulario de pago.</p>
+</section>
+{% endif %}
+
 {% if es_mes %}
 <section class="card" style="margin-top:12px">
   <header class="card-head">

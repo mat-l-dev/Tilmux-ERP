@@ -47,6 +47,7 @@ from .casillas import calcular
 from .clientes import nombre_cliente
 from .conciliacion_documentos import totales_documentales
 from .conciliacion_rce import comparar_rce
+from .forms import CompararSaldoIGVForm
 from .sire import ArchivoInvalido, leer_filas, moneda_verificada_soles, sumar, validar_contexto, verificar_registro
 from .utils import FiltroReporteError, filtros_seguros, rango
 
@@ -413,6 +414,11 @@ def impuestos(request):
     igv_resultante = igv_anterior + igv
     c145 = max(-igv_anterior, Decimal("0"))
     c184 = igv - c145
+    formulario_saldo = CompararSaldoIGVForm(request.POST if request.method == "POST" else None)
+    comparacion_saldo = None
+    if empresa and request.method == "POST" and formulario_saldo.is_valid():
+        declarado = formulario_saldo.cleaned_data["saldo_declarado"]
+        comparacion_saldo = {"declarado": declarado, "libro": c145, "diferencia": declarado - c145}
     puede_asentar = bool(empresa and es_mes and renta > 0 and asiento is None)
     puede_pagar_igv = bool(
         empresa
@@ -448,6 +454,9 @@ def impuestos(request):
         "c145": c145,
         "c184": c184,
         "c184_abs": abs(c184),
+        "formulario_saldo": formulario_saldo,
+        "comparacion_saldo": comparacion_saldo,
+        "mes_anterior": desde - timedelta(days=1),
         "c301": base_renta,
         "c312": renta,
         "c303": None,

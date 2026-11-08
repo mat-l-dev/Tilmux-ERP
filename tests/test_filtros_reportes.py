@@ -1,12 +1,15 @@
 from datetime import date
+from decimal import Decimal
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
-from core.models import Empresa, Perfil
+from contabilidad.models import Asiento
+from core.models import Empresa, HistorialDocumento, Perfil
 from reportes.eeff import construir
+from tesoreria.models import MovimientoTesoreria
 
 
 class FiltrosReportesTest(TestCase):
@@ -59,3 +62,28 @@ class FiltrosReportesTest(TestCase):
         self.assertIsNone(respuesta.context["c304"])
         self.assertContains(respuesta, "No verificado")
         self.assertContains(respuesta, "No determinado")
+
+    def test_compara_saldo_declarado_con_libro_sin_guardar_ni_cambiar_calculo(self):
+        url = reverse("reportes:impuestos") + "?periodo=2026-10"
+        antes = (Asiento.objects.count(), MovimientoTesoreria.objects.count(), HistorialDocumento.objects.count())
+        with patch("reportes.views.saldo_cuenta", return_value=Decimal("-110.28")):
+            respuesta = self.client.post(url, {"saldo_declarado": "110.00"})
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(respuesta.context["comparacion_saldo"], {
+            "declarado": Decimal("110.00"), "libro": Decimal("110.28"), "diferencia": Decimal("-0.28"),
+        })
+        self.assertEqual(respuesta.context["c145"], Decimal("110.28"))
+        self.assertEqual(respuesta.context["c184"], Decimal("-110.28"))
+        self.assertContains(respuesta, "Hay una diferencia por revisar")
+        self.assertEqual(antes, (Asiento.objects.count(), MovimientoTesoreria.objects.count(),
+                                 HistorialDocumento.objects.count()))
+
+    def test_rechaza_saldo_invalido_y_admite_cero(self):
+        url = reverse("reportes:impuestos") + "?periodo=2026-10"
+        for valor in ("-110", "NaN", "1.001"):
+            with self.subTest(valor=valor):
+                respuesta = self.client.post(url, {"saldo_declarado": valor})
+                self.assertIsNone(respuesta.context["comparacion_saldo"])
+                self.assertTrue(respuesta.context["formulario_saldo"].errors)
+        respuesta = self.client.post(url, {"saldo_declarado": "0"})
+        self.assertEqual(respuesta.context["comparacion_saldo"]["declarado"], Decimal("0"))
