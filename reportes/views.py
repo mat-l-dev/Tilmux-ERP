@@ -613,6 +613,16 @@ def inventario(request):
             Q(producto__sku__icontains=q) | Q(producto__nombre__icontains=q)
         )
 
+    movimientos = MovimientoStock.objects.filter(empresa=empresa)
+    if q:
+        movimientos = movimientos.filter(
+            Q(producto__sku__icontains=q) | Q(producto__nombre__icontains=q)
+        )
+    saldos = list(movimientos.values("producto_id").annotate(
+        entradas=Sum("cantidad", filter=Q(tipo=MovimientoStock.Tipo.ENTRADA)),
+        salidas=Sum("cantidad", filter=Q(tipo=MovimientoStock.Tipo.SALIDA)),
+    ))
+
     resumen = {}
     for capa in capas:
         fila = resumen.setdefault(
@@ -628,8 +638,16 @@ def inventario(request):
         fila["valor"] += capa.cantidad_restante * capa.costo_unitario
         fila["capas"] += 1
 
+    faltantes = {saldo["producto_id"] for saldo in saldos} - resumen.keys()
+    for producto in Producto.objects.filter(pk__in=faltantes).select_related("unidad"):
+        resumen[producto.pk] = {"producto": producto, "cantidad": CERO, "valor": CERO, "capas": 0}
+    for saldo in saldos:
+        resumen[saldo["producto_id"]]["saldo_kardex"] = (saldo["entradas"] or CERO) - (saldo["salidas"] or CERO)
+
     filas = sorted(resumen.values(), key=lambda f: f["producto"].sku)
     for fila in filas:
+        fila["saldo_kardex"] = fila.get("saldo_kardex", CERO)
+        fila["diferencia"] = fila["saldo_kardex"] != fila["cantidad"]
         fila["costo_promedio"] = (
             fila["valor"] / fila["cantidad"] if fila["cantidad"] else CERO
         )
@@ -641,6 +659,7 @@ def inventario(request):
             "filas": filas,
             "q": q,
             "total_valor": sum((f["valor"] for f in filas), CERO),
+            "hay_diferencias": any(f["diferencia"] for f in filas),
         },
     )
 

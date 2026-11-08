@@ -14,6 +14,8 @@
   <button class="btn btn-ghost" type="submit">Buscar</button>
 </form>
 
+<p class="preview-note">Incluye productos agotados que tienen movimientos. La cantidad y el valor provienen de las capas PEPS actuales; abre el SKU para ver su kardex.</p>
+{% if hay_diferencias %}<p class="preview-note"><strong>Hay saldos que requieren revisión:</strong> las cantidades de las capas no coinciden con las entradas y salidas del kardex. No se han modificado los movimientos.</p>{% endif %}
 <section class="card">
   <header class="card-head">
     <h2>Existencias por producto</h2>
@@ -35,7 +37,7 @@
       {% for f in filas %}
       <tr>
         <td><a href="{% url 'reportes:kardex' f.producto.pk %}">{{ f.producto.sku }}</a></td>
-        <td>{{ f.producto.nombre }}</td>
+        <td>{{ f.producto.nombre }}{% if f.diferencia %}<br><strong>Revisar: kardex {{ f.saldo_kardex }} {{ f.producto.unidad.codigo }}</strong>{% elif not f.cantidad %}<br><span class="muted">Agotado</span>{% endif %}</td>
         <td class="num der">{{ f.cantidad }} {{ f.producto.unidad.codigo }}</td>
         <td class="num der">{{ f.costo_promedio|floatformat:4 }}</td>
         <td class="num der">{{ f.valor|floatformat:2 }}</td>
@@ -52,7 +54,7 @@
     </tfoot>
   </table>
   {% else %}
-  <p class="muted">No hay stock con ese filtro.</p>
+  <p class="muted">No hay existencias ni movimientos para esta búsqueda.</p>
   {% endif %}
 </section>
 {% endblock %}

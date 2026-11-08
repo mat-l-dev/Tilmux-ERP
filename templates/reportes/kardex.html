@@ -5,6 +5,8 @@
 
 {% block contenido %}
 {% include "reportes/_tabs.html" %}
+<p><a href="{% url 'reportes:inventario' %}">← Volver al inventario</a></p>
+<p class="preview-note">El saldo se calcula con las entradas y salidas registradas. Las capas abiertas muestran las existencias disponibles según PEPS.</p>
 
 <section class="card">
   <header class="card-head">

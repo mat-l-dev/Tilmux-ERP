@@ -121,14 +121,20 @@ del comprobante deben coincidir. En su detalle verás el saldo y podrás registr
 uno o varios pagos, cada uno con su fecha real y cuenta. Cuando el saldo llega a
 cero, el gasto figura como pagado. Si ya registraste provisiones del mismo
 proveedor, puedes seleccionarlas cuando no haya IGV y sumen exactamente el
-comprobante. El sistema verifica su respaldo, vincula el comprobante sin volver
-a contabilizar el gasto y permite pagos posteriores. Las provisiones históricas
-sin respaldo verificable, diferencias de importe o IGV requieren revisión.
+comprobante. Para una factura con IGV y crédito fiscal, puedes vincular una sola
+provisión por su base exacta y confirmar que corresponde a ella. El sistema
+verifica el respaldo, evita repetir el gasto y permite pagos posteriores. Otros
+casos con IGV, importes diferentes o sin respaldo verificable requieren revisión.
 
 Para proteger el costo PEPS, no se puede ingresar una entrada o salida con fecha
 anterior a una salida ya registrada del mismo producto. Si necesitas corregir
 un movimiento anterior, revisa el historial y los costos antes de proceder; el
 sistema todavía no recalcula automáticamente esas operaciones.
+
+En **Reportes → Inventario** aparecen también los productos agotados con
+movimientos; abre su SKU para consultar el kardex. Si la cantidad disponible en
+capas difiere del saldo de entradas y salidas, la pantalla muestra una alerta
+para investigar el historial. Esta comparación no modifica los datos.
 
 El sistema comprueba proveedor, tipo, serie y número antes de confirmar una
 compra o registrar un gasto. Si el comprobante ya está registrado, incluso con
