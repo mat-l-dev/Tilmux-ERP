@@ -9,9 +9,10 @@
 
 <section class="card">
   <header class="card-head">
-    <h2>Movimientos por cuenta</h2>
+    <h2>Saldos y movimientos por cuenta</h2>
     <span class="chip">{{ desde|date:"d/m/Y" }} — {{ hasta|date:"d/m/Y" }}</span>
   </header>
+  <p class="preview-note">El saldo inicial acumula los asientos confirmados anteriores al rango. El debe y el haber corresponden al rango; los saldos deudor y acreedor corresponden al cierre. El saldo inicial positivo es deudor y el negativo, acreedor.</p>
 
   {% if filas %}
   <table class="tabla-doc">
@@ -19,6 +20,7 @@
       <tr>
         <th>Cuenta</th>
         <th>Nombre</th>
+        <th class="der">Saldo inicial</th>
         <th class="der">Debe</th>
         <th class="der">Haber</th>
         <th class="der">Saldo deudor</th>
@@ -30,8 +32,9 @@
       <tr>
         <td>{{ f.codigo }}</td>
         <td>{{ f.nombre }}</td>
-        <td class="num der">{{ f.total_debe|floatformat:2 }}</td>
-        <td class="num der">{{ f.total_haber|floatformat:2 }}</td>
+        <td class="num der">{{ f.saldo_inicial|floatformat:2 }}</td>
+        <td class="num der">{{ f.total_debe|default:0|floatformat:2 }}</td>
+        <td class="num der">{{ f.total_haber|default:0|floatformat:2 }}</td>
         <td class="num der">{{ f.saldo_deudor|floatformat:2 }}</td>
         <td class="num der">{{ f.saldo_acreedor|floatformat:2 }}</td>
       </tr>
@@ -39,10 +42,11 @@
     </tbody>
     <tfoot>
       <tr>
-        <td colspan="2"><strong>Totales</strong></td>
+        <td colspan="3"><strong>Totales de toda la consulta</strong></td>
         <td class="num der"><strong>{{ total_debe|floatformat:2 }}</strong></td>
         <td class="num der"><strong>{{ total_haber|floatformat:2 }}</strong></td>
-        <td colspan="2"></td>
+        <td class="num der"><strong>{{ total_deudor|floatformat:2 }}</strong></td>
+        <td class="num der"><strong>{{ total_acreedor|floatformat:2 }}</strong></td>
       </tr>
     </tfoot>
   </table>
@@ -54,7 +58,7 @@
   </nav>
   {% endif %}
   {% else %}
-  <p class="muted">No hay asientos en el rango elegido.</p>
+  <p class="muted">No hay saldos anteriores ni movimientos en el rango elegido.</p>
   {% endif %}
 </section>
 {% endblock %}

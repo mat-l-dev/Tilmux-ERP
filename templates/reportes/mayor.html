@@ -10,8 +10,9 @@
 <section class="card">
   <header class="card-head">
     <h2>{% if cuenta %}{{ cuenta.codigo }} · {{ cuenta.nombre }}{% else %}Elige una cuenta{% endif %}</h2>
-    {% if cuenta %}<span class="chip">Saldo {{ saldo|floatformat:2 }}</span>{% endif %}
+    {% if cuenta %}<span class="chip">Saldo al cierre {{ saldo|floatformat:2 }}</span>{% endif %}
   </header>
+  {% if cuenta %}<p class="preview-note">Saldo inicial: {{ saldo_inicial|floatformat:2 }}. El saldo positivo es deudor y el negativo, acreedor; incluye los asientos confirmados anteriores al rango.</p>{% endif %}
 
   {% if movimientos %}
   <table class="tabla-doc">

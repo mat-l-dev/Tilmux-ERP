@@ -285,13 +285,18 @@ anulación o devolución total requiere acreditar toda la venta sin notas previa
 
 | Reporte | Qué muestra |
 |---|---|
-| Balance de comprobación | Debe, haber y saldos por cuenta |
-| Libro mayor | Movimientos con saldo corrido |
+| Balance de comprobación | Saldo inicial, movimientos del período y saldos de cierre por cuenta |
+| Libro mayor | Saldo inicial y movimientos con saldo corrido por cuenta |
 | Registro de ventas | Ventas y notas, con exportación CSV |
 | Registro de compras | Compras y gastos, con exportación CSV; no incluye provisiones |
 | IGV y RER | IGV del mes y renta del 1,5 % |
 | Estados financieros | Situación, resultados, cambios y flujo |
 | Conciliación SUNAT | Casillas contra la vista preliminar o contra la propuesta del SIRE |
+
+El balance y el mayor consideran los asientos confirmados anteriores al rango
+para calcular el saldo inicial. Los movimientos corresponden al rango elegido;
+un saldo positivo en el mayor es deudor y uno negativo, acreedor. Estos reportes
+son consultas del ERP y no constituyen por sí solos libros electrónicos enviados.
 
 ## Impuestos
 

@@ -90,11 +90,13 @@ def balance(request):
             Cuenta.objects.filter(
                 lineas_asiento__asiento__empresa=empresa,
                 lineas_asiento__asiento__estado="CONFIRMADO",
-                lineas_asiento__asiento__fecha__range=(desde, hasta),
+                lineas_asiento__asiento__fecha__lte=hasta,
             )
             .annotate(
-                total_debe=Sum("lineas_asiento__debe"),
-                total_haber=Sum("lineas_asiento__haber"),
+                inicial_debe=Sum("lineas_asiento__debe", filter=Q(lineas_asiento__asiento__fecha__lt=desde)),
+                inicial_haber=Sum("lineas_asiento__haber", filter=Q(lineas_asiento__asiento__fecha__lt=desde)),
+                total_debe=Sum("lineas_asiento__debe", filter=Q(lineas_asiento__asiento__fecha__gte=desde)),
+                total_haber=Sum("lineas_asiento__haber", filter=Q(lineas_asiento__asiento__fecha__gte=desde)),
             )
             .order_by("codigo")
         )
@@ -102,12 +104,16 @@ def balance(request):
     for fila in filas:
         debe = fila.total_debe or Decimal("0")
         haber = fila.total_haber or Decimal("0")
-        neto = debe - haber
+        fila.saldo_inicial = (fila.inicial_debe or Decimal("0")) - (fila.inicial_haber or Decimal("0"))
+        neto = fila.saldo_inicial + debe - haber
         fila.saldo_deudor = neto if neto > 0 else Decimal("0")
         fila.saldo_acreedor = -neto if neto < 0 else Decimal("0")
 
+    filas = [f for f in filas if f.saldo_inicial or f.total_debe or f.total_haber]
     total_debe = sum((f.total_debe or 0) for f in filas)
     total_haber = sum((f.total_haber or 0) for f in filas)
+    total_deudor = sum((f.saldo_deudor for f in filas), Decimal("0"))
+    total_acreedor = sum((f.saldo_acreedor for f in filas), Decimal("0"))
     pagina = Paginator(filas, 25).get_page(request.GET.get("page"))
     contexto = {
         "filas": pagina,
@@ -116,6 +122,8 @@ def balance(request):
         "hasta": hasta,
         "total_debe": total_debe,
         "total_haber": total_haber,
+        "total_deudor": total_deudor,
+        "total_acreedor": total_acreedor,
     }
     return render(request, "reportes/balance.html", contexto)
 
@@ -129,10 +137,16 @@ def mayor(request):
     cuenta = None
     movimientos = []
     saldo = Decimal("0")
+    saldo_inicial = Decimal("0")
 
     if empresa and codigo:
         cuenta = Cuenta.objects.filter(version="2026", codigo=codigo).first()
         if cuenta:
+            previo = cuenta.lineas_asiento.filter(
+                asiento__empresa=empresa, asiento__estado="CONFIRMADO", asiento__fecha__lt=desde,
+            ).aggregate(debe=Sum("debe"), haber=Sum("haber"))
+            saldo_inicial = (previo["debe"] or Decimal("0")) - (previo["haber"] or Decimal("0"))
+            saldo = saldo_inicial
             lineas = (
                 cuenta.lineas_asiento.filter(
                     asiento__empresa=empresa,
@@ -155,6 +169,7 @@ def mayor(request):
         "movimientos": pagina,
         "page_obj": pagina,
         "saldo": saldo,
+        "saldo_inicial": saldo_inicial,
     }
     return render(request, "reportes/mayor.html", contexto)
 
