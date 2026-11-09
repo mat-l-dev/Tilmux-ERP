@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import calendar
 from datetime import date, timedelta
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from django.db import transaction
 from django.db.models import Sum
@@ -150,17 +150,35 @@ def monto_igv_pagado(empresa: Empresa, anio: int, mes: int) -> Decimal:
     return (filas["d"] or CERO) - (filas["h"] or CERO)
 
 
-def _igv_del_periodo(empresa: Empresa, anio: int, mes: int) -> Decimal:
+def _igv_del_periodo(
+    empresa: Empresa,
+    anio: int,
+    mes: int,
+    saldo_favor_anterior: Decimal | None = None,
+) -> Decimal:
     datos = calculo(empresa, anio, mes)
-    desde = date(anio, mes, 1)
-    saldo_anterior = saldo_cuenta(empresa, CUENTA_IGV, desde - timedelta(days=1))
-    saldo_a_favor_anterior = max(-saldo_anterior, CERO)
-    return datos["resultado"] - saldo_a_favor_anterior
+    if saldo_favor_anterior is None:
+        desde = date(anio, mes, 1)
+        saldo_anterior = saldo_cuenta(empresa, CUENTA_IGV, desde - timedelta(days=1))
+        saldo_favor_anterior = max(-saldo_anterior, CERO)
+    else:
+        try:
+            saldo_favor_anterior = Decimal(str(saldo_favor_anterior))
+            if not saldo_favor_anterior.is_finite() or saldo_favor_anterior < CERO:
+                raise InvalidOperation
+        except (InvalidOperation, TypeError, ValueError):
+            raise ContabilidadError("El saldo anterior debe ser un importe no negativo.") from None
+    return datos["resultado"] - saldo_favor_anterior
 
 
-def igv_pendiente(empresa: Empresa, anio: int, mes: int) -> Decimal:
+def igv_pendiente(
+    empresa: Empresa,
+    anio: int,
+    mes: int,
+    saldo_favor_anterior: Decimal | None = None,
+) -> Decimal:
     """IGV del periodo que aún no se ha pagado."""
-    c184 = _igv_del_periodo(empresa, anio, mes)
+    c184 = _igv_del_periodo(empresa, anio, mes, saldo_favor_anterior=saldo_favor_anterior)
     if c184 <= CERO:
         return CERO
     pagado = monto_igv_pagado(empresa, anio, mes)
@@ -176,10 +194,15 @@ def pagar_igv(
     anio: int,
     mes: int,
     usuario=None,
+    saldo_favor_anterior=None,
 ):
     """Registra el pago del IGV de un periodo, con asiento y movimiento."""
     from tesoreria.servicios import registrar
 
+    if saldo_favor_anterior is not None:
+        raise ContabilidadError(
+            "La comparación temporal del saldo anterior no puede usarse para registrar pagos."
+        )
     importe = Decimal(importe).quantize(Decimal("0.01"))
     if importe <= CERO:
         raise ContabilidadError("El importe debe ser mayor a cero.")
@@ -187,6 +210,8 @@ def pagar_igv(
         raise ContabilidadError("Elige una cuenta de tesorería con cuenta contable.")
     if medio.empresa_id != empresa.pk:
         raise ContabilidadError("La cuenta de tesorería pertenece a otra empresa.")
+    if not medio.activa or medio.moneda != "PEN":
+        raise ContabilidadError("Elige una cuenta activa en soles para registrar el pago de IGV.")
 
     # Evita que dos pagos simultáneos calculen el mismo saldo pendiente.
     Empresa.objects.select_for_update().get(pk=empresa.pk)

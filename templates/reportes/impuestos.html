@@ -95,11 +95,46 @@
   </dl>
   {% if comparacion_saldo.diferencia %}<p class="preview-note"><strong>Hay una diferencia por revisar.</strong> Contrasta el 621 y el tratamiento de los céntimos antes de declarar o registrar un pago.</p>{% else %}<p class="preview-note">Los importes ingresados coinciden; esto no verifica la declaración en SUNAT.</p>{% endif %}
   {% endif %}
-  <p class="preview-note">Comparación temporal: no guarda ni verifica el dato ingresado, no modifica asientos y no cambia la estimación ni el límite del formulario de pago.</p>
+  <p class="preview-note">Comparación temporal: no guarda ni verifica el dato ingresado, no modifica asientos y no cambia el límite del formulario de pago.</p>
 </section>
 {% endif %}
 
 {% if es_mes %}
+{% if empresa_activa %}
+<section class="card" style="margin-top:12px">
+  <header class="card-head"><h2>Constancias 621 registradas</h2></header>
+  <p class="preview-note">Copia manual de declaraciones ya presentadas para este mes. Revisa la constancia de SUNAT: el ERP no verifica su presentación ni determina si una rectificatoria surtió efecto. No registra pagos ni cambia los asientos.</p>
+  {% for declaracion in declaraciones_igv %}
+  <dl class="datos">
+    <div><dt>Orden y tipo</dt><dd>{{ declaracion.numero_orden }} · {{ declaracion.get_tipo_display }}</dd></div>
+    <div><dt>Presentada</dt><dd>{{ declaracion.fecha_presentacion|date:"d/m/Y" }}</dd></div>
+    <div><dt>Casillas 140 / 145 / 184</dt><dd>{{ declaracion.casilla_140 }} / {{ declaracion.casilla_145 }} / {{ declaracion.casilla_184 }}</dd></div>
+    <div><dt>Registro manual</dt><dd>{{ declaracion.registrado_en|date:"d/m/Y H:i" }} · {{ declaracion.registrado_por|default:"Usuario no disponible" }}</dd></div>
+    {% if declaracion.anulada %}<div><dt>Registro interno anulado</dt><dd>{{ declaracion.motivo_anulacion }} · {{ declaracion.anulada_en|date:"d/m/Y H:i" }} · {{ declaracion.anulada_por|default:"Usuario no disponible" }}</dd></div>{% endif %}
+  </dl>
+  {% if not declaracion.anulada %}
+  <details><summary>Corregir un error de digitación</summary>
+    <p class="preview-note">Esto anula únicamente esta copia en el ERP, no la declaración en SUNAT. Después podrás ingresar nuevamente los datos correctos.</p>
+    <form method="post" action="{% url 'reportes:anular_registro_621' declaracion.pk %}" class="filtro">
+      {% csrf_token %}<label>Motivo <input name="motivo" maxlength="250" required></label>
+      <button type="submit" class="btn btn-ghost">Anular registro interno</button>
+    </form>
+  </details>
+  {% endif %}
+  {% empty %}<p class="preview-note">No hay constancias registradas para este mes.</p>{% endfor %}
+  <details>
+    <summary>Registrar datos de una constancia presentada</summary>
+    <p class="preview-note">Introduce los valores en soles enteros como figuran en la constancia. Para un saldo a favor en las casillas 140 o 184, usa el signo negativo. Si luego presentas otra declaración, registra su nueva constancia.</p>
+    <form method="post" action="{% url 'reportes:registrar_declaracion_igv' %}" class="filtro">
+      {% csrf_token %}
+      <input type="hidden" name="anio" value="{{ desde.year }}">
+      <input type="hidden" name="mes" value="{{ desde.month }}">
+      {% for campo in formulario_declaracion %}<label class="field"><span>{{ campo.label }}</span>{{ campo }}</label>{% endfor %}
+      <button type="submit" class="btn btn-ghost">Guardar datos de la constancia</button>
+    </form>
+  </details>
+</section>
+{% endif %}
 <section class="card" style="margin-top:12px">
   <header class="card-head">
     <h2>IGV por pagar</h2>
@@ -111,6 +146,12 @@
     <div><dt>Pagado en el libro</dt><dd class="num">{{ igv_pagado|floatformat:2 }}</dd></div>
     <div class="total"><dt>Pendiente estimado según el libro</dt><dd class="num">{{ igv_pendiente|floatformat:2 }}</dd></div>
   </dl>
+  {% if comparacion_saldo and igv_pendiente_declarado is not None %}
+  <dl class="totales" style="margin-top:8px">
+    <div><dt>Estimación con saldo anterior ingresado</dt><dd class="num">{{ c184_declarado|floatformat:2 }}</dd></div>
+    <div class="total"><dt>Pendiente estimado con ese saldo</dt><dd class="num">{{ igv_pendiente_declarado|floatformat:2 }}</dd></div>
+  </dl>
+  {% endif %}
   <p class="preview-note">Estos valores no son la declaración presentada. Compara los saldos y el redondeo con el 621 y el comprobante real. El ERP limita el registro al pendiente estimado; si SUNAT muestra otro importe, revisa la diferencia antes de registrar el pago.</p>
 
   {% if puede_pagar_igv %}

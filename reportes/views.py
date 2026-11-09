@@ -9,6 +9,7 @@ from decimal import Decimal, InvalidOperation
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
+from django.db import IntegrityError, transaction
 from django.db.models import Q, Sum
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404, redirect, render
@@ -35,10 +36,10 @@ from contabilidad.impuestos import (
 from contabilidad.impuestos import (
     pagar_renta as registrar_pago_renta,
 )
-from contabilidad.models import Cuenta
+from contabilidad.models import Cuenta, DeclaracionIGV621
 from contabilidad.servicios import ContabilidadError
 from core.context import empresa_actual
-from core.models import Periodo
+from core.models import HistorialDocumento, Periodo
 from core.permisos import requiere_escritura
 from inventario.models import CapaFIFO, MovimientoStock
 from ventas.models import NotaCredito, NotaDebito, Venta
@@ -47,7 +48,7 @@ from .casillas import calcular
 from .clientes import nombre_cliente
 from .conciliacion_documentos import totales_documentales
 from .conciliacion_rce import comparar_rce
-from .forms import CompararSaldoIGVForm
+from .forms import CompararSaldoIGVForm, DeclaracionIGV621Form
 from .sire import ArchivoInvalido, leer_filas, moneda_verificada_soles, sumar, validar_contexto, verificar_registro
 from .utils import FiltroReporteError, filtros_seguros, rango
 
@@ -416,9 +417,16 @@ def impuestos(request):
     c184 = igv - c145
     formulario_saldo = CompararSaldoIGVForm(request.POST if request.method == "POST" else None)
     comparacion_saldo = None
+    c184_declarado = None
+    igv_pendiente_declarado = None
     if empresa and request.method == "POST" and formulario_saldo.is_valid():
         declarado = formulario_saldo.cleaned_data["saldo_declarado"]
         comparacion_saldo = {"declarado": declarado, "libro": c145, "diferencia": declarado - c145}
+        c184_declarado = igv - declarado
+        if es_mes:
+            igv_pendiente_declarado = igv_pendiente(
+                empresa, desde.year, desde.month, saldo_favor_anterior=declarado
+            )
     puede_asentar = bool(empresa and es_mes and renta > 0 and asiento is None)
     puede_pagar_igv = bool(
         empresa
@@ -456,6 +464,13 @@ def impuestos(request):
         "c184_abs": abs(c184),
         "formulario_saldo": formulario_saldo,
         "comparacion_saldo": comparacion_saldo,
+        "c184_declarado": c184_declarado,
+        "igv_pendiente_declarado": igv_pendiente_declarado,
+        "declaraciones_igv": (
+            DeclaracionIGV621.objects.filter(empresa=empresa, anio=desde.year, mes=desde.month)
+            if empresa and es_mes else []
+        ),
+        "formulario_declaracion": DeclaracionIGV621Form(),
         "mes_anterior": desde - timedelta(days=1),
         "c301": base_renta,
         "c312": renta,
@@ -474,6 +489,82 @@ def impuestos(request):
         "hoy": date.today(),
     }
     return render(request, "reportes/impuestos.html", contexto)
+
+
+@login_required
+@requiere_escritura
+@require_POST
+def registrar_declaracion_igv(request):
+    empresa = empresa_actual(request)
+    try:
+        anio, mes = int(request.POST.get("anio", "")), int(request.POST.get("mes", ""))
+        if not 2000 <= anio <= 2100 or not 1 <= mes <= 12:
+            raise ValueError
+    except (TypeError, ValueError):
+        messages.error(request, "Selecciona un período válido.")
+        return redirect("reportes:impuestos")
+    destino = f"{reverse('reportes:impuestos')}?periodo={anio}-{mes:02d}"
+    formulario = DeclaracionIGV621Form(request.POST)
+    if not empresa:
+        messages.error(request, "Configura una empresa antes de registrar la declaración.")
+    elif not formulario.is_valid():
+        for errores in formulario.errors.values():
+            for error in errores:
+                messages.error(request, error)
+    else:
+        try:
+            with transaction.atomic():
+                declaracion = formulario.save(commit=False)
+                declaracion.empresa = empresa
+                declaracion.anio, declaracion.mes = anio, mes
+                declaracion.registrado_por = request.user
+                declaracion.save()
+                HistorialDocumento.objects.create(
+                    empresa=empresa, tipo=HistorialDocumento.Tipo.IMPUESTO,
+                    documento_id=anio * 100 + mes, usuario=request.user, accion="REGISTRO_621",
+                    detalle=(f"Constancia 621 {declaracion.numero_orden}, {declaracion.get_tipo_display()}; "
+                             f"casillas 140: {declaracion.casilla_140}, 145: {declaracion.casilla_145}, "
+                             f"184: {declaracion.casilla_184}. Registro manual, sin verificar en SUNAT."),
+                )
+        except IntegrityError:
+            if not DeclaracionIGV621.objects.filter(
+                empresa=empresa, numero_orden=formulario.cleaned_data["numero_orden"], anulada=False,
+            ).exists():
+                raise
+            messages.error(request, "Ya existe una constancia con ese número de orden para esta empresa.")
+        else:
+            messages.success(request, "Datos de la constancia guardados. Verifica su efecto en SUNAT.")
+    return redirect(destino)
+
+
+@login_required
+@requiere_escritura
+@require_POST
+def anular_registro_621(request, pk):
+    empresa = empresa_actual(request)
+    motivo = (request.POST.get("motivo") or "").strip()
+    with transaction.atomic():
+        registro = get_object_or_404(
+            DeclaracionIGV621.objects.select_for_update(), pk=pk, empresa=empresa,
+        )
+        if not motivo or len(motivo) > 250:
+            messages.error(request, "Indica el motivo del error, con un máximo de 250 caracteres.")
+        elif registro.anulada:
+            messages.error(request, "Este registro interno ya fue anulado.")
+        else:
+            registro.anulada = True
+            registro.motivo_anulacion = motivo
+            registro.anulada_por = request.user
+            registro.anulada_en = timezone.now()
+            registro.save(update_fields=["anulada", "motivo_anulacion", "anulada_por", "anulada_en"])
+            HistorialDocumento.objects.create(
+                empresa=empresa, tipo=HistorialDocumento.Tipo.IMPUESTO,
+                documento_id=registro.anio * 100 + registro.mes, usuario=request.user,
+                accion="ANULAR_REG_621",
+                detalle=f"Anulación del registro interno {registro.numero_orden}; motivo: {motivo}.",
+            )
+            messages.success(request, "Registro interno anulado; esto no anula la declaración en SUNAT.")
+    return redirect(f"{reverse('reportes:impuestos')}?periodo={registro.anio}-{registro.mes:02d}")
 
 
 @login_required
@@ -561,6 +652,8 @@ def pagar_igv_mes(request):
             medio = CuentaTesoreria.objects.get(
                 pk=request.POST.get("medio"), empresa=empresa, activa=True
             )
+            if request.POST.get("saldo_declarado") not in (None, ""):
+                raise ValueError("La comparación temporal no es válida para pagos")
         except (InvalidOperation, TypeError, ValueError, CuentaTesoreria.DoesNotExist):
             messages.error(request, "Revisa el importe, el medio de pago y la fecha.")
         else:

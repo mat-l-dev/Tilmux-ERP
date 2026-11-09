@@ -189,6 +189,31 @@ class NumeracionSeries(BaseContable):
 
 
 class PagoIGV(BaseContable):
+    def test_comparacion_temporal_no_cambia_pago_ni_se_envia_al_servidor(self) -> None:
+        self.comprar("10", "100")
+        self.vender("10", "250")
+        usuario = get_user_model().objects.create_user(username="comparacion_igv")
+        Perfil.objects.create(usuario=usuario, empresa=self.empresa)
+        self.client.force_login(usuario)
+
+        respuesta = self.client.post(
+            reverse("reportes:impuestos") + "?periodo=2026-11",
+            {"saldo_declarado": "10.00"},
+        )
+        self.assertContains(respuesta, "Estimación con saldo anterior ingresado")
+        self.assertNotContains(respuesta, '<input type="hidden" name="saldo_declarado"')
+
+        respuesta = self.client.post(
+            reverse("reportes:pagar_igv"),
+            {
+                "anio": "2026", "mes": "11", "fecha": "2026-11-25",
+                "importe": "10.00", "medio": str(self.bbva.pk), "saldo_declarado": "0",
+            },
+            follow=True,
+        )
+        self.assertContains(respuesta, "Revisa el importe, el medio de pago y la fecha.")
+        self.assertEqual(monto_igv_pagado(self.empresa, 2026, 11), Decimal("0"))
+
     def test_paga_periodo_cerrado_en_mes_posterior_abierto(self) -> None:
         self.comprar("10", "100")
         self.vender("10", "250")

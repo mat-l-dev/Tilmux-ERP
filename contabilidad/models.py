@@ -6,6 +6,45 @@ from django.conf import settings
 from django.db import models
 
 
+class DeclaracionIGV621(models.Model):
+    """Copia manual de casillas de una constancia presentada; no es la deuda total."""
+
+    class Tipo(models.TextChoices):
+        ORIGINAL = "ORIGINAL", "Original"
+        SUSTITUTORIA = "SUSTITUTORIA", "Sustitutoria"
+        RECTIFICATORIA = "RECTIFICATORIA", "Rectificatoria"
+
+    empresa = models.ForeignKey("core.Empresa", on_delete=models.PROTECT)
+    anio = models.PositiveSmallIntegerField()
+    mes = models.PositiveSmallIntegerField()
+    tipo = models.CharField(max_length=14, choices=Tipo.choices)
+    numero_orden = models.CharField(max_length=40)
+    fecha_presentacion = models.DateField()
+    casilla_140 = models.DecimalField(max_digits=15, decimal_places=0)
+    casilla_145 = models.DecimalField(max_digits=15, decimal_places=0)
+    casilla_184 = models.DecimalField(max_digits=15, decimal_places=0)
+    registrado_por = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL)
+    registrado_en = models.DateTimeField(auto_now_add=True)
+    anulada = models.BooleanField(default=False)
+    motivo_anulacion = models.CharField(max_length=250, blank=True)
+    anulada_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="registros_621_anulados",
+    )
+    anulada_en = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-registrado_en", "-pk"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["empresa", "numero_orden"], condition=models.Q(anulada=False),
+                name="declaracion_621_orden_unica",
+            ),
+            models.CheckConstraint(condition=models.Q(mes__gte=1, mes__lte=12), name="declaracion_621_mes_valido"),
+            models.CheckConstraint(condition=models.Q(casilla_145__gte=0), name="declaracion_621_saldo_no_negativo"),
+        ]
+
+
 class Cuenta(models.Model):
     """Cuenta del Plan Contable General Empresarial.
 

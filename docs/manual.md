@@ -317,9 +317,27 @@ las exportaciones usan el mismo período que se muestra en pantalla.
 En **Comparar saldo anterior de IGV**, ingresa el saldo a favor de la casilla 184
 de la declaración presentada del mes anterior como importe positivo. Si no hubo
 saldo a favor, ingresa cero. El ERP lo compara con el saldo del libro y muestra
-la diferencia. La consulta es temporal: no verifica ni guarda el dato, no cambia
-los asientos ni recalcula el impuesto o el límite del registro de pagos. Ante
+la diferencia y una estimación adicional. La consulta es temporal: no verifica ni
+guarda el dato, no cambia los asientos ni el límite del registro de pagos. Ante
 una diferencia, contrasta la declaración y sus importes antes de continuar.
+
+En **Constancias 621 registradas**, elige el mes declarado y registra únicamente
+declaraciones que ya presentaste: tipo, número de orden, fecha y casillas 140,
+145 y 184 tal como aparecen en la constancia. Usa números enteros y signo
+negativo si la casilla 140 o 184 indica saldo a favor; la 145 se ingresa como
+saldo a favor positivo o cero. La casilla 184 debe ser la 140 menos la 145.
+Si presentas una declaración sustitutoria o rectificatoria, registra también su
+constancia: el ERP conserva ambas. El orden de registro no determina cuál tiene
+efecto legal. Para corregir una digitación, usa **Corregir un error de
+digitación**, explica el motivo y vuelve a registrar los datos correctos. El
+registro anterior queda visible como anulado en el ERP; esta acción no anula
+la declaración ante SUNAT.
+
+La constancia se copia manualmente: el ERP no la descarga ni comprueba ante
+SUNAT, tampoco registra pagos o modifica el límite calculado desde el libro.
+La casilla 184 no necesariamente es el importe final de la deuda o del pago;
+revisa las demás casillas y la constancia correspondiente. No registres octubre
+como presentado hasta que efectivamente hayas enviado la declaración.
 
 La tarjeta **Renta RER por pagar** muestra el saldo de la 40171, es decir, la
 renta de meses anteriores que aún no se paga.
