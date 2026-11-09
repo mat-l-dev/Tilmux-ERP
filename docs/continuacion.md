@@ -67,12 +67,13 @@ revisión de la normativa o de los comprobantes.
    permisos por empresa, trazabilidad, accesibilidad y consistencia entre
    módulos. Priorizar errores reproducidos y respaldarlos con pruebas. Revisar
    los expedientes y vouchers antes de registrar restituciones o movimientos.
-6. **Comprobación de respaldos.** La ejecución de «Verificar restauración» del
-   9/11 falló porque compara datos restaurados con importes y cantidades fijos
-   en `.github/workflows/verificar-restauracion.yml`. Investigar si los valores
-   quedaron desactualizados y sustituir esa comparación por verificaciones
-   coherentes con el mismo respaldo y con sus invariantes. El fallo por sí solo
-   no demuestra pérdida de datos ni valida que el respaldo sea recuperable.
+6. **Comprobación de respaldos.** La ejecución anterior de «Verificar
+   restauración» falló al comparar contra cifras fijas. El nuevo verificador
+   compara cantidad y huella de las filas de las tablas del ERP con una
+   instantánea compartida por `pg_dump`. No valida por sí solo los permisos,
+   secuencias, extensiones ni la corrección contable de los datos; debe seguir
+   comprobándose la restauración y el acceso de la aplicación. El archivo de
+   huellas se usa temporalmente y no se publica junto con el respaldo.
 
 ## Verificación reciente
 
