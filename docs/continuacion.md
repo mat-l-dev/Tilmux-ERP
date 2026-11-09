@@ -67,6 +67,12 @@ revisión de la normativa o de los comprobantes.
    permisos por empresa, trazabilidad, accesibilidad y consistencia entre
    módulos. Priorizar errores reproducidos y respaldarlos con pruebas. Revisar
    los expedientes y vouchers antes de registrar restituciones o movimientos.
+6. **Comprobación de respaldos.** La ejecución de «Verificar restauración» del
+   9/11 falló porque compara datos restaurados con importes y cantidades fijos
+   en `.github/workflows/verificar-restauracion.yml`. Investigar si los valores
+   quedaron desactualizados y sustituir esa comparación por verificaciones
+   coherentes con el mismo respaldo y con sus invariantes. El fallo por sí solo
+   no demuestra pérdida de datos ni valida que el respaldo sea recuperable.
 
 ## Verificación reciente
 
