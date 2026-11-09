@@ -136,11 +136,23 @@ def balance(request):
 def mayor(request):
     empresa = empresa_actual(request)
     desde, hasta = rango(request)
-    codigo = request.GET.get("cuenta", "")
+    codigo = request.GET.get("cuenta", "").strip()
     cuenta = None
     movimientos = []
     saldo = Decimal("0")
     saldo_inicial = Decimal("0")
+    cuentas_disponibles = Cuenta.objects.none()
+
+    if empresa:
+        cuentas_disponibles = (
+            Cuenta.objects.filter(version="2026")
+            .filter(
+                Q(lineas_asiento__asiento__empresa=empresa, lineas_asiento__asiento__estado="CONFIRMADO")
+                | Q(codigo=codigo)
+            )
+            .distinct()
+            .order_by("codigo")
+        )
 
     if empresa and codigo:
         cuenta = Cuenta.objects.filter(version="2026", codigo=codigo).first()
@@ -169,6 +181,7 @@ def mayor(request):
         "hasta": hasta,
         "codigo": codigo,
         "cuenta": cuenta,
+        "cuentas_disponibles": cuentas_disponibles,
         "movimientos": pagina,
         "page_obj": pagina,
         "saldo": saldo,

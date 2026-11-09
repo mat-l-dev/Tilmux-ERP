@@ -20,11 +20,6 @@
     <span>Hasta</span>
     <input type="date" name="hasta" value="{{ hasta|date:'Y-m-d' }}">
   </label>
-  {% if codigo %}
-  <label class="field">
-    <span>Cuenta</span>
-    <input type="text" name="cuenta" value="{{ codigo }}" maxlength="6">
-  </label>
-  {% endif %}
+  {% if codigo %}<input type="hidden" name="cuenta" value="{{ codigo }}">{% endif %}
   <button class="btn btn-ghost" type="submit">Consultar fechas</button>
 </form>

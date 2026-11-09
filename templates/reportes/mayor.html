@@ -7,6 +7,26 @@
 {% include "reportes/_tabs.html" %}
 {% include "reportes/_filtro.html" %}
 
+<form method="get" class="filtro">
+  {% if request.GET.periodo %}
+  <input type="hidden" name="periodo" value="{{ request.GET.periodo }}">
+  {% else %}
+  <input type="hidden" name="desde" value="{{ desde|date:'Y-m-d' }}">
+  <input type="hidden" name="hasta" value="{{ hasta|date:'Y-m-d' }}">
+  {% endif %}
+  <label class="field" style="min-width:260px">
+    <span>Cuenta contable</span>
+    <select name="cuenta" required>
+      <option value="">Selecciona una cuenta</option>
+      {% for opcion in cuentas_disponibles %}
+      <option value="{{ opcion.codigo }}" {% if codigo == opcion.codigo %}selected{% endif %}>{{ opcion.codigo }} · {{ opcion.nombre }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <button class="btn btn-primary" type="submit">Ver movimientos</button>
+</form>
+<p class="preview-note">Elige una cuenta con movimientos registrados en la empresa. Puedes cambiar el mes o consultar un rango de fechas.</p>
+
 <section class="card">
   <header class="card-head">
     <h2>{% if cuenta %}{{ cuenta.codigo }} · {{ cuenta.nombre }}{% else %}Elige una cuenta{% endif %}</h2>
@@ -31,7 +51,7 @@
       <tr>
         <td>{{ m.linea.asiento.fecha|date:"d/m/Y" }}</td>
         <td>{{ m.linea.asiento.numero }}</td>
-        <td class="muted">{{ m.linea.glosa }}</td>
+        <td class="muted">{{ m.linea.glosa|default:m.linea.asiento.glosa }}</td>
         <td class="num der">{{ m.linea.debe|floatformat:2 }}</td>
         <td class="num der">{{ m.linea.haber|floatformat:2 }}</td>
         <td class="num der">{{ m.saldo|floatformat:2 }}</td>
@@ -46,10 +66,12 @@
     {% if page_obj.has_next %}<a href="{% querystring page=page_obj.next_page_number %}">Siguiente</a>{% endif %}
   </nav>
   {% endif %}
-  {% elif codigo %}
+  {% elif codigo and not cuenta %}
+  <p class="muted">No encontramos esa cuenta. Selecciona una de la lista.</p>
+  {% elif cuenta %}
   <p class="muted">Esa cuenta no tiene movimientos en el rango.</p>
   {% else %}
-  <p class="muted">Escribe un código de cuenta, por ejemplo 1212, y aplica el filtro.</p>
+  <p class="muted">Selecciona una cuenta para ver su saldo inicial y sus movimientos.</p>
   {% endif %}
 </section>
 {% endblock %}

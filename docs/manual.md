@@ -297,6 +297,11 @@ El balance y el mayor consideran los asientos confirmados anteriores al rango
 para calcular el saldo inicial. Los movimientos corresponden al rango elegido;
 un saldo positivo en el mayor es deudor y uno negativo, acreedor. Estos reportes
 son consultas del ERP y no constituyen por sí solos libros electrónicos enviados.
+En **Mayor**, selecciona un mes o rango y elige una cuenta en la lista para ver
+su saldo inicial, cada movimiento y el saldo después de cada uno. La lista incluye
+las cuentas con movimientos confirmados de la empresa, incluso si no tienen
+movimientos en el período elegido. Desde el balance, pulsa un código de cuenta
+para abrir el mayor de esa cuenta con las mismas fechas.
 El registro de ventas agrupa los importes por la moneda registrada sin hacer una
 conversión tributaria. Su CSV es un archivo de revisión, no un archivo validado
 para importar directamente a SUNAT; los documentos sin tipo de identidad conocido

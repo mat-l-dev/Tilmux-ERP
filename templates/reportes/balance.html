@@ -30,7 +30,7 @@
     <tbody>
       {% for f in filas %}
       <tr>
-        <td>{{ f.codigo }}</td>
+        <td><a href="{% url 'reportes:mayor' %}?desde={{ desde|date:'Y-m-d' }}&amp;hasta={{ hasta|date:'Y-m-d' }}&amp;cuenta={{ f.codigo }}">{{ f.codigo }}</a></td>
         <td>{{ f.nombre }}</td>
         <td class="num der">{{ f.saldo_inicial|floatformat:2 }}</td>
         <td class="num der">{{ f.total_debe|default:0|floatformat:2 }}</td>
