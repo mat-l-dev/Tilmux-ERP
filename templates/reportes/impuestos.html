@@ -26,7 +26,7 @@
   <article class="kpi">
     <span class="kpi-label">Renta RER del mes</span>
     <span class="kpi-value num">S/ {{ renta|floatformat:2 }}</span>
-    <span class="kpi-note">1,5 % de {{ ventas_base|floatformat:2 }}</span>
+    <span class="kpi-note">1,5 % de {{ c301|floatformat:2 }}</span>
   </article>
 </section>
 
@@ -190,8 +190,9 @@
   <dl class="totales">
     <div><dt>Renta del periodo</dt><dd class="num">{{ renta|floatformat:2 }}</dd></div>
     <div><dt>Asentada en el libro</dt><dd class="num">{{ monto_asentado|floatformat:2 }}</dd></div>
-    <div class="total"><dt>IR por pagar acumulado</dt><dd class="num">{{ ir_por_pagar|floatformat:2 }}</dd></div>
+    <div class="total"><dt>IR por pagar acumulado al {{ hasta|date:"d/m/Y" }}</dt><dd class="num">{{ ir_por_pagar|floatformat:2 }}</dd></div>
   </dl>
+  <p class="preview-note">Es el saldo contable al cierre del mes seleccionado. No incluye pagos registrados después de esa fecha; consulta el mes del pago para verlos reflejados.</p>
 
   {% if asiento %}
   <p class="preview-note">

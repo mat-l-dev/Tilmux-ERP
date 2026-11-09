@@ -5,6 +5,27 @@ from django.conf import settings
 from django.db import migrations, models
 
 
+def proteger_constancias(apps, schema_editor):
+    if schema_editor.connection.vendor != 'postgresql':
+        return
+    with schema_editor.connection.cursor() as cursor:
+        cursor.execute("SELECT rolname FROM pg_roles WHERE rolname IN ('anon', 'authenticated')")
+        roles = [fila[0] for fila in cursor.fetchall()]
+        cita = schema_editor.quote_name
+        destinatarios = ', '.join(['PUBLIC', *(cita(rol) for rol in roles)])
+        cursor.execute('ALTER TABLE public.contabilidad_declaracionigv621 ENABLE ROW LEVEL SECURITY')
+        cursor.execute(f'REVOKE ALL ON TABLE public.contabilidad_declaracionigv621 FROM {destinatarios}')
+        cursor.execute(
+            "SELECT pg_get_serial_sequence('public.contabilidad_declaracionigv621', 'id')"
+        )
+        secuencia = cursor.fetchone()[0]
+        if secuencia:
+            esquema, nombre = secuencia.split('.', 1)
+            cursor.execute(
+                f'REVOKE ALL ON SEQUENCE {cita(esquema)}.{cita(nombre)} FROM {destinatarios}'
+            )
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -39,4 +60,5 @@ class Migration(migrations.Migration):
                 'constraints': [models.UniqueConstraint(condition=models.Q(('anulada', False)), fields=('empresa', 'numero_orden'), name='declaracion_621_orden_unica'), models.CheckConstraint(condition=models.Q(('mes__gte', 1), ('mes__lte', 12)), name='declaracion_621_mes_valido'), models.CheckConstraint(condition=models.Q(('casilla_145__gte', 0)), name='declaracion_621_saldo_no_negativo')],
             },
         ),
+        migrations.RunPython(proteger_constancias, migrations.RunPython.noop),
     ]

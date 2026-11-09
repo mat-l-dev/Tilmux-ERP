@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
@@ -189,6 +190,22 @@ class NumeracionSeries(BaseContable):
 
 
 class PagoIGV(BaseContable):
+    def test_pantalla_explora_base_y_fecha_del_saldo_de_renta(self) -> None:
+        usuario = get_user_model().objects.create_user(username="renta_periodo")
+        Perfil.objects.create(usuario=usuario, empresa=self.empresa)
+        self.client.force_login(usuario)
+        datos = {
+            "ventas_base": Decimal("100"), "ventas_igv": Decimal("18"),
+            "descuentos_base": Decimal("20"), "descuentos_igv": Decimal("3.60"),
+            "compras_base": Decimal("0"), "compras_igv": Decimal("0"),
+            "no_gravado": Decimal("0"), "base_renta": Decimal("80"),
+            "renta": Decimal("1.20"), "resultado": Decimal("14.40"),
+        }
+        with patch("reportes.views.calcular", return_value=datos):
+            respuesta = self.client.get(reverse("reportes:impuestos"), {"periodo": "2026-10"})
+        self.assertContains(respuesta, "1,5 % de 80,00")
+        self.assertContains(respuesta, "No incluye pagos registrados después de esa fecha")
+
     def test_comparacion_temporal_no_cambia_pago_ni_se_envia_al_servidor(self) -> None:
         self.comprar("10", "100")
         self.vender("10", "250")

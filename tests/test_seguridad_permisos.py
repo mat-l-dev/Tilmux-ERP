@@ -12,7 +12,10 @@ class SeguridadTablasERPTest(TestCase):
     def test_tablas_sensibles_no_tienen_acceso_publico_directo(self):
         if connection.vendor != "postgresql":
             self.skipTest("La protección se aplica en PostgreSQL.")
-        nombres = ["auth_user", "core_empresa", "compras_gasto", "ventas_cobroventa", "django_session"]
+        nombres = [
+            "auth_user", "core_empresa", "compras_gasto", "ventas_cobroventa", "django_session",
+            "contabilidad_declaracionigv621",
+        ]
         with connection.cursor() as cursor:
             cursor.execute(
                 "SELECT c.relname, c.relrowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace "
