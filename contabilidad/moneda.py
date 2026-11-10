@@ -23,6 +23,12 @@ def tipo_cambio_de(fecha: date) -> TipoCambio:
         ) from exc
 
 
+def tipo_cambio_para(fecha: date) -> tuple[TipoCambio, bool]:
+    """Devuelve el TC aplicable y si es de una fecha anterior (para avisar)."""
+    registro = tipo_cambio_de(fecha)
+    return registro, registro.fecha != fecha
+
+
 def a_soles(importe, moneda: str, fecha: date, *, lado: str = "venta") -> tuple[Decimal, Decimal]:
     """Devuelve (importe en soles, tipo de cambio usado)."""
     valor = Decimal(importe).quantize(CENT)

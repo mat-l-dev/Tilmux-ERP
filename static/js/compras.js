@@ -14,6 +14,16 @@
     const control = document.querySelector("#id_con_igv");
     return control ? control.checked : false;
   };
+  const moneda = () => document.querySelector("[data-moneda]");
+  const esFx = () => {
+    const control = moneda();
+    return Boolean(control && control.value !== "PEN");
+  };
+  const tipoCambio = () => {
+    const control = document.querySelector("[data-tc]");
+    const valor = control ? num(control.value) : 0;
+    return valor > 0 ? valor : 0;
+  };
 
   function totales() {
     let base = 0, igv = 0;
@@ -42,17 +52,25 @@
       igv += num(input.value);
     });
     const total = base + igv;
+    const fx = esFx();
+    const tc = fx ? tipoCambio() : 1;
     document.querySelectorAll("[data-total-base]").forEach((e) => (e.textContent = fmt(base)));
     document.querySelectorAll("[data-total-igv]").forEach((e) => (e.textContent = fmt(igv)));
     document.querySelectorAll("[data-total-total]").forEach((e) => (e.textContent = fmt(total)));
+    document.querySelectorAll("[data-total-pen]").forEach((e) => (e.textContent = fmt(fx ? total * tc : total)));
+    const filaSoles = document.querySelector("[data-fila-soles]");
+    if (filaSoles) filaSoles.hidden = !fx;
+    const nota = document.querySelector("[data-nota-moneda]");
+    if (nota) nota.hidden = !fx;
     const tipo = document.querySelector("[data-tipo-compra]");
     const conCredito = tipo && tipo.value === "FACTURA";
-    document.querySelectorAll("[data-asiento-inventario]").forEach((e) => (e.textContent = fmt(conCredito ? base : total)));
-    document.querySelectorAll("[data-asiento-igv]").forEach((e) => (e.textContent = fmt(conCredito ? igv : 0)));
+    document.querySelectorAll("[data-asiento-inventario]").forEach((e) => (e.textContent = fmt((conCredito ? base : total) * tc)));
+    document.querySelectorAll("[data-asiento-igv]").forEach((e) => (e.textContent = fmt(conCredito ? igv * tc : 0)));
+    document.querySelectorAll("[data-asiento-total]").forEach((e) => (e.textContent = fmt(total * tc)));
   }
 
   document.addEventListener("input", (event) => {
-    if (event.target.matches(".js-cantidad, .js-precio, [data-costo-base], [data-costo-igv]")) {
+    if (event.target.matches(".js-cantidad, .js-precio, [data-costo-base], [data-costo-igv], [data-tc]")) {
       totales();
     }
   });
@@ -61,6 +79,8 @@
   if (igvControl) igvControl.addEventListener("change", totales);
   const tipoCompra = document.querySelector("[data-tipo-compra]");
   if (tipoCompra) tipoCompra.addEventListener("change", totales);
+  const monedaControl = moneda();
+  if (monedaControl) monedaControl.addEventListener("change", totales);
 
   totales();
 })();

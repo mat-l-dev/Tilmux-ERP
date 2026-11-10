@@ -65,6 +65,9 @@
         <div><dt>Base</dt><dd class="num">{{ compra.subtotal|floatformat:2 }}</dd></div>
         <div><dt>IGV</dt><dd class="num">{{ compra.igv|floatformat:2 }}</dd></div>
         <div class="total"><dt>Total</dt><dd class="num">{{ compra.total|floatformat:2 }}</dd></div>
+        {% if compra.moneda != "PEN" %}
+        <div><dt>Total factura ({{ compra.moneda }})</dt><dd class="num">{{ compra.total_moneda_origen|floatformat:2 }} · TC {{ compra.tipo_cambio|floatformat:4 }}</dd></div>
+        {% endif %}
       </dl>
     </section>
 
@@ -75,6 +78,10 @@
         <div><dt>Total registrado</dt><dd>S/ {{ compra.total|floatformat:2 }}</dd></div>
         {% if compra.revaluacion %}<div><dt>Revaluación contable</dt><dd>S/ {{ compra.revaluacion|floatformat:2 }}</dd></div>{% endif %}
         <div><dt>Importe contable cancelado</dt><dd>S/ {{ compra.monto_pagado|floatformat:2 }}</dd></div>
+        {% if compra.moneda != "PEN" %}
+        <div><dt>Pagado en {{ compra.moneda }}</dt><dd>{{ compra.pagado_moneda_origen|floatformat:2 }}</dd></div>
+        <div><dt>Saldo en {{ compra.moneda }}</dt><dd><strong>{{ compra.saldo_moneda_origen|floatformat:2 }}</strong></dd></div>
+        {% endif %}
         <div><dt>Saldo contable pendiente</dt><dd><strong>S/ {{ saldo_compra|floatformat:2 }}</strong></dd></div>
       </dl>
       {% if pagos %}<div class="tabla-scroll"><table class="tabla-doc"><thead><tr><th>Fecha</th><th>Cuenta</th><th>Canal</th><th class="der">Salida de dinero</th></tr></thead><tbody>

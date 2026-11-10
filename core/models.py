@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import logging
+
 from django.conf import settings
 from django.db import models
+
+logger = logging.getLogger(__name__)
 
 
 class Empresa(models.Model):
@@ -96,10 +100,30 @@ class TipoCambio(models.Model):
         return f"{self.fecha} · compra {self.compra} · venta {self.venta}"
 
     @classmethod
+    def de_la_fecha(cls, fecha):
+        """Tipo de cambio publicado exactamente para esa fecha, o None."""
+        return cls.objects.filter(fecha=fecha).first()
+
+    @classmethod
     def del_dia(cls, fecha):
-        registro = cls.objects.filter(fecha__lte=fecha).first()
+        """Tipo de cambio de la fecha; si no existe, el último anterior.
+
+        El uso de una fecha anterior no es silencioso: se registra una
+        advertencia con ambas fechas para poder mostrarla en pantalla.
+        """
+        registro = cls.de_la_fecha(fecha)
+        if registro is not None:
+            return registro
+        registro = cls.objects.filter(fecha__lt=fecha).first()
         if registro is None:
             raise ValueError(f"No hay tipo de cambio para {fecha}.")
+        logger.warning(
+            "No hay tipo de cambio del %s; se usa el del %s (compra %s / venta %s).",
+            fecha,
+            registro.fecha,
+            registro.compra,
+            registro.venta,
+        )
         return registro
 
 

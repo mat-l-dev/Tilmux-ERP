@@ -91,7 +91,7 @@ Fuente: auditoría consolidada 2026-11-10 + confirmación del usuario 09/11.
 | `tesoreria/` | cuentas, movimientos, conciliación |
 | `reportes/` | SIRE, casillas, RCE, EEFF, exportar |
 | `data/` | PCGE 2026 en JSON |
-| `tests/` | 49 archivos `test_*.py` (incluye `test_devolucion_proveedor.py` y `test_restitucion_4411_4419.py`) |
+| `tests/` | 50 archivos `test_*.py` (incluye `test_devolucion_proveedor.py`, `test_restitucion_4411_4419.py` y `test_moneda_extranjera.py`) |
 | `docs/`, `scripts/`, `templates/`, `static/` | documentación, utilidades, UI |
 
 ## 5. Cómo trabajar
@@ -132,7 +132,7 @@ docker rm -f tilmux-test-pg                                 # al terminar
 
 `config/settings.py:25` carga `.env` con `os.environ.setdefault`, así que las
 variables del proceso **sí** ganan. `settings.py:114` aborta si falta
-`DATABASE_URL`. La suite completa (327 tests al 10/11/2026) tarda ~1,5 min.
+`DATABASE_URL`. La suite completa (339 tests al 10/11/2026) tarda ~1,5 min.
 
 ## 7. Convenciones del código
 
@@ -150,11 +150,23 @@ variables del proceso **sí** ganan. `settings.py:114` aborta si falta
 
 ## 8. Trampas conocidas verificadas (2026-11-10)
 
-- `core/models.py:98-103` `TipoCambio.del_dia()`: `fecha__lte` devuelve el TC
-  anterior **en silencio**. Es el fallback que P0-4 debe eliminar.
-- `compras/servicios.py:410` bloquea pagos parciales FX; `:429-434` calcula la
-  porción FX desde `total_moneda_origen` y `:488` suma a `monto_pagado` en soles:
-  no existe saldo en moneda original (P0-4).
+- `TipoCambio.del_dia()` ya no calla: si no hay TC de la fecha, usa el último
+  anterior y **registra un warning** con ambas fechas. `de_la_fecha()` da el
+  exacto o `None`, y `tipo_cambio_para()` informa si es de una fecha anterior.
+  Nunca hay fallback sin rastro.
+- **Moneda extranjera (P0-4, implementada):** `Compra.pagado_moneda_origen`
+  (migración `compras/0021`) y la propiedad `saldo_moneda_origen`. `confirmar()`
+  acepta facturas en USD: convierte el total al TC de la compra y reparte base e
+  IGV en soles con `distribuir_en_soles()` (el total en soles manda, para no
+  perder céntimos). `pagar()` recibe el importe **en la moneda de la factura**,
+  descuenta `saldo_moneda_origen` y lleva la diferencia a 6761/7761; los pagos
+  parciales en USD ya están permitidos. `revaluar()` ajusta solo el saldo
+  pendiente (moneda origen × TC de cierre) y también admite parciales. Siguen
+  bloqueados: costos de internamiento en la misma factura FX, y la devolución a
+  proveedor en FX (P0-2, reportado como pendiente).
+- Las ventas, cobros, gastos y transferencias en USD siguen **bloqueados** con
+  mensaje claro (decisión de alcance del 10/11/2026). La pantalla “Nueva compra”
+  ya permite registrar una factura en USD con su tipo de cambio.
 - `compras/reversion.py` es corrección interna (motivo, sin pagos, sin stock
   consumido): **no** es una devolución a proveedor. Desde P0-2 además bloquea
   compras con notas de crédito registradas.
@@ -177,8 +189,9 @@ variables del proceso **sí** ganan. `settings.py:114` aborta si falta
 - `docker-entrypoint.sh`: `migrate --noinput` al arrancar; en Render Free no hay
   `preDeployCommand`. Un merge a `main` despliega (`render.yaml`).
 - El importador de Excel está suspendido (`core/management/commands/importar_excel.py:250`).
-- Tests FX (`tests/test_invariantes.py:552-657`) crean la compra USD directo en BD
-  saltándose `confirmar()`: no cubren los rechazos.
+- Tests FX: `tests/test_invariantes.py` crea la compra USD directo en BD
+  (bypassea `confirmar()`); `tests/test_moneda_extranjera.py` cubre el flujo
+  real: confirmar, pago total y parcial, revaluación, TC anterior y SinTipoCambio.
 
 ## 9. Estado del tooling (verificado 2026-11-10)
 
@@ -206,7 +219,9 @@ variables del proceso **sí** ganan. `settings.py:114` aborta si falta
   `astral-sh/setup-uv@v10.3.3`, uv `0.13.7`, `postgres:17.11`.
 - Branch protection en `main`: activa desde el 10/11/2026 con los checks `Ruff`
   e `Invariantes` (strict=false, 0 aprobaciones, sin enforce_admins).
-  Suite local en verde al 10/11/2026: `Ran 327 tests ... OK (skipped=1)`.
+  Suite local en verde al 10/11/2026: `Ran 339 tests ... OK (skipped=1)`.
+  Serie real de tests: 304 (P0-1) → 317 (P0-2) → 327 (P0-3) → 339 (P0-4). El
+  “316” que se reportó en el P0-2 fue un error de conteo; no usarlo.
 
 
 ## 10. Restitución al socio (P0-3, implementada 10/11/2026)
@@ -238,7 +253,38 @@ variables del proceso **sí** ganan. `settings.py:114` aborta si falta
   `RESTITUCION_SOCIO`) y depende de `contabilidad/0013` (P0-2). Está aplicada
   solo en pruebas; producción la recibe con el despliegue.
 
-## 11. Qué no hacer nunca
+## 11. Moneda extranjera (P0-4, implementada 10/11/2026)
+
+- Modelo: `Compra.pagado_moneda_origen` (4 decimales) y la propiedad
+  `saldo_moneda_origen = total_moneda_origen − pagado_moneda_origen`. Migración
+  `compras/0021`. Para soles, `pagado_moneda_origen` se mantiene igual a
+  `monto_pagado` para que la propiedad no mienta.
+- `confirmar()` acepta compras en USD: las líneas y los totales del documento
+  están en la moneda de la factura; `distribuir_en_soles()` reparte el total en
+  soles (total USD × TC) y de ahí saca base e IGV en soles. El total en soles
+  manda para no perder céntimos por redondeos por línea. La capa PEPS se crea
+  con el costo en soles.
+- `pagar()` en FX recibe el importe **en la moneda de la factura** (no en soles),
+  aplica el TC del pago o del día, descuenta `saldo_moneda_origen`, lleva la
+  diferencia a 6761/7761 y deja el saldo en USD visible. Parciales permitidos.
+- `revaluar()` usa solo el saldo pendiente (saldo origen × TC de cierre) y
+  admite compras con pagos parciales. Sigue posteando `REVALUACION` al último
+  día del mes.
+- TC: `TipoCambio.del_dia()` avisa por log cuando usa una fecha anterior;
+  `de_la_fecha()` es exacto; `tipo_cambio_para()` dice si es anterior para la
+  pantalla. `SinTipoCambio` se convierte en `CompraError` en `pagar()` y
+  `confirmar()`: nunca escapa como excepción técnica.
+- Criterio de TC: compra, pago y revaluación usan el **venta** de SUNAT (el
+  criterio anterior, se conserva; documentado aquí y en el plan). El formulario
+  de pago permite TC manual del voucher, que manda sobre el del día.
+- UI: “Nueva compra” tiene selector de moneda (PEN/USD) y tipo de cambio; el
+  resumen muestra el total en USD y el total contable en soles. En el pago se
+  muestra qué TC se aplicará y su fecha, con aviso si es de un día anterior.
+- Bloqueado a propósito: costos de internamiento en la misma factura FX (flete
+  de otro proveedor), devolución a proveedor en FX (P0-2), y venta/cobro/gasto/
+  transferencia en USD (decisión de alcance del usuario, 10/11/2026).
+
+## 12. Qué no hacer nunca
 
 - Mergear o empujar a `main`; crear PR de merge por cuenta propia.
 - Editar migraciones ya aplicadas (crear una nueva).
