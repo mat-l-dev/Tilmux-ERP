@@ -19,12 +19,15 @@ package = false
 
 [dependency-groups]
 dev = [
-    "ruff>=0.17.3",
+    "ruff>=0.17.4",
 ]
 
 [tool.ruff]
 line-length = 120
 target-version = "py314"
+# Las migraciones son código generado por Django: no se lintean ni se reformatean
+# (editarlas después de aplicadas está prohibido, ver AGENTS.md).
+extend-exclude = ["*/migrations/*"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]

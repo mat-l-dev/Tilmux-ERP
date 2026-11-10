@@ -5,7 +5,12 @@ services:
     plan: free
     region: virginia
     healthCheckPath: /salud/
-    autoDeploy: true
+    # Solo despliega cuando pasan los checks de GitHub (Ruff + Invariantes).
+    # Antes: autoDeploy: true, es decir cada push a main desplegaba sin gate.
+    autoDeployTrigger: checksPass
+    # Cuando el servicio pase a plan pago, mover las migraciones aquí y quitarlas
+    # de docker-entrypoint.sh: preDeployCommand solo existe en planes pagos.
+    # preDeployCommand: uv run --no-dev python manage.py migrate --noinput
     envVars:
       - key: DJANGO_DEBUG
         value: "false"

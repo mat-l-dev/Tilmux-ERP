@@ -1,17 +1,60 @@
 name: Tests
 
+# Antes solo corría después del merge a main. Ahora también en cada PR contra
+# main, para que el código no llegue a main (ni a Render) sin pasar lint y
+# pruebas. Ver AGENTS.md y docs/auditoria-exhaustiva-2026-11-10.md (P0-1).
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  ruff:
+    name: Ruff
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      # Base del PR (o del push) para el trinquete de formato.
+      BASE_COMPARACION: ${{ github.event.pull_request.base.sha || github.event.before }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Instalar uv
+        uses: astral-sh/setup-uv@v10.3.3
+        with:
+          version: "0.13.7"
+          python-version: "3.14"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Instalar dependencias
+        run: uv sync --frozen
+
+      - name: Revisar el estilo (ruff check)
+        run: uv run ruff check .
+
+      - name: Revisar el formato de lo modificado (ruff format --check)
+        run: uv run python scripts/verificar_formato.py
+
   tests:
-    runs-on: ubuntu-latest
+    name: Invariantes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
 
     services:
       postgres:
-        image: postgres:17
+        image: postgres:17.11
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: postgres
@@ -31,15 +74,18 @@ jobs:
       PYTHONIOENCODING: utf-8
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Instalar uv
-        run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+        uses: astral-sh/setup-uv@v10.3.3
+        with:
+          version: "0.13.7"
+          python-version: "3.14"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
 
       - name: Instalar dependencias
-        run: uv sync
+        run: uv sync --frozen
 
       - name: Ejecutar los invariantes
         run: uv run python manage.py test tests -v 2
