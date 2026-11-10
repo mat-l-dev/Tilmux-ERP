@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block titulo %}Restitución al socio{% endblock %}
+{% block titulo_pagina %}Restitución al socio{% endblock %}
+
+{% block contenido %}
+<div class="doc"><div class="doc-main">
+  <form method="post" class="card form">
+    {% csrf_token %}
+    <header class="card-head"><h2>Datos del voucher bancario</h2></header>
+    <p class="preview-note">
+      Sin N° de operación, fecha y hora, cuenta de origen y destino, importe
+      exacto y concepto, el pago no se registra y la obligación sigue PENDIENTE.
+      El importe no puede superar el saldo de la cuenta.
+    </p>
+    <div class="grid-fields">
+      {% for campo in formulario %}
+      <label class="field"><span>{{ campo.label }}</span>{{ campo }}{% if campo.errors %}<span class="message error">{{ campo.errors|join:", " }}</span>{% endif %}</label>
+      {% endfor %}
+    </div>
+    {% if formulario.non_field_errors %}
+    <p class="message error">{{ formulario.non_field_errors|join:", " }}</p>
+    {% endif %}
+    <button class="btn btn-primary" type="submit">Registrar restitución</button>
+    <a class="btn btn-ghost" href="{% url 'tesoreria:obligaciones_socios' %}">Volver a socios</a>
+  </form>
+</div>
+
+<aside class="doc-side">
+  <div class="card sticky">
+    <header class="card-head"><h2>Saldo pendiente</h2></header>
+    {% if pendientes %}
+    <table class="tabla-doc">
+      <thead><tr><th>Cuenta</th><th class="der">Saldo</th></tr></thead>
+      <tbody>
+        {% for fila in pendientes %}
+        <tr><td>{{ fila.codigo }}</td><td class="num der">S/ {{ fila.saldo|floatformat:2 }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="muted">No hay saldo pendiente.</p>
+    {% endif %}
+    <p class="preview-note">
+      El formulario no convierte el pago en gasto ni en dividendo: solo cancela
+      la deuda contra la cuenta de tesorería. Guarda el voucher fuera del ERP.
+    </p>
+  </div>
+</aside></div>
+{% endblock %}

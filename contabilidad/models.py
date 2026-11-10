@@ -114,6 +114,7 @@ class Regla(models.Model):
         REVALUACION = "REVALUACION", "Revaluación de moneda extranjera"
         CAPITAL_SUSCRITO = "CAPITAL_SUSCRITO", "Capital suscrito"
         REEMBOLSO_SOCIO = "REEMBOLSO_SOCIO", "Dinero de socio por reembolsar"
+        RESTITUCION_SOCIO = "RESTITUCION_SOCIO", "Restitución al socio"
         COMISION_PASARELA = "COMISION_PASARELA", "Comisión de pasarela"
         CIERRE = "CIERRE", "Cierre del ejercicio"
 

@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block titulo %}Socios{% endblock %}
+{% block titulo_pagina %}Deudas con el socio{% endblock %}
+
+{% block contenido %}
+<div class="doc"><div class="doc-main">
+  <section class="card">
+    <header class="card-head">
+      <h2>Obligaciones pendientes</h2>
+      <span class="chip {% if pendientes %}chip-warn{% endif %}">
+        {% if pendientes %}{{ pendientes|length }} pendiente{{ pendientes|length|pluralize }}{% else %}Sin saldo pendiente{% endif %}
+      </span>
+    </header>
+    <p class="preview-note">
+      El saldo sale de las cuentas 4411 (préstamo), 4419 (reembolso al socio),
+      4429 (director) y 4699 (tercero). Mientras haya saldo, la obligación está
+      PENDIENTE: el sistema no la marca pagada sin voucher.
+    </p>
+    {% if pendientes %}
+    <div class="tabla-scroll" tabindex="0" role="region" aria-label="Obligaciones pendientes con el socio">
+      <table class="tabla-doc">
+        <thead>
+          <tr><th>Cuenta</th><th>Concepto</th><th class="der">Saldo</th><th>Estado</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for fila in pendientes %}
+          <tr>
+            <td>{{ fila.codigo }} · {{ fila.cuenta.nombre|default:"—" }}</td>
+            <td class="muted">{{ fila.etiqueta }}</td>
+            <td class="num der">S/ {{ fila.saldo|floatformat:2 }}</td>
+            <td><span class="chip chip-warn">{{ fila.estado }}</span></td>
+            <td>
+              {% if puede_escribir %}
+              <a class="btn btn-ghost" href="{% url 'tesoreria:restitucion_socio' %}?tipo={{ fila.tipo }}">Registrar pago con voucher</a>
+              {% else %}
+              <span class="muted">Solo lectura</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="muted">No hay deudas pendientes con el socio en las cuentas controladas.</p>
+    {% endif %}
+
+    {% if puede_escribir %}
+    <a class="btn btn-primary" href="{% url 'tesoreria:restitucion_socio' %}">Registrar restitución</a>
+    {% endif %}
+    <a class="btn btn-ghost" href="{% url 'tesoreria:movimientos' %}">Volver a tesorería</a>
+  </section>
+
+  <section class="card" style="margin-top:12px">
+    <header class="card-head"><h2>Pagos registrados con voucher</h2></header>
+    {% if pagos %}
+    <div class="tabla-scroll" tabindex="0" role="region" aria-label="Restituciones registradas">
+      <table class="tabla-doc">
+        <thead>
+          <tr><th>Fecha y hora</th><th>Beneficiario</th><th>Cuenta pagada</th><th>N° operación</th><th>Cuenta destino</th><th class="der">Importe</th><th>Asiento</th></tr>
+        </thead>
+        <tbody>
+          {% for pago in pagos %}
+          <tr>
+            <td>{{ pago.fecha_hora|date:"d/m/Y H:i" }}</td>
+            <td>{{ pago.beneficiario }}</td>
+            <td>{{ pago.cuenta_contable.codigo }}</td>
+            <td class="num">{{ pago.numero_operacion }}</td>
+            <td class="muted">{{ pago.cuenta_destino_visible }}</td>
+            <td class="num der">S/ {{ pago.importe|floatformat:2 }}</td>
+            <td>{% if pago.asiento %}N.º {{ pago.asiento.numero }}{% else %}—{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="muted">Todavía no hay restituciones registradas.</p>
+    {% endif %}
+  </section>
+</div>
+
+<aside class="doc-side">
+  <div class="card sticky">
+    <header class="card-head"><h2>Por qué se exige voucher</h2></header>
+    <p class="preview-note">
+      Un retiro a favor del socio o gerente sin obligación de devolver sustentada
+      puede calificar como dividendo presunto (art. 24-A inc. f LIR, RTF
+      04122-10-2025). Si el beneficiario es una vinculada, el sustento también
+      importa para precio de transferencia (arts. 32 y 32-A LIR).
+    </p>
+    <p class="preview-note">
+      El pago solo mueve la deuda (4411/4419/4429/4699) contra la cuenta de
+      tesorería: no pasa por 4212, no es gasto y no es dividendo.
+    </p>
+    <p class="preview-note">
+      Un expediente que dice «RESTITUIDO» sin voucher no sustituye al voucher:
+      el pago queda PENDIENTE hasta que exista la operación bancaria.
+    </p>
+  </div>
+</aside></div>
+{% endblock %}

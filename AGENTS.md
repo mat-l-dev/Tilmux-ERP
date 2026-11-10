@@ -52,8 +52,10 @@ Fuente: auditoría consolidada 2026-11-10 + confirmación del usuario 09/11.
 - S/ 500 préstamo socio (4411): **NO restituido**. EXP-002 dice RESTITUIDO
   08/10/2026 y es **falso** (confirmado por el usuario). Sin voucher. No marcar
   pagado. EXP-001 son otros S/ 500 (capital inicial en BBVA), no confundir.
-- S/ 39 reembolso token BCP (4419): **NO reembolsado**. Beneficiario sin
-  aclarar (Gerente General vs padre): no asumir.
+- S/ 39 reembolso token BCP (4419): **NO reembolsado**. Beneficiario confirmado
+  por el usuario el 10/11/2026: **su padre (socio)** → cuenta 4419. Antes se
+  dudaba entre Gerente General (EXP-003) y padre; no cambiar de beneficiario sin
+  un documento nuevo.
 - Boleta B001-00393302, comisiones Mercado Libre S/ 198,04 del 31/10/2026: es
   **compra**, no venta. Tipo 03, Tabla 11 Anexo 1 RS 040-2022 → no va en la
   propuesta RCE por diseño; va por **Complementar (Anexo 8)** a casilla 120, sin
@@ -89,7 +91,7 @@ Fuente: auditoría consolidada 2026-11-10 + confirmación del usuario 09/11.
 | `tesoreria/` | cuentas, movimientos, conciliación |
 | `reportes/` | SIRE, casillas, RCE, EEFF, exportar |
 | `data/` | PCGE 2026 en JSON |
-| `tests/` | 48 archivos `test_*.py` (incluye `test_devolucion_proveedor.py`) |
+| `tests/` | 49 archivos `test_*.py` (incluye `test_devolucion_proveedor.py` y `test_restitucion_4411_4419.py`) |
 | `docs/`, `scripts/`, `templates/`, `static/` | documentación, utilidades, UI |
 
 ## 5. Cómo trabajar
@@ -130,7 +132,7 @@ docker rm -f tilmux-test-pg                                 # al terminar
 
 `config/settings.py:25` carga `.env` con `os.environ.setdefault`, así que las
 variables del proceso **sí** ganan. `settings.py:114` aborta si falta
-`DATABASE_URL`. La suite completa (316 tests al 10/11/2026) tarda ~1,5 min.
+`DATABASE_URL`. La suite completa (327 tests al 10/11/2026) tarda ~1,5 min.
 
 ## 7. Convenciones del código
 
@@ -204,10 +206,39 @@ variables del proceso **sí** ganan. `settings.py:114` aborta si falta
   `astral-sh/setup-uv@v10.3.3`, uv `0.13.7`, `postgres:17.11`.
 - Branch protection en `main`: activa desde el 10/11/2026 con los checks `Ruff`
   e `Invariantes` (strict=false, 0 aprobaciones, sin enforce_admins).
-  Suite local en verde al 10/11/2026: ver el reporte del P0 en curso.
+  Suite local en verde al 10/11/2026: `Ran 327 tests ... OK (skipped=1)`.
 
 
-## 10. Qué no hacer nunca
+## 10. Restitución al socio (P0-3, implementada 10/11/2026)
+
+- `tesoreria/restituciones.py`: `registrar_restitucion()` paga una obligación
+  **solo con voucher completo** (N° de operación, fecha y hora, cuenta de origen
+  y destino, importe exacto, beneficiario y concepto). Sin esos datos lanza
+  `RestitucionError` y no postea nada: la obligación sigue PENDIENTE.
+- Cuentas por tipo: `PRESTAMO_SOCIO` → 4411, `REEMBOLSO_SOCIO` → 4419,
+  `REEMBOLSO_DIRECTOR` → 4429, `REEMBOLSO_TERCERO` → 4699. **4439 no existe en
+  el PCGE 2026** cargado: no inventarla.
+- Asiento `RESTITUCION_SOCIO`: D 4411/4419/4429/4699 / H cuenta de tesorería.
+  Nunca por 4212, nunca gasto (6xxx), nunca dividendo. Movimiento de tesorería
+  `EGRESO` con `origen_tipo="RESTITUCION_SOCIO"`.
+- Modelo `tesoreria.RestitucionSocio` (migración `tesoreria/0003`) guarda el
+  voucher; `cuenta_destino_visible` muestra solo los últimos 4 dígitos.
+- Pantallas: `/tesoreria/socios/` (pendientes con estado PENDIENTE y pagos
+  registrados) y `/tesoreria/socios/restitucion/` (formulario con voucher).
+- Beneficiario del S/ 39 confirmado por el usuario el 10/11/2026: **su padre
+  (socio)** → 4419. Si alguna vez cambia a gerente sin vínculo societario, la
+  cuenta correcta es 4699 y habría que reclasificar 4419→4699 con sustento.
+- Cautela fiscal (no es asesoría): un retiro al socio sin obligación de devolver
+  sustentada puede ser dividendo presunto (art. 24-A inc. f LIR; RTF
+  04122-10-2025); un crédito a vinculadas sin sustento es reparo (RTF
+  06598-2-2012); precio de transferencia va por arts. 32 y 32-A LIR, no por el
+  art. 26. Por eso el voucher y la obligación son obligatorios.
+- Nota de migraciones: `contabilidad/0014` agrega al `choices` los tipos del
+  P0-2 y del P0-3 (`DEVOLUCION_COMPRA`, `REEMBOLSO_PROVEEDOR`,
+  `RESTITUCION_SOCIO`) y depende de `contabilidad/0013` (P0-2). Está aplicada
+  solo en pruebas; producción la recibe con el despliegue.
+
+## 11. Qué no hacer nunca
 
 - Mergear o empujar a `main`; crear PR de merge por cuenta propia.
 - Editar migraciones ya aplicadas (crear una nueva).

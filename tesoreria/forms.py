@@ -7,7 +7,7 @@ from django import forms
 
 from catalogo.models import CuentaTesoreria
 
-from .models import MovimientoTesoreria
+from .models import MovimientoTesoreria, RestitucionSocio
 
 
 class BuscarOperacionBancariaForm(forms.Form):
@@ -42,3 +42,39 @@ class ConfirmarConciliacionForm(BuscarOperacionBancariaForm):
 
 class RevertirConciliacionForm(forms.Form):
     motivo = forms.CharField(max_length=1000, label="Motivo de la reversión")
+
+
+class RestitucionSocioForm(forms.Form):
+    """Datos del voucher: sin ellos no se registra la restitución."""
+
+    tipo = forms.ChoiceField(
+        choices=[(tipo, etiqueta) for tipo, etiqueta in RestitucionSocio.Tipo.choices],
+        label="Obligación que se paga",
+    )
+    fecha_hora = forms.DateTimeField(
+        label="Fecha y hora del voucher",
+        widget=forms.DateTimeInput(
+            attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"
+        ),
+    )
+    cuenta = forms.ModelChoiceField(
+        queryset=CuentaTesoreria.objects.none(), label="Cuenta de origen (empresa)"
+    )
+    beneficiario = forms.CharField(max_length=200, label="Beneficiario")
+    numero_operacion = forms.CharField(max_length=60, label="N° de operación del voucher")
+    cuenta_destino = forms.CharField(
+        max_length=120, label="Cuenta de destino (la del voucher)"
+    )
+    importe = forms.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        min_value=Decimal("0.01"),
+        label="Importe exacto del voucher",
+    )
+    concepto = forms.CharField(max_length=200, label="Concepto")
+
+    def __init__(self, *args, empresa, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["cuenta"].queryset = CuentaTesoreria.objects.filter(
+            empresa=empresa, activa=True, moneda="PEN", cuenta_contable__isnull=False
+        ).order_by("nombre", "pk")
