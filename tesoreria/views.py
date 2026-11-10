@@ -10,15 +10,22 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from catalogo.models import CuentaTesoreria
+from contabilidad.servicios import ContabilidadError
 from core.context import empresa_actual
 from core.models import Perfil
 from core.permisos import requiere_escritura
 
 from .conciliacion import ConciliacionError, buscar_candidatos, confirmar, revertir
 from .filtros import filtrar_movimientos
-from .forms import BuscarOperacionBancariaForm, ConfirmarConciliacionForm, RevertirConciliacionForm
-from .models import ConciliacionBancaria, MovimientoTesoreria
+from .forms import (
+    BuscarOperacionBancariaForm,
+    ConfirmarConciliacionForm,
+    RestitucionSocioForm,
+    RevertirConciliacionForm,
+)
+from .models import ConciliacionBancaria, MovimientoTesoreria, RestitucionSocio
 from .origenes import enlazar_documentos
+from .restituciones import RestitucionError, obligaciones, reembolsos_registrados, registrar_restitucion
 
 
 @login_required
@@ -106,6 +113,72 @@ def confirmar_conciliacion(request):
     else:
         messages.error(request, "Revisa los datos, la referencia y la confirmación antes de conciliar.")
     return redirect("tesoreria:comparar_banco")
+
+
+@login_required
+def obligaciones_socios(request):
+    """Deudas con el socio pendientes de restitución y pagos ya registrados."""
+    empresa = empresa_actual(request)
+    return render(
+        request,
+        "tesoreria/obligaciones.html",
+        {
+            "pendientes": obligaciones(empresa),
+            "pagos": reembolsos_registrados(empresa)[:50],
+            "puede_escribir": _puede_escribir(request),
+        },
+    )
+
+
+@login_required
+@requiere_escritura
+def restitucion_socio(request):
+    """Registra el pago de 4411/4419 con el voucher bancario obligatorio."""
+    empresa = empresa_actual(request)
+    inicial = {"tipo": request.GET.get("tipo") or RestitucionSocio.Tipo.PRESTAMO_SOCIO}
+    formulario = RestitucionSocioForm(
+        request.POST if request.method == "POST" else None, empresa=empresa, initial=inicial
+    )
+    if request.method == "POST" and formulario.is_valid():
+        datos = formulario.cleaned_data
+        try:
+            restitucion = registrar_restitucion(
+                empresa=empresa,
+                tipo=datos["tipo"],
+                cuenta=datos["cuenta"],
+                fecha_hora=datos["fecha_hora"],
+                numero_operacion=datos["numero_operacion"],
+                cuenta_destino=datos["cuenta_destino"],
+                beneficiario=datos["beneficiario"],
+                importe=datos["importe"],
+                concepto=datos["concepto"],
+                usuario=request.user,
+            )
+        except (RestitucionError, ContabilidadError) as exc:
+            messages.error(request, str(exc))
+        else:
+            messages.success(
+                request,
+                f"Restitución registrada por S/ {restitucion.importe}. "
+                f"Asiento N.º {restitucion.asiento.numero}. La obligación quedó cancelada.",
+            )
+            return redirect("tesoreria:obligaciones_socios")
+    elif request.method == "POST":
+        messages.error(request, "Completa todos los datos del voucher; sin ellos no se registra el pago.")
+
+    return render(
+        request,
+        "tesoreria/restitucion_socio.html",
+        {
+            "formulario": formulario,
+            "pendientes": obligaciones(empresa),
+        },
+    )
+
+
+def _puede_escribir(request) -> bool:
+    perfil = getattr(request.user, "perfil", None)
+    return perfil is None or perfil.rol != Perfil.Rol.LECTOR
 
 
 @login_required

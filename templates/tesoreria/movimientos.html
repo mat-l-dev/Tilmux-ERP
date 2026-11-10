@@ -5,7 +5,7 @@
 
 {% block contenido %}
 <section class="card">
-  <header class="card-head tesoreria-cabecera"><div><h2>Movimientos por cuenta</h2><p class="muted tesoreria-subtitulo">Resumen acumulado por cuenta</p></div><div class="acciones-head tesoreria-acciones"><a class="btn btn-primary" href="{% url 'tesoreria:comparar_banco' %}">Comparar con el banco</a><a class="btn btn-ghost" href="{% url 'tesoreria:historial_conciliaciones' %}">Historial de conciliaciones</a></div></header>
+  <header class="card-head tesoreria-cabecera"><div><h2>Movimientos por cuenta</h2><p class="muted tesoreria-subtitulo">Resumen acumulado por cuenta</p></div><div class="acciones-head tesoreria-acciones"><a class="btn btn-primary" href="{% url 'tesoreria:comparar_banco' %}">Comparar con el banco</a><a class="btn btn-ghost" href="{% url 'tesoreria:historial_conciliaciones' %}">Historial de conciliaciones</a><a class="btn btn-ghost" href="{% url 'tesoreria:obligaciones_socios' %}">Deudas con el socio</a></div></header>
   <p class="preview-note">Los totales son la suma de movimientos registrados en el ERP, antes de aplicar los filtros del historial. No incluyen necesariamente el saldo inicial y no representan un saldo bancario conciliado. Verifica la moneda de los movimientos antiguos.</p>
   {% if filas %}
   <div class="tabla-scroll" tabindex="0" role="region" aria-label="Resumen de movimientos por cuenta"><table class="tabla-doc">

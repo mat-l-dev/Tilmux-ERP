@@ -57,6 +57,69 @@ class MovimientoTesoreria(models.Model):
         return f"{signo}{self.importe} · {self.cuenta.nombre}"
 
 
+class RestitucionSocio(models.Model):
+    """Pago de una deuda con el socio (4411/4419) con los datos del voucher.
+
+    Solo existe cuando el voucher bancario está completo: número de operación,
+    fecha y hora, cuenta de origen y destino, importe exacto y concepto. Sin eso
+    la obligación queda PENDIENTE y no se postea ningún asiento.
+    """
+
+    class Tipo(models.TextChoices):
+        PRESTAMO_SOCIO = "PRESTAMO_SOCIO", "Préstamo del socio (4411)"
+        REEMBOLSO_SOCIO = "REEMBOLSO_SOCIO", "Reembolso al socio (4419)"
+        REEMBOLSO_DIRECTOR = "REEMBOLSO_DIRECTOR", "Reembolso al director (4429)"
+        REEMBOLSO_TERCERO = "REEMBOLSO_TERCERO", "Reembolso a tercero (4699)"
+
+    empresa = models.ForeignKey(
+        "core.Empresa", on_delete=models.PROTECT, related_name="restituciones_socio"
+    )
+    tipo = models.CharField(max_length=20, choices=Tipo.choices)
+    fecha = models.DateField()
+    fecha_hora = models.DateTimeField(help_text="Fecha y hora que figuran en el voucher.")
+    cuenta = models.ForeignKey(
+        "catalogo.CuentaTesoreria", on_delete=models.PROTECT, related_name="restituciones"
+    )
+    cuenta_contable = models.ForeignKey(
+        "contabilidad.Cuenta", on_delete=models.PROTECT, related_name="restituciones"
+    )
+    beneficiario = models.CharField(max_length=200)
+    numero_operacion = models.CharField(max_length=60)
+    cuenta_destino = models.CharField(max_length=120)
+    importe = models.DecimalField(max_digits=18, decimal_places=2)
+    concepto = models.CharField(max_length=200)
+    asiento = models.ForeignKey(
+        "contabilidad.Asiento", on_delete=models.PROTECT, null=True, blank=True
+    )
+    creado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True
+    )
+    creado = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "restitución a socio"
+        verbose_name_plural = "restitución a socios"
+        ordering = ["-fecha_hora", "-pk"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["empresa", "numero_operacion"],
+                name="restitucion_operacion_unica",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(importe__gt=0), name="restitucion_importe_positivo"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.fecha:%d/%m/%Y} · {self.beneficiario} · {self.importe}"
+
+    @property
+    def cuenta_destino_visible(self) -> str:
+        """Muestra solo los últimos dígitos de la cuenta del beneficiario."""
+        limpio = (self.cuenta_destino or "").replace(" ", "")
+        return f"•••• {limpio[-4:]}" if len(limpio) > 4 else "••••"
+
+
 class ConciliacionBancaria(models.Model):
     """Vínculo explícito con una operación bancaria, conservado si se revierte."""
 
