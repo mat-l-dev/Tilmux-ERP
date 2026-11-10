@@ -2,7 +2,7 @@ from django.contrib import admin
 
 from core.admin_seguro import SoloConsultaContable
 
-from .models import Compra, CompraLinea, CostoAdicional
+from .models import Compra, CompraLinea, CostoAdicional, NotaCreditoCompra, NotaCreditoCompraLinea
 from .models_gasto import Gasto
 
 
@@ -48,3 +48,25 @@ class CompraAdmin(SoloConsultaContable, admin.ModelAdmin):
     date_hierarchy = "fecha"
     autocomplete_fields = ("proveedor",)
     inlines = [CompraLineaInline, CostoAdicionalInline]
+
+
+class NotaCreditoCompraLineaInline(admin.TabularInline):
+    model = NotaCreditoCompraLinea
+    extra = 0
+    can_delete = False
+    fields = ("compra_linea", "cantidad", "base", "igv", "total", "costo_total")
+    readonly_fields = fields
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(NotaCreditoCompra)
+class NotaCreditoCompraAdmin(SoloConsultaContable, admin.ModelAdmin):
+    list_display = (
+        "fecha", "compra", "serie", "numero", "motivo_codigo", "total", "reembolsado", "creada_por",
+    )
+    list_filter = ("compra__empresa", "motivo_codigo", "reembolsado")
+    search_fields = ("compra__proveedor__nombre", "serie", "numero")
+    date_hierarchy = "fecha"
+    inlines = [NotaCreditoCompraLineaInline]

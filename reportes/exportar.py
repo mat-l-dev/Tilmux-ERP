@@ -18,7 +18,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font
 
 from compras.comprobantes import evaluar_tributacion
-from compras.models import Compra
+from compras.models import Compra, NotaCreditoCompra
 from compras.models_gasto import Gasto
 from core.context import empresa_actual
 from ventas.models import NotaCredito, NotaDebito, Venta
@@ -224,6 +224,33 @@ def compras(request):
                     "Gasto",
                     "Sí" if usa_credito else "No",
                     "Sí" if estado_tributario.requiere_revision else "No",
+                ]
+            )
+
+        # Notas de crédito del proveedor: tipo 07 y signo negativo, como en el RCE.
+        for nota in NotaCreditoCompra.objects.annotate(
+            fecha_tributaria=Coalesce("fecha_anotacion", "fecha")
+        ).filter(
+            compra__empresa=empresa, fecha_tributaria__range=(desde, hasta)
+        ).select_related("compra", "compra__proveedor").order_by("fecha", "serie", "numero"):
+            compra = nota.compra
+            usa_credito = evaluar_tributacion(compra).incluido
+            filas.append(
+                [
+                    _periodo(nota.fecha_anotacion or nota.fecha),
+                    nota.fecha.isoformat(),
+                    "07",
+                    nota.serie,
+                    nota.numero,
+                    compra.proveedor.numero_doc,
+                    compra.proveedor.nombre,
+                    _importe(-nota.base if usa_credito and nota.igv > 0 else 0),
+                    _importe(-nota.igv if usa_credito else 0),
+                    _importe(-nota.base if usa_credito and nota.igv == 0 else 0),
+                    _importe(-nota.total),
+                    "Mercadería (nota de crédito)",
+                    "Sí" if usa_credito else "No",
+                    "No",
                 ]
             )
 

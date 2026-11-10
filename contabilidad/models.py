@@ -103,6 +103,8 @@ class Regla(models.Model):
         GASTO_SIN_IGV = "GASTO_SIN_IGV", "Gasto sin IGV"
         PROVISION_GASTO = "PROVISION_GASTO", "Provisión de gasto"
         NOTA_CREDITO = "NOTA_CREDITO", "Nota de crédito de venta"
+        DEVOLUCION_COMPRA = "DEVOLUCION_COMPRA", "Nota de crédito de compra"
+        REEMBOLSO_PROVEEDOR = "REEMBOLSO_PROVEEDOR", "Reembolso de proveedor"
         APORTE_CAPITAL = "APORTE_CAPITAL", "Aporte de capital"
         PRESTAMO_SOCIO = "PRESTAMO_SOCIO", "Préstamo de socio"
         TRANSFERENCIA = "TRANSFERENCIA", "Transferencia entre cuentas"

@@ -135,3 +135,94 @@ class CostoAdicional(models.Model):
 
     def __str__(self) -> str:
         return f"{self.concepto} · {self.base}"
+
+
+class NotaCreditoCompra(models.Model):
+    """Nota de crédito del proveedor: devolución real, no corrección interna.
+
+    Reduce la deuda 4212, revierte el IGV 40111 y la base del RCE, y saca del
+    inventario las unidades al costo de la capa original de la compra. Es
+    distinta de ``revertir_registro`` (que anula un registro erróneo).
+    """
+
+    class Motivo(models.TextChoices):
+        ANULACION = "01", "Anulación de la operación"
+        ERROR_RUC = "02", "Anulación por error en el RUC"
+        ERROR_DESCRIPCION = "03", "Corrección por error en la descripción"
+        DESCUENTO_GLOBAL = "04", "Descuento global"
+        DESCUENTO_ITEM = "05", "Descuento por ítem"
+        DEVOLUCION_TOTAL = "06", "Devolución total"
+        DEVOLUCION_ITEM = "07", "Devolución por ítem"
+        BONIFICACION = "08", "Bonificación"
+        DISMINUCION = "09", "Disminución en el valor"
+        OTROS = "10", "Otros conceptos"
+
+    compra = models.ForeignKey(
+        Compra, on_delete=models.PROTECT, related_name="notas_credito"
+    )
+    fecha = models.DateField()
+    fecha_anotacion = models.DateField(
+        null=True,
+        blank=True,
+        help_text="Fecha de anotación en el RCE; si no se indica, se usa la emisión.",
+    )
+    serie = models.CharField(max_length=4)
+    numero = models.CharField(max_length=20)
+    motivo_codigo = models.CharField(
+        max_length=2, choices=Motivo.choices, default=Motivo.DEVOLUCION_ITEM
+    )
+    motivo = models.CharField(max_length=200)
+    base = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    igv = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    total = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    costo = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    reembolsado = models.BooleanField(default=False)
+    fecha_reembolso = models.DateField(null=True, blank=True)
+    importe_reembolsado = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    creada_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="notas_credito_compra",
+    )
+    creada = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "nota de crédito de compra"
+        verbose_name_plural = "notas de crédito de compras"
+        ordering = ["-fecha", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["compra", "serie", "numero"], name="nota_credito_compra_unica"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(total__gte=0) & models.Q(costo__gte=0),
+                name="nota_credito_compra_importes_no_negativos",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.serie}-{self.numero} · compra {self.compra_id}"
+
+
+class NotaCreditoCompraLinea(models.Model):
+    nota = models.ForeignKey(
+        NotaCreditoCompra, on_delete=models.CASCADE, related_name="lineas"
+    )
+    compra_linea = models.ForeignKey(
+        CompraLinea, on_delete=models.PROTECT, related_name="notas_credito"
+    )
+    cantidad = models.DecimalField(max_digits=18, decimal_places=4)
+    base = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    igv = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    total = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    costo_total = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+
+    class Meta:
+        verbose_name = "línea de nota de crédito de compra"
+        verbose_name_plural = "líneas de nota de crédito de compras"
+        ordering = ["nota", "id"]
+
+    def __str__(self) -> str:
+        return f"{self.compra_linea.producto.sku} × {self.cantidad}"

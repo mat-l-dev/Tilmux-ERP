@@ -11,7 +11,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:17
+        image: postgres:17.11
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: restaurado
@@ -42,12 +42,12 @@ jobs:
       - name: Restaurar en una base vacía
         run: |
           # El volcado incluye CREATE SCHEMA public; se elimina antes para que no choque.
-          docker run --rm --network host -e PGPASSWORD=postgres postgres:17 \
+          docker run --rm --network host -e PGPASSWORD=postgres postgres:17.11 \
             psql -h 127.0.0.1 -U postgres -d restaurado -v ON_ERROR_STOP=1 \
               -c "DROP SCHEMA IF EXISTS public CASCADE;"
 
           docker run --rm --network host \
-            -v "$PWD/out:/in" -e PGPASSWORD=postgres postgres:17 \
+            -v "$PWD/out:/in" -e PGPASSWORD=postgres postgres:17.11 \
             pg_restore -h 127.0.0.1 -U postgres -d restaurado \
               -O -x --exit-on-error /in/tilmux.dump
 
