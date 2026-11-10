@@ -74,10 +74,15 @@ revisión de la normativa o de los comprobantes.
    secuencias, extensiones ni la corrección contable de los datos; debe seguir
    comprobándose la restauración y el acceso de la aplicación. El archivo de
    huellas se usa temporalmente y no se publica junto con el respaldo.
+   La [ejecución del 9/11](https://github.com/mat-l-dev/Tilmux-ERP/actions/runs/42724851652)
+   restauró una copia temporal y encontró coincidencia en 46 tablas del ERP.
+   La instantánea se comparte con `pg_dump` según la
+   [documentación de PostgreSQL](https://www.postgresql.org/docs/17/app-pgdump.html).
 
 ## Verificación reciente
 
-Antes de la entrega se ejecutó la suite completa en PostgreSQL aislado: 301
-pruebas, una omitida. La comprobación de seguridad que se omite fuera de CI se
-ejecutó aparte con el entorno de CI y pasó. Estas verificaciones no prueban que
+Para el cambio de verificación del respaldo se ejecutaron 304 pruebas en
+PostgreSQL aislado con la configuración de CI, sin omisiones. Se comprobó por
+separado que una escritura posterior a la instantánea no afecte el respaldo y
+que una alteración en la copia se detecte. Estas verificaciones no prueban que
 todos los flujos o cálculos tributarios del ERP estén completos.
