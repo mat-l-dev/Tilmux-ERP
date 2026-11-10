@@ -11,8 +11,9 @@ from django.db import transaction
 from django.db.models import Sum
 from django.utils import timezone
 
+from contabilidad.calculos import TASA_IGV
 from contabilidad.models import Asiento, Cuenta
-from contabilidad.moneda import tipo_cambio_de
+from contabilidad.moneda import SinTipoCambio, tipo_cambio_de
 from contabilidad.servicios import Montos, postear, postear_lineas
 from core.contexto import usuario_actual
 from core.models import Empresa, TipoCambio
@@ -49,6 +50,38 @@ def _cent(valor) -> Decimal:
     return Decimal(valor).quantize(CENT, rounding=ROUND_HALF_UP)
 
 
+def distribuir_en_soles(filas, tasa, con_credito):
+    """Reparte en soles el total de una factura en moneda extranjera.
+
+    El total en soles es el de la factura (moneda original × tipo de cambio).
+    La base y el IGV se derivan de ese total por línea acumulada para que el
+    asiento cuadre al centavo y no se pierda un céntimo por redondeos.
+    ``filas`` son tuplas (base_origen, igv_origen, total_origen).
+    """
+    tasa = Decimal(tasa)
+    filas = [(Decimal(b), Decimal(i), Decimal(t)) for b, i, t in filas]
+    total_origen = sum((f[2] for f in filas), Decimal("0"))
+    if total_origen <= 0:
+        raise CompraError("La factura no tiene un total válido en moneda de origen.")
+    total_pen = _cent(total_origen * tasa)
+    reparto = []
+    acum_origen = Decimal("0")
+    acum_pen = Decimal("0")
+    for _base_origen, igv_origen, total_linea in filas:
+        acum_origen += total_linea
+        nuevo = _cent(acum_origen / total_origen * total_pen)
+        parte = nuevo - acum_pen
+        acum_pen = nuevo
+        if con_credito and igv_origen > 0:
+            base_pen = _cent(parte / (Decimal("1") + TASA_IGV))
+            igv_pen = parte - base_pen
+        else:
+            base_pen = parte
+            igv_pen = Decimal("0.00")
+        reparto.append((base_pen, igv_pen, parte))
+    return reparto
+
+
 @transaction.atomic
 def confirmar(compra: Compra) -> Compra:
     compra = Compra.objects.select_for_update().get(pk=compra.pk)
@@ -59,8 +92,6 @@ def confirmar(compra: Compra) -> Compra:
         )
     if compra.estado != Compra.Estado.BORRADOR:
         raise CompraError("Solo se confirma una compra en borrador.")
-    if compra.moneda != "PEN":
-        raise CompraError("La confirmación de mercadería en moneda extranjera aún requiere revisión de costos.")
     if compra.con_credito and compra.tipo_doc != Compra.TipoDoc.FACTURA:
         raise CompraError("Este flujo solo admite crédito fiscal en facturas.")
     validar_comprobante(
@@ -83,6 +114,28 @@ def confirmar(compra: Compra) -> Compra:
     for linea in lineas:
         if linea.cantidad <= 0 or linea.base <= 0 or linea.igv < 0 or linea.total != linea.base + linea.igv:
             raise CompraError("Revisa las líneas: cantidad y base positivas, IGV no negativo y total consistente.")
+
+    # En moneda extranjera las líneas están en la moneda de la factura y el
+    # asiento se lleva en soles al tipo de cambio de la compra.
+    tasa = None
+    if compra.moneda != "PEN":
+        if compra.costos.exists():
+            raise CompraError(
+                "Una compra en moneda extranjera no admite costos de internamiento en "
+                "la misma factura: regístralos en una compra aparte en soles."
+            )
+        try:
+            tasa = Decimal(compra.tipo_cambio)
+            if not tasa.is_finite() or tasa <= 1:
+                raise InvalidOperation
+        except (InvalidOperation, TypeError, ValueError):
+            try:
+                tasa = tipo_cambio_de(compra.fecha).venta
+            except SinTipoCambio as exc:
+                raise CompraError(
+                    f"{exc} Indica el tipo de cambio de la compra antes de confirmarla."
+                ) from None
+            compra.tipo_cambio = tasa
 
     costos = list(compra.costos.all())
     asignado = {linea.pk: Decimal("0") for linea in lineas}
@@ -110,10 +163,25 @@ def confirmar(compra: Compra) -> Compra:
             asignacion_acumulada = nuevo_acumulado
             asignado[linea.pk] += parte
 
-    for linea in lineas:
+    reparto = None
+    if tasa is not None:
+        reparto = distribuir_en_soles(
+            [(linea.base, linea.igv, linea.total) for linea in lineas],
+            tasa,
+            compra.con_credito,
+        )
+
+    for indice, linea in enumerate(lineas):
         # Si el comprobante no da crédito fiscal, su IGV forma parte del costo.
-        impuesto_al_costo = Decimal("0") if compra.con_credito else Decimal(linea.igv)
-        costo_total_linea = Decimal(linea.base) + impuesto_al_costo + asignado[linea.pk]
+        if reparto is None:
+            impuesto_al_costo = Decimal("0") if compra.con_credito else Decimal(linea.igv)
+            costo_total_linea = Decimal(linea.base) + impuesto_al_costo + asignado[linea.pk]
+        else:
+            base_linea, _, total_linea = reparto[indice]
+            # Sin crédito, el IGV ya viene incluido en el total de la línea.
+            costo_total_linea = base_linea + _cent(asignado[linea.pk] * tasa) + (
+                Decimal("0") if compra.con_credito else (total_linea - base_linea)
+            )
         costo_unitario = (costo_total_linea / linea.cantidad).quantize(
             DIEZ, rounding=ROUND_HALF_UP
         )
@@ -130,14 +198,23 @@ def confirmar(compra: Compra) -> Compra:
             glosa=f"Compra {compra.serie}-{compra.numero}".strip(" -"),
         )
 
-    base = _cent(sum((linea.base for linea in lineas), Decimal("0")) + sum((c.base for c in costos), Decimal("0")))
-    igv = _cent(sum((linea.igv for linea in lineas), Decimal("0")) + sum((c.igv for c in costos), Decimal("0")))
+    if reparto is None:
+        base = _cent(sum((linea.base for linea in lineas), Decimal("0")) + sum((c.base for c in costos), Decimal("0")))
+        igv = _cent(sum((linea.igv for linea in lineas), Decimal("0")) + sum((c.igv for c in costos), Decimal("0")))
+        total_moneda_origen = None
+    else:
+        base = _cent(sum((fila[0] for fila in reparto), Decimal("0")))
+        igv = _cent(sum((fila[1] for fila in reparto), Decimal("0")))
+        total_moneda_origen = _cent(
+            sum((linea.total for linea in lineas), Decimal("0"))
+            + sum((c.total for c in costos), Decimal("0"))
+        )
     total = base + igv
 
     compra.subtotal = base
     compra.igv = igv
     compra.total = total
-    compra.total_moneda_origen = total
+    compra.total_moneda_origen = total if total_moneda_origen is None else total_moneda_origen
     compra.estado = Compra.Estado.CONFIRMADA
     compra.confirmado_en = timezone.now()
     compra.save(
@@ -146,6 +223,7 @@ def confirmar(compra: Compra) -> Compra:
             "igv",
             "total",
             "total_moneda_origen",
+            "tipo_cambio",
             "estado",
             "confirmado_en",
         ]
@@ -393,32 +471,46 @@ def pagar(
     pagado_previo = _cent(compra.monto_pagado)
     # Lo acreditado por una nota de crédito del proveedor ya no se debe pagar.
     acreditado = _cent(compra.notas_credito.aggregate(s=Sum("total"))["s"] or Decimal("0.00"))
-    saldo = _cent(total_pen - pagado_previo - acreditado)
-    if saldo <= 0:
+    saldo_contable = _cent(total_pen - pagado_previo - acreditado)
+    if saldo_contable <= 0:
         raise CompraError("La compra ya está pagada o cubierta por notas de crédito.")
 
-    try:
-        valor = Decimal(str(importe)) if importe is not None else saldo
-        if not valor.is_finite():
-            raise InvalidOperation
-        monto = _cent(valor)
-    except (InvalidOperation, ValueError):
-        raise CompraError("Indica un importe válido.") from None
-    if monto <= 0:
-        raise CompraError("El importe debe ser mayor a cero.")
-    if monto > saldo:
-        raise CompraError(f"El saldo pendiente es {saldo}.")
-
-    if compra.moneda != "PEN" and (pagado_previo > 0 or monto != saldo):
-        raise CompraError("Los pagos parciales en moneda extranjera requieren revisión; aún no están disponibles.")
-    if compra.moneda != "PEN" and compra.total_moneda_origen <= 0:
-        raise CompraError("La compra no tiene un importe válido en moneda de origen; revisa el documento.")
-
+    monto_origen = None
     if compra.moneda == "PEN":
+        try:
+            valor = Decimal(str(importe)) if importe is not None else saldo_contable
+            if not valor.is_finite():
+                raise InvalidOperation
+            monto = _cent(valor)
+        except (InvalidOperation, ValueError):
+            raise CompraError("Indica un importe válido.") from None
+        if monto <= 0:
+            raise CompraError("El importe debe ser mayor a cero.")
+        if monto > saldo_contable:
+            raise CompraError(f"El saldo pendiente es {saldo_contable}.")
         llevado = monto
         pagado = monto
         diferencia = Decimal("0.00")
     else:
+        # En moneda extranjera el importe se expresa en la moneda de la factura.
+        saldo_origen = compra.saldo_moneda_origen
+        if saldo_origen <= 0:
+            raise CompraError(
+                f"La compra no tiene saldo pendiente en {compra.moneda}."
+            )
+        try:
+            valor = Decimal(str(importe)) if importe not in (None, "") else saldo_origen
+            if not valor.is_finite():
+                raise InvalidOperation
+            monto_origen = valor.quantize(Decimal("0.0001"))
+        except (InvalidOperation, ValueError):
+            raise CompraError(f"Indica un importe válido en {compra.moneda}.") from None
+        if monto_origen <= 0:
+            raise CompraError("El importe debe ser mayor a cero.")
+        if monto_origen > saldo_origen:
+            raise CompraError(
+                f"El saldo pendiente es {saldo_origen} {compra.moneda}."
+            )
         try:
             tasa = (
                 Decimal(str(tipo_cambio_pago))
@@ -427,13 +519,15 @@ def pagar(
             )
             if not tasa.is_finite() or tasa <= 0:
                 raise InvalidOperation
+        except SinTipoCambio as exc:
+            raise CompraError(str(exc)) from None
         except (InvalidOperation, ValueError):
             raise CompraError("Indica un tipo de cambio válido y mayor que cero.") from None
-        porcion = (
-            Decimal(compra.total_moneda_origen) * monto / total_pen
-        ).quantize(Decimal("0.0001"))
-        pagado = _cent(porcion * tasa)
-        llevado = monto
+        if monto_origen == saldo_origen:
+            llevado = saldo_contable
+        else:
+            llevado = _cent(saldo_contable * monto_origen / saldo_origen)
+        pagado = _cent(monto_origen * tasa)
         diferencia = _cent(pagado - llevado)
 
     cuentas = {
@@ -443,6 +537,15 @@ def pagar(
             codigo__in=["4212", CUENTA_DIFERENCIA_PERDIDA, CUENTA_DIFERENCIA_GANANCIA],
         )
     }
+    faltantes = [
+        codigo
+        for codigo in ("4212", CUENTA_DIFERENCIA_PERDIDA, CUENTA_DIFERENCIA_GANANCIA)
+        if codigo not in cuentas
+    ]
+    if faltantes:
+        raise CompraError(
+            f"Faltan cuentas del PCGE 2026 para el pago: {', '.join(faltantes)}."
+        )
     documento = f"{compra.serie}-{compra.numero}".strip(" -")
     lineas = [
         (cuentas["4212"], llevado, Decimal("0.00"), f"Pago compra {documento}")
@@ -488,12 +591,24 @@ def pagar(
         origen_id=compra.pk,
     )
 
-    compra.monto_pagado = pagado_previo + llevado
-    # La deuda también se extingue con una nota de crédito del proveedor.
-    compra.pagada = _cent(total_pen - compra.monto_pagado - acreditado) <= 0
+    compra.monto_pagado = _cent(pagado_previo + llevado)
+    if compra.moneda == "PEN":
+        compra.pagado_moneda_origen = compra.monto_pagado
+        # La deuda también se extingue con una nota de crédito del proveedor.
+        compra.pagada = _cent(total_pen - compra.monto_pagado - acreditado) <= 0
+    else:
+        compra.pagado_moneda_origen = (
+            Decimal(compra.pagado_moneda_origen) + monto_origen
+        ).quantize(Decimal("0.0001"))
+        compra.pagada = (
+            compra.saldo_moneda_origen <= 0
+            and _cent(total_pen - compra.monto_pagado - acreditado) <= 0
+        )
     if compra.pagada:
         compra.fecha_pago = fecha
-    compra.save(update_fields=["monto_pagado", "pagada", "fecha_pago"])
+    compra.save(
+        update_fields=["monto_pagado", "pagado_moneda_origen", "pagada", "fecha_pago"]
+    )
     return pagado, diferencia
 
 
@@ -508,15 +623,10 @@ def revaluar(empresa, anio: int, mes: int):
         .filter(
             empresa=empresa,
             estado=Compra.Estado.CONFIRMADA,
-            pagada=False,
             fecha__lte=ultimo_dia,
         )
         .exclude(moneda="PEN")
     )
-    if compras.filter(monto_pagado__gt=0).exists():
-        raise CompraError(
-            "Hay compras en moneda extranjera con pagos parciales; revisa sus saldos antes de revaluar."
-        )
     if compras.filter(total_moneda_origen__lte=0).exists():
         raise CompraError(
             "Hay compras sin importe válido en moneda de origen; revisa los documentos antes de revaluar."
@@ -534,13 +644,31 @@ def revaluar(empresa, anio: int, mes: int):
             codigo__in=["4212", CUENTA_DIFERENCIA_PERDIDA, CUENTA_DIFERENCIA_GANANCIA],
         )
     }
+    faltantes = [
+        codigo
+        for codigo in ("4212", CUENTA_DIFERENCIA_PERDIDA, CUENTA_DIFERENCIA_GANANCIA)
+        if codigo not in cuentas
+    ]
+    if faltantes:
+        raise CompraError(
+            f"Faltan cuentas del PCGE 2026 para la revaluación: {', '.join(faltantes)}."
+        )
 
     ajustadas = 0
     total = Decimal("0.00")
 
     for compra in compras:
-        objetivo = _cent(Decimal(compra.total_moneda_origen) * tasa)
-        llevado = _cent(Decimal(compra.total) + Decimal(compra.revaluacion))
+        saldo_origen = compra.saldo_moneda_origen
+        if saldo_origen <= 0:
+            continue
+        # La revaluación mira solo lo que sigue pendiente y ya está en libros:
+        # con pagos parciales, el saldo contable no es el total original.
+        objetivo = _cent(saldo_origen * tasa)
+        llevado = _cent(
+            Decimal(compra.total)
+            + Decimal(compra.revaluacion)
+            - Decimal(compra.monto_pagado)
+        )
         delta = _cent(objetivo - llevado)
         if delta == 0:
             continue

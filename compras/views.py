@@ -20,7 +20,7 @@ from django.views.decorators.http import require_POST
 
 from catalogo.models import CuentaTesoreria, Producto, Tercero
 from contabilidad.models import Asiento, Cuenta
-from contabilidad.moneda import SinTipoCambio, a_soles
+from contabilidad.moneda import SinTipoCambio, a_soles, tipo_cambio_para
 from contabilidad.servicios import ContabilidadError
 from core.context import empresa_actual
 from core.contexto import usuario_actual
@@ -52,7 +52,13 @@ from .models_gasto import Gasto, PagoGasto
 from .pagos_compra import registrar_pago
 from .provisiones import registrar_provision
 from .reversion import revertir_registro
-from .servicios import CompraError, confirmar, registrar_gasto, validar_comprobante
+from .servicios import (
+    CompraError,
+    confirmar,
+    distribuir_en_soles,
+    registrar_gasto,
+    validar_comprobante,
+)
 
 
 @login_required
@@ -379,6 +385,8 @@ def nueva(request):
             "proveedor": "",
             "glosa": "",
             "factura_pendiente": False,
+            "moneda": "PEN",
+            "tipo_cambio": "",
         },
     }
 
@@ -416,6 +424,10 @@ def nueva(request):
             "proveedor": compra_edit.proveedor_id,
             "glosa": compra_edit.glosa,
             "factura_pendiente": compra_edit.estado == Compra.Estado.PENDIENTE,
+            "moneda": compra_edit.moneda,
+            "tipo_cambio": (
+                "" if compra_edit.moneda == "PEN" else f"{compra_edit.tipo_cambio:.4f}"
+            ),
         }
 
     if request.method != "POST":
@@ -446,6 +458,23 @@ def nueva(request):
     precios = request.POST.getlist("linea_precio")
     descripciones = request.POST.getlist("linea_descripcion")
     con_igv = bool(request.POST.get("con_igv"))
+    moneda = (request.POST.get("moneda") or "PEN").strip().upper()
+    tipo_cambio = None
+    if moneda not in {"PEN", "USD"}:
+        errores.append("Selecciona una moneda válida (soles o dólares).")
+    if moneda != "PEN":
+        try:
+            tipo_cambio = Decimal(
+                (request.POST.get("tipo_cambio") or "").strip().replace(",", ".")
+            )
+            if not tipo_cambio.is_finite() or tipo_cambio <= 1:
+                raise InvalidOperation
+        except (InvalidOperation, ValueError):
+            tipo_cambio = None
+            errores.append(
+                "Indica el tipo de cambio en soles por unidad de la moneda extranjera "
+                "(por ejemplo 3.452)."
+            )
     if len({len(productos_ids), len(cantidades), len(precios)}) != 1:
         errores.append("Las líneas están incompletas; revisa los productos, cantidades y precios.")
     if any(descripcion.strip() for descripcion in descripciones[len(productos_ids):]):
@@ -514,6 +543,11 @@ def nueva(request):
         >= Decimal("10000000000000000")
     ):
         errores.append("El total de la compra excede el importe permitido.")
+    if moneda != "PEN" and costos:
+        errores.append(
+            "Una compra en moneda extranjera no admite costos de internamiento en la "
+            "misma factura: regístralos en una compra aparte en soles."
+        )
 
     contexto.update(
         {
@@ -532,6 +566,8 @@ def nueva(request):
                 "proveedor_nombre": request.POST.get("proveedor_nombre", ""),
                 "glosa": request.POST.get("glosa", ""),
                 "factura_pendiente": bool(request.POST.get("factura_pendiente")),
+                "moneda": moneda,
+                "tipo_cambio": request.POST.get("tipo_cambio", ""),
             },
         }
     )
@@ -568,6 +604,8 @@ def nueva(request):
     compra.serie = datos["serie"].upper()[:4]
     compra.numero = datos["numero"][:20]
     compra.glosa = datos.get("glosa", "")[:255]
+    compra.moneda = moneda
+    compra.tipo_cambio = tipo_cambio if moneda != "PEN" else Decimal("1")
     compra.con_credito = datos["tipo_doc"] == Compra.TipoDoc.FACTURA
     compra.estado = (
         Compra.Estado.PENDIENTE if factura_pendiente else Compra.Estado.BORRADOR
@@ -597,14 +635,37 @@ def nueva(request):
             total=costo["total"],
         )
 
-    compra.subtotal = sum((f["base"] for f in filas), Decimal("0")) + sum(
-        (c["base"] for c in costos), Decimal("0")
+    if moneda == "PEN":
+        compra.subtotal = sum((f["base"] for f in filas), Decimal("0")) + sum(
+            (c["base"] for c in costos), Decimal("0")
+        )
+        compra.igv = sum((f["igv"] for f in filas), Decimal("0")) + sum(
+            (c["igv"] for c in costos), Decimal("0")
+        )
+        compra.total = compra.subtotal + compra.igv
+        compra.total_moneda_origen = compra.total
+    else:
+        reparto = distribuir_en_soles(
+            [(f["base"], f["igv"], f["total"]) for f in filas],
+            tipo_cambio,
+            compra.con_credito,
+        )
+        compra.subtotal = sum((fila[0] for fila in reparto), Decimal("0"))
+        compra.igv = sum((fila[1] for fila in reparto), Decimal("0"))
+        compra.total = compra.subtotal + compra.igv
+        compra.total_moneda_origen = sum(
+            (f["total"] for f in filas), Decimal("0")
+        )
+    compra.save(
+        update_fields=[
+            "subtotal",
+            "igv",
+            "total",
+            "total_moneda_origen",
+            "moneda",
+            "tipo_cambio",
+        ]
     )
-    compra.igv = sum((f["igv"] for f in filas), Decimal("0")) + sum(
-        (c["igv"] for c in costos), Decimal("0")
-    )
-    compra.total = compra.subtotal + compra.igv
-    compra.save(update_fields=["subtotal", "igv", "total"])
 
     HistorialDocumento.objects.create(
         empresa=empresa,
@@ -628,6 +689,13 @@ def nueva(request):
 
 
 MAXIMO_XML = 2 * 1024 * 1024
+
+CENT = Decimal("0.01")
+
+
+def _a_soles(valor, tasa) -> Decimal:
+    """Convierte un importe de la factura a soles, al centavo."""
+    return (Decimal(valor) * Decimal(tasa)).quantize(CENT)
 
 CUENTAS_SUGERIDAS = {"BANCO": "6391", "MERCADOLIBRE": "6311"}
 
@@ -995,6 +1063,18 @@ def pagar_compra(request, pk: int):
                 messages.success(request, mensaje)
                 return redirect("compras:detalle", compra.pk)
 
+    saldo = (
+        compra.saldo_moneda_origen
+        if compra.moneda != "PEN"
+        else (compra.total + compra.revaluacion) - compra.monto_pagado
+    )
+    tc_registro, tc_anterior = None, False
+    if compra.moneda != "PEN":
+        try:
+            tc_registro, tc_anterior = tipo_cambio_para(hoy)
+        except SinTipoCambio:
+            tc_registro, tc_anterior = None, False
+
     return render(
         request,
         "compras/pagar.html",
@@ -1003,7 +1083,10 @@ def pagar_compra(request, pk: int):
             "cuentas": cuentas,
             "hoy": hoy,
             "operacion": operacion,
-            "saldo": (compra.total + compra.revaluacion) - compra.monto_pagado,
+            "saldo": saldo,
+            "saldo_moneda_origen": compra.saldo_moneda_origen,
+            "tc_registro": tc_registro,
+            "tc_anterior": tc_anterior,
         },
     )
 

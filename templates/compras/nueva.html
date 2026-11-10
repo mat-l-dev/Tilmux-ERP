@@ -39,6 +39,17 @@
           <input type="text" name="numero" value="{{ cabecera.numero }}" maxlength="20">
         </label>
 
+        <label class="field">
+          <span>Moneda</span>
+          <select name="moneda" data-moneda>
+            <option value="PEN" {% if cabecera.moneda != "USD" %}selected{% endif %}>Soles (PEN)</option>
+            <option value="USD" {% if cabecera.moneda == "USD" %}selected{% endif %}>Dólares (USD)</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Tipo de cambio (S/ por USD)</span>
+          <input type="text" name="tipo_cambio" data-tc inputmode="decimal" value="{{ cabecera.tipo_cambio }}" placeholder="3.452">
+        </label>
         <label class="field field-wide">
           <span>Proveedor</span>
           <select name="proveedor">
@@ -140,13 +151,15 @@
         <div><dt>Base</dt><dd class="num" data-total-base>0,00</dd></div>
         <div><dt>IGV</dt><dd class="num" data-total-igv>0,00</dd></div>
         <div class="total"><dt>Total</dt><dd class="num" data-total-total>0,00</dd></div>
+        <div data-fila-soles><dt>Total contable en soles</dt><dd class="num" data-total-pen>0,00</dd></div>
       </dl>
+      <p class="preview-note" data-nota-moneda hidden>Escribiste una factura en dólares: las líneas y el total de arriba están en USD; el asiento y la deuda se llevan en soles al tipo de cambio indicado.</p>
 
       <div class="preview">
         <p class="preview-title">Asiento estimado</p>
         <div class="preview-row"><span>20111 · Inventario</span><b class="num" data-asiento-inventario>0,00</b></div>
         <div class="preview-row"><span>40111 · IGV</span><b class="num" data-asiento-igv>0,00</b></div>
-        <div class="preview-row"><span>4212 · Por pagar</span><b class="num" data-total-total>0,00</b></div>
+        <div class="preview-row"><span>4212 · Por pagar</span><b class="num" data-asiento-total>0,00</b></div>
         <p class="preview-note">El costo unitario final incluye los costos de internamiento. Si no corresponde crédito, el IGV forma parte del costo.</p>
       </div>
 

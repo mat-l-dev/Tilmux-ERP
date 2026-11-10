@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 from django.conf import settings
 from django.db import models
 
@@ -57,6 +59,12 @@ class Compra(models.Model):
     pagada = models.BooleanField(default=False)
     fecha_pago = models.DateField(null=True, blank=True)
     monto_pagado = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    pagado_moneda_origen = models.DecimalField(
+        max_digits=18,
+        decimal_places=4,
+        default=0,
+        help_text="Cuánto se pagó en la moneda de la factura; el saldo se calcula con esto.",
+    )
     creado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -83,6 +91,21 @@ class Compra(models.Model):
 
     def __str__(self) -> str:
         return f"{self.fecha} · {self.proveedor.nombre} · {self.total}"
+
+    @property
+    def es_extranjera(self) -> bool:
+        return self.moneda != "PEN"
+
+    @property
+    def saldo_moneda_origen(self) -> Decimal:
+        """Saldo de la factura en su propia moneda.
+
+        Es la base del pago parcial en moneda extranjera. En soles coincide con
+        la deuda del documento cuando no hay notas de crédito del proveedor
+        (las devoluciones en moneda extranjera están bloqueadas por diseño).
+        """
+        saldo = Decimal(self.total_moneda_origen) - Decimal(self.pagado_moneda_origen)
+        return saldo if saldo > 0 else Decimal("0")
 
 
 class CompraLinea(models.Model):
