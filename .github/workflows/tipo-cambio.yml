@@ -8,14 +8,14 @@ on:
 
 jobs:
   actualizar:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       DJANGO_SECRET_KEY: tarea-programada
       DJANGO_DEBUG: "false"
       PYTHONIOENCODING: utf-8
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Instalar uv
         run: |
@@ -23,7 +23,7 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Instalar dependencias
-        run: uv sync
+        run: uv sync --frozen
 
       - name: Descargar y guardar el tipo de cambio
         run: uv run python manage.py actualizar_tipo_cambio
