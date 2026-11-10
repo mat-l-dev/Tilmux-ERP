@@ -17,8 +17,9 @@ código verificado, vale el código y se anota aquí y en el reporte.
 
 ## 2. Reglas duras (no negociables)
 
-1. Rama de trabajo `fix/p0-auditoria-v2`. Nunca commit directo ni merge a `main`:
-   `main` despliega en Render. Dejar la rama lista y esperar aprobación humana.
+1. Rama `fix/p0-…` por cada P0, creada desde `main` actualizado. Nunca commit
+   directo ni merge a `main`: `main` despliega en Render y tiene branch protection
+   (checks `Ruff` e `Invariantes`). Dejar la rama lista y esperar aprobación humana.
 2. No registrar pagos, declaraciones, restituciones ni movimientos sin
    voucher/constancia. Dato sin sustento = PENDIENTE.
 3. No alterar datos históricos para que los reportes cuadren. Si algo no se puede
@@ -88,7 +89,7 @@ Fuente: auditoría consolidada 2026-11-10 + confirmación del usuario 09/11.
 | `tesoreria/` | cuentas, movimientos, conciliación |
 | `reportes/` | SIRE, casillas, RCE, EEFF, exportar |
 | `data/` | PCGE 2026 en JSON |
-| `tests/` | 47 archivos `test_*.py` |
+| `tests/` | 48 archivos `test_*.py` (incluye `test_devolucion_proveedor.py`) |
 | `docs/`, `scripts/`, `templates/`, `static/` | documentación, utilidades, UI |
 
 ## 5. Cómo trabajar
@@ -129,7 +130,7 @@ docker rm -f tilmux-test-pg                                 # al terminar
 
 `config/settings.py:25` carga `.env` con `os.environ.setdefault`, así que las
 variables del proceso **sí** ganan. `settings.py:114` aborta si falta
-`DATABASE_URL`. La suite completa (304 tests) tarda ~1,5 min en este equipo.
+`DATABASE_URL`. La suite completa (316 tests al 10/11/2026) tarda ~1,5 min.
 
 ## 7. Convenciones del código
 
@@ -153,8 +154,18 @@ variables del proceso **sí** ganan. `settings.py:114` aborta si falta
   porción FX desde `total_moneda_origen` y `:488` suma a `monto_pagado` en soles:
   no existe saldo en moneda original (P0-4).
 - `compras/reversion.py` es corrección interna (motivo, sin pagos, sin stock
-  consumido): **no** es una devolución a proveedor. Una compra pagada + devolución
-  real no tiene vía hoy (P0-2).
+  consumido): **no** es una devolución a proveedor. Desde P0-2 además bloquea
+  compras con notas de crédito registradas.
+- **Devolución a proveedor (P0-2, implementada):** `compras/devoluciones.py`
+  (`registrar_devolucion`, `registrar_reembolso`). Modelos `NotaCreditoCompra` y
+  `NotaCreditoCompraLinea` (migración `compras/0020`). Asiento
+  `DEVOLUCION_COMPRA`: D 4212 / H 20111 (costo de la capa original) / H 40111.
+  El reembolso es `REEMBOLSO_PROVEEDOR`: D cuenta de tesorería / H 4212.
+  `pagar()` descuenta lo acreditado y `saldo_4212()` es la fuente de verdad del
+  saldo. Bloqueado a propósito: compras con costos de internamiento (flete de
+  otro proveedor) y compras en moneda extranjera (P0-4); tampoco admite fechas
+  fuera de orden. El RCE revierte por `fecha_anotacion` o fecha de la nota en
+  `reportes/casillas.py`, `registro_compras` y el CSV (tipo 07, signo negativo).
 - `inventario/servicios.py:139` guarda costo unitario **promedio** al salir: la NC
   de venta reingresa al promedio, no a la capa PEPS original (P1-1).
 - `contabilidad/impuestos.py:153-241`: `igv_pendiente`/`pagar_igv` miran el libro y
@@ -177,8 +188,8 @@ variables del proceso **sí** ganan. `settings.py:114` aborta si falta
 - Deuda de formato: 96 archivos de app + migraciones sin formato de ruff. **No
   se reformatea el repo entero**: el gate es un trinquete
   (`scripts/verificar_formato.py`) que exige `ruff format --check` solo a los
-  `.py` tocados respecto de la base del PR/push. Un reformateo masivo es una
-  decisión aparte, no parte de un P0 funcional.
+  `.py` **nuevos** de cada PR/push. Los archivos legacy editados pasan por
+  `ruff check` pero no se reformatean dentro de un P0 funcional.
 - `.github/workflows/tests.yml` (P0-1, 10/11/2026): `pull_request` contra `main`,
   jobs `Ruff` (check + trinquete de formato) e `Invariantes`, `actions/checkout@v7`,
   `astral-sh/setup-uv@v10.3.3` con caché y `uv sync --frozen`, `ubuntu-24.04`,
@@ -191,9 +202,9 @@ variables del proceso **sí** ganan. `settings.py:114` aborta si falta
 - Versiones vigentes verificadas (10/11/2026 vía API de GitHub / docs de Render):
   `actions/checkout@v7.0.1`, `actions/upload-artifact@v7.0.2`,
   `astral-sh/setup-uv@v10.3.3`, uv `0.13.7`, `postgres:17.11`.
-- Pendiente para el usuario: activar branch protection en GitHub exigiendo
-  `Ruff` e `Invariantes` (sin eso, `checksPass` no tiene nada que esperar).
-  Suite local en verde al 10/11/2026: `Ran 304 tests ... OK (skipped=1)`.
+- Branch protection en `main`: activa desde el 10/11/2026 con los checks `Ruff`
+  e `Invariantes` (strict=false, 0 aprobaciones, sin enforce_admins).
+  Suite local en verde al 10/11/2026: ver el reporte del P0 en curso.
 
 
 ## 10. Qué no hacer nunca

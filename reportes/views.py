@@ -19,7 +19,7 @@ from django.views.decorators.http import require_POST
 
 from catalogo.models import CuentaTesoreria, Producto
 from compras.comprobantes import evaluar_tributacion
-from compras.models import Compra
+from compras.models import Compra, NotaCreditoCompra
 from compras.models_gasto import Gasto
 from contabilidad.impuestos import (
     asentar_renta,
@@ -336,6 +336,32 @@ def registro_compras(request):
                     "credito": usa_credito,
                     "pendiente": estado_tributario.requiere_revision,
                     "clase": "Gasto",
+                }
+            )
+
+        for nota in NotaCreditoCompra.objects.annotate(
+            fecha_tributaria=Coalesce("fecha_anotacion", "fecha")
+        ).filter(
+            compra__empresa=empresa, fecha_tributaria__range=(desde, hasta)
+        ).select_related("compra", "compra__proveedor"):
+            compra = nota.compra
+            usa_credito = evaluar_tributacion(compra).incluido
+            filas.append(
+                {
+                    "fecha": nota.fecha,
+                    "fecha_anotacion": nota.fecha_anotacion,
+                    "tipo": "Nota de crédito",
+                    "documento": f"{nota.serie}-{nota.numero}".strip(" -"),
+                    "ruc": compra.proveedor.numero_doc,
+                    "proveedor": compra.proveedor.nombre,
+                    "detalle": f"Devolución de {compra.serie}-{compra.numero}".strip(" -"),
+                    "base": -nota.base if usa_credito and nota.igv > 0 else 0,
+                    "no_gravado": -nota.base if usa_credito and nota.igv == 0 else 0,
+                    "igv": -nota.igv if usa_credito and nota.igv > 0 else 0,
+                    "total": -nota.total,
+                    "credito": usa_credito,
+                    "pendiente": False,
+                    "clase": "Mercadería",
                 }
             )
 

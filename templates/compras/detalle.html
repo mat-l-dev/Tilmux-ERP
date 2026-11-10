@@ -84,6 +84,29 @@
     </section>
     {% endif %}
 
+    {% if notas_credito %}
+    <section class="card">
+      <header class="card-head"><h2>Notas de crédito del proveedor</h2><span class="chip">Devolución</span></header>
+      <table class="tabla-doc">
+        <thead><tr><th>Fecha</th><th>Documento</th><th>Motivo</th><th class="der">Base</th><th class="der">IGV</th><th class="der">Total</th><th class="der">Reembolsado</th></tr></thead>
+        <tbody>
+          {% for nota in notas_credito %}
+          <tr>
+            <td>{{ nota.fecha|date:"d/m/Y" }}</td>
+            <td>{{ nota.serie }}-{{ nota.numero }}</td>
+            <td class="muted">{{ nota.motivo }}</td>
+            <td class="num der">{{ nota.base|floatformat:2 }}</td>
+            <td class="num der">{{ nota.igv|floatformat:2 }}</td>
+            <td class="num der">{{ nota.total|floatformat:2 }}</td>
+            <td class="num der">{% if nota.reembolsado %}S/ {{ nota.importe_reembolsado|floatformat:2 }}{% else %}Pendiente{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <p class="preview-note">La nota reduce la deuda y el crédito fiscal del período en que se anota. No es una reversión interna del registro.</p>
+    </section>
+    {% endif %}
+
     {% include "reportes/_casillas_documento.html" %}
 
     {% if asiento %}
@@ -136,6 +159,8 @@
       <p class="muted">Compra pagada el {{ compra.fecha_pago|date:"d/m/Y" }}.</p>
       {% endif %}
       {% if compra.estado == "CONFIRMADA" %}
+      <a class="btn btn-ghost btn-block" href="{% url 'compras:devolucion' compra.pk %}">Registrar devolución al proveedor</a>
+      <p class="preview-note">Nota de crédito del proveedor: baja la deuda, revierte el IGV y el RCE, y saca stock al costo original. Requiere el documento del proveedor.</p>
       <a class="btn btn-ghost btn-block" href="{% url 'compras:corregir' compra.pk %}">Corregir datos</a>
       {% if compra.pagada or compra.monto_pagado > 0 %}
       <p class="preview-note">La compra ya tiene pagos y no se puede revertir aquí. Para corregir importes, revisa el comprobante correspondiente con tu contador.</p>

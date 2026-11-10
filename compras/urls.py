@@ -21,5 +21,6 @@ urlpatterns = [
     path("<int:pk>/", views.detalle, name="detalle"),
     path("<int:pk>/confirmar/", views.confirmar_compra, name="confirmar"),
     path("<int:pk>/corregir/", views.corregir, name="corregir"),
+    path("<int:pk>/devolucion/", views.devolucion, name="devolucion"),
     path("<int:pk>/anular/", views.anular, name="anular"),
 ]

@@ -37,6 +37,7 @@ from ventas.models import Venta
 from ventas.models_guia import GuiaRemision
 
 from .anotacion import AnotacionError, cambiar_fecha_anotacion
+from .devoluciones import registrar_devolucion, saldo_4212
 from .forms import (
     CabeceraCompraForm,
     GastoPagadoForm,
@@ -46,7 +47,7 @@ from .forms import (
     ProvisionGastoForm,
 )
 from .gastos_pendientes import pagar_gasto, registrar_pendiente
-from .models import Compra, CompraLinea, CostoAdicional
+from .models import Compra, CompraLinea, CostoAdicional, NotaCreditoCompraLinea
 from .models_gasto import Gasto, PagoGasto
 from .pagos_compra import registrar_pago
 from .provisiones import registrar_provision
@@ -1022,8 +1023,9 @@ def detalle(request, pk: int):
             "pagos": MovimientoTesoreria.objects.filter(
                 empresa=compra.empresa, origen_tipo="COMPRA_PAGO", origen_id=compra.pk,
             ).select_related("cuenta").order_by("fecha", "id"),
-            "saldo_compra": (compra.total + compra.revaluacion) - compra.monto_pagado,
+            "saldo_compra": saldo_4212(compra),
             "casillas_621": casillas_documento(compra),
+            "notas_credito": compra.notas_credito.order_by("fecha", "id"),
             "historial": HistorialDocumento.objects.filter(
                 empresa=compra.empresa, tipo="COMPRA", documento_id=compra.pk
             ).order_by("-fecha")[:10],
@@ -1150,6 +1152,101 @@ def corregir(request, pk: int):
         return redirect("compras:detalle", compra.pk)
 
     return render(request, "compras/corregir.html", {"compra": compra})
+
+
+@login_required
+@requiere_escritura
+def devolucion(request, pk: int):
+    """Registra la nota de crédito del proveedor por devolución de mercadería."""
+    compra = get_object_or_404(Compra, pk=pk, empresa=empresa_actual(request))
+    lineas = list(compra.lineas.select_related("producto", "producto__unidad"))
+    cuentas = list(
+        CuentaTesoreria.objects.filter(
+            empresa=compra.empresa, activa=True, moneda="PEN", cuenta_contable__isnull=False
+        )
+    )
+    acreditado_por_linea = {
+        fila["compra_linea_id"]: fila["cantidad"]
+        for fila in NotaCreditoCompraLinea.objects.filter(nota__compra=compra)
+        .values("compra_linea_id")
+        .annotate(cantidad=Sum("cantidad"))
+    }
+    disponible = {
+        linea.pk: linea.cantidad - acreditado_por_linea.get(linea.pk, Decimal("0"))
+        for linea in lineas
+    }
+
+    if request.method == "POST":
+        cantidades = {}
+        error = False
+        for linea in lineas:
+            texto = (request.POST.get(f"cantidad_{linea.pk}") or "").strip()
+            if not texto:
+                continue
+            try:
+                cantidades[linea.pk] = Decimal(texto.replace(",", "."))
+            except InvalidOperation:
+                messages.error(request, f"Indica una cantidad válida para {linea.producto.sku}.")
+                error = True
+                break
+        cuenta_reembolso = None
+        if not error and request.POST.get("cuenta_reembolso"):
+            cuenta_reembolso = next(
+                (c for c in cuentas if str(c.pk) == request.POST["cuenta_reembolso"]), None
+            )
+            if cuenta_reembolso is None:
+                messages.error(request, "Elige una cuenta válida para el reembolso.")
+                error = True
+        if not error:
+            try:
+                nota = registrar_devolucion(
+                    compra=compra,
+                    fecha=date.fromisoformat(request.POST.get("fecha", "")),
+                    serie=request.POST.get("serie", ""),
+                    numero=request.POST.get("numero", ""),
+                    motivo_codigo=request.POST.get("motivo_codigo", "07"),
+                    cantidades=cantidades,
+                    descripcion=request.POST.get("descripcion", ""),
+                    fecha_anotacion=(
+                        date.fromisoformat(request.POST["fecha_anotacion"])
+                        if request.POST.get("fecha_anotacion")
+                        else None
+                    ),
+                    cuenta_reembolso=cuenta_reembolso,
+                    canal=request.POST.get("canal", "TRANSFERENCIA"),
+                    usuario=request.user,
+                )
+            except ValueError:
+                messages.error(request, "Indica una fecha válida para la nota de crédito.")
+            except (CompraError, StockError, ContabilidadError) as exc:
+                messages.error(request, str(exc))
+            else:
+                messages.success(
+                    request,
+                    f"Nota de crédito {nota.serie}-{nota.numero} registrada por S/ {nota.total}. "
+                    "Revisa el RCE del período.",
+                )
+                return redirect("compras:detalle", compra.pk)
+
+    return render(
+        request,
+        "compras/devolucion.html",
+        {
+            "compra": compra,
+            "filas": [
+                {
+                    "linea": linea,
+                    "disponible": disponible[linea.pk],
+                    "valor": request.POST.get(f"cantidad_{linea.pk}", ""),
+                }
+                for linea in lineas
+            ],
+            "acreditado": compra.notas_credito.all(),
+            "cuentas": cuentas,
+            "hoy": timezone.localdate(),
+            "saldo": (compra.total + compra.revaluacion) - compra.monto_pagado,
+        },
+    )
 
 
 @login_required

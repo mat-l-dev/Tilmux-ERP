@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block titulo %}Devolución a proveedor{% endblock %}
+{% block titulo_pagina %}Nota de crédito del proveedor{% endblock %}
+
+{% block contenido %}
+<div class="doc">
+  <div class="doc-main">
+    <section class="card">
+      <header class="card-head">
+        <h2>{{ compra.serie }}-{{ compra.numero }}</h2>
+        <span class="chip">{{ compra.proveedor.nombre }}</span>
+      </header>
+
+      <dl class="datos">
+        <div><dt>Fecha de la compra</dt><dd>{{ compra.fecha|date:"d/m/Y" }}</dd></div>
+        <div><dt>Total de la compra</dt><dd class="num">S/ {{ compra.total|floatformat:2 }}</dd></div>
+        <div><dt>Pagado</dt><dd class="num">S/ {{ compra.monto_pagado|floatformat:2 }}</dd></div>
+        <div><dt>Saldo contable</dt><dd class="num">S/ {{ saldo|floatformat:2 }}</dd></div>
+      </dl>
+
+      {% if acreditado %}
+      <p class="preview-title">Notas de crédito ya registradas</p>
+      <table class="tabla-doc">
+        <thead><tr><th>Fecha</th><th>Documento</th><th class="der">Total</th><th class="der">Reembolsado</th></tr></thead>
+        <tbody>
+          {% for nota in acreditado %}
+          <tr>
+            <td>{{ nota.fecha|date:"d/m/Y" }}</td>
+            <td>{{ nota.serie }}-{{ nota.numero }}</td>
+            <td class="num der">S/ {{ nota.total|floatformat:2 }}</td>
+            <td class="num der">S/ {{ nota.importe_reembolsado|floatformat:2 }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+
+      <form method="post" class="form">
+        {% csrf_token %}
+        <div class="grid-fields">
+          <label class="field">
+            <span>Fecha de la nota</span>
+            <input type="date" name="fecha" value="{% if request.method == 'POST' %}{{ request.POST.fecha }}{% else %}{{ hoy|date:'Y-m-d' }}{% endif %}" required>
+          </label>
+          <label class="field">
+            <span>Serie</span>
+            <input type="text" name="serie" maxlength="4" value="{{ request.POST.serie }}" placeholder="FC01" required>
+          </label>
+          <label class="field">
+            <span>Número</span>
+            <input type="text" name="numero" maxlength="20" value="{{ request.POST.numero }}" required>
+          </label>
+          <label class="field">
+            <span>Fecha de anotación en el RCE (opcional)</span>
+            <input type="date" name="fecha_anotacion" value="{{ request.POST.fecha_anotacion }}">
+          </label>
+          <label class="field">
+            <span>Motivo</span>
+            <select name="motivo_codigo">
+              <option value="07" {% if request.POST.motivo_codigo != '06' %}selected{% endif %}>07 · Devolución por ítem</option>
+              <option value="06" {% if request.POST.motivo_codigo == '06' %}selected{% endif %}>06 · Devolución total</option>
+            </select>
+          </label>
+        </div>
+
+        <p class="preview-title">Unidades a devolver</p>
+        <table class="tabla-doc tabla-lineas">
+          <thead>
+            <tr>
+              <th>Producto</th>
+              <th class="der">Compradas</th>
+              <th class="der">Disponibles</th>
+              <th class="der">Costo unitario</th>
+              <th class="der">Devolver</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for fila in filas %}
+            <tr>
+              <td>{{ fila.linea.producto.sku }} · {{ fila.linea.producto.nombre }}</td>
+              <td class="num der">{{ fila.linea.cantidad }}</td>
+              <td class="num der">{{ fila.disponible }}</td>
+              <td class="num der">{{ fila.linea.costo_unitario_final|floatformat:4 }}</td>
+              <td class="der">
+                <input class="input-cantidad" type="text" inputmode="decimal" name="cantidad_{{ fila.linea.pk }}"
+                       value="{{ fila.valor }}" placeholder="0"
+                       aria-label="Cantidad a devolver de {{ fila.linea.producto.sku }}">
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+        <div class="grid-fields">
+          <label class="field">
+            <span>Cuenta donde entra el reembolso (si el proveedor ya cobró)</span>
+            <select name="cuenta_reembolso">
+              <option value="">Sin reembolso por ahora</option>
+              {% for c in cuentas %}
+              <option value="{{ c.pk }}">{{ c.nombre }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label class="field">
+            <span>Canal del reembolso</span>
+            <select name="canal">
+              <option value="TRANSFERENCIA">Transferencia</option>
+              <option value="YAPE">Yape</option>
+              <option value="PLIN">Plin</option>
+              <option value="EFECTIVO">Efectivo</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Detalle / motivo</span>
+            <input type="text" name="descripcion" maxlength="200" value="{{ request.POST.descripcion }}">
+          </label>
+        </div>
+        <button class="btn btn-primary" type="submit">Registrar nota de crédito</button>
+      </form>
+    </section>
+  </div>
+
+  <aside class="doc-side">
+    <div class="card sticky">
+      <header class="card-head"><h2>Qué se registra</h2></header>
+      <p class="preview-note">
+        La devolución reduce la deuda 4212, revierte el IGV 40111 y la base del RCE,
+        y saca del inventario las unidades de esta compra al costo de su capa original.
+      </p>
+      <p class="preview-note">
+        Si la compra ya estaba pagada, el proveedor devuelve dinero: registra el
+        reembolso en la cuenta que elijas. Si no lo elijas, queda pendiente y se
+        puede registrar después.
+      </p>
+      <p class="preview-note">
+        No aplica a compras con flete de internamiento ni a compras en moneda
+        extranjera: esos casos requieren definir el tratamiento del flete y el
+        saldo en moneda original.
+      </p>
+      <a class="btn btn-ghost btn-block" href="{% url 'compras:detalle' compra.pk %}">Volver</a>
+    </div>
+  </aside>
+</div>
+{% endblock %}

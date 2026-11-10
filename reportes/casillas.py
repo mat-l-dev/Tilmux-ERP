@@ -10,7 +10,7 @@ from django.db.models import Sum
 from django.db.models.functions import Coalesce
 
 from compras.comprobantes import evaluar_tributacion
-from compras.models import Compra
+from compras.models import Compra, NotaCreditoCompra
 from compras.models_gasto import Gasto
 from ventas.models import NotaCredito, NotaDebito, Venta
 
@@ -88,6 +88,23 @@ def calcular(empresa, anio: int, mes: int) -> dict:
     igv_compras += sum((g.igv for g in gastos_gravados), CERO)
 
     no_gravado += sum((g.base for g in gastos if g.igv == 0), CERO)
+
+    # Las notas de crédito del proveedor revierten base e IGV del período en que
+    # se anotan: bajan el crédito fiscal (107/108) o el no gravado (120).
+    for nota in (
+        NotaCreditoCompra.objects.annotate(
+            fecha_tributaria=Coalesce("fecha_anotacion", "fecha")
+        )
+        .filter(compra__empresa=empresa, fecha_tributaria__range=(desde, hasta))
+        .select_related("compra", "compra__proveedor")
+    ):
+        if not evaluar_tributacion(nota.compra).incluido:
+            continue
+        if nota.igv > 0:
+            base_compras -= nota.base
+            igv_compras -= nota.igv
+        else:
+            no_gravado -= nota.base
 
     base_renta = base_ventas - descuentos_base
     return {

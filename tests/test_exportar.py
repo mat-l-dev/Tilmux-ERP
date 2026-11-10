@@ -26,11 +26,13 @@ class ExportacionComprasTest(SimpleTestCase):
             patch("reportes.exportar.rango", return_value=(date(2026, 10, 1), date(2026, 10, 31))),
             patch("reportes.exportar.Compra.objects.annotate") as compras_anotadas,
             patch("reportes.exportar.Gasto.objects.annotate") as gastos_anotados,
+            patch("reportes.exportar.NotaCreditoCompra.objects.annotate") as notas_anotadas,
         ):
             compras_filtradas = compras_anotadas.return_value.filter
             gastos_filtrados = gastos_anotados.return_value.filter
             compras_filtradas.return_value.select_related.return_value.order_by.return_value = [factura]
             gastos_filtrados.return_value.exclude.return_value.select_related.return_value.order_by.return_value = []
+            notas_anotadas.return_value.filter.return_value.select_related.return_value.order_by.return_value = []
             respuesta = compras(request)
         filas = list(csv.DictReader(io.StringIO(respuesta.content.decode("utf-8-sig"))))
         self.assertEqual(filas[0]["base_imponible"], "0.00")

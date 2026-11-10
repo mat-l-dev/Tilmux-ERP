@@ -1,10 +1,11 @@
-"""Exige formato de ruff solo a los archivos que toca un cambio.
+"""Exige formato de ruff solo a los archivos nuevos de un cambio.
 
 El repositorio arrastra deuda de formato en código anterior (ver `AGENTS.md` §9):
-un `ruff format --check` sobre todo el árbol fallaría siempre y bloquearía
-cambios legítimos. Este verificador funciona como trinquete: revisa únicamente
-los `.py` modificados respecto de una base, de modo que el código nuevo y el que
-se edite queden formateados sin reformatear de golpe lo demás.
+un `ruff format --check` sobre todo el árbol fallaría siempre y obligaría a
+reformatear archivos enteros dentro de cada P0, que es justo lo que la regla
+"no reformatear el repo dentro de un P0" prohíbe. Este verificador funciona como
+trinquete: exige formato a los `.py` **nuevos** de cada PR o push. El código
+existente sigue bajo `ruff check`, y la deuda de formato queda registrada.
 
 Uso:
     uv run python scripts/verificar_formato.py            # base origin/main
@@ -62,22 +63,22 @@ def _limpiar(archivos: list[str]) -> list[str]:
     return sorted(set(limpios))
 
 
-def archivos_modificados(base: str) -> list[str]:
-    """Devuelve los `.py` agregados o modificados respecto de la base."""
-    resultado = _git("diff", "--name-only", "--diff-filter=ACMR", f"{base}...HEAD", "--", "*.py")
+def archivos_nuevos(base: str) -> list[str]:
+    """Devuelve los `.py` agregados respecto de la base (no los modificados)."""
+    resultado = _git("diff", "--name-only", "--diff-filter=A", f"{base}...HEAD", "--", "*.py")
     if resultado.returncode != 0:
         raise RuntimeError(resultado.stderr.strip() or "No se pudo comparar con la base.")
     return _limpiar(resultado.stdout.splitlines())
 
 
 def archivos_en_curso() -> list[str]:
-    """Devuelve los `.py` tocados en el árbol de trabajo (aún sin confirmar)."""
+    """Devuelve los `.py` nuevos del árbol de trabajo (aún sin confirmar)."""
     resultado = _git("status", "--porcelain", "--untracked-files=all", "--", "*.py")
     if resultado.returncode != 0:
         raise RuntimeError(resultado.stderr.strip() or "No se pudo leer el estado de git.")
     archivos = []
     for linea in resultado.stdout.splitlines():
-        if len(linea) > 3:
+        if linea.startswith("??") and len(linea) > 3:
             archivos.append(linea[3:])
     return _limpiar(archivos)
 
@@ -135,12 +136,12 @@ def main() -> int:
     if base != opciones.base:
         print(f"Aviso: '{opciones.base}' no existe; se compara con '{base}'.")
 
-    archivos = sorted(set(archivos_modificados(base)) | set(archivos_en_curso()))
+    archivos = sorted(set(archivos_nuevos(base)) | set(archivos_en_curso()))
     if not archivos:
-        print(f"Sin archivos .py modificados respecto de {base}; nada que revisar.")
+        print(f"Sin archivos .py nuevos respecto de {base}; nada que revisar.")
         return 0
 
-    print(f"Revisando {len(archivos)} archivos modificados respecto de {base}:")
+    print(f"Revisando {len(archivos)} archivos nuevos respecto de {base}:")
     for archivo in archivos:
         print(f"  {archivo}")
     return revisar(archivos, ruff)

@@ -8,6 +8,7 @@ from datetime import date
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 from django.db import transaction
+from django.db.models import Sum
 from django.utils import timezone
 
 from contabilidad.models import Asiento, Cuenta
@@ -390,9 +391,11 @@ def pagar(
 
     total_pen = _cent(Decimal(compra.total) + Decimal(compra.revaluacion))
     pagado_previo = _cent(compra.monto_pagado)
-    saldo = _cent(total_pen - pagado_previo)
+    # Lo acreditado por una nota de crédito del proveedor ya no se debe pagar.
+    acreditado = _cent(compra.notas_credito.aggregate(s=Sum("total"))["s"] or Decimal("0.00"))
+    saldo = _cent(total_pen - pagado_previo - acreditado)
     if saldo <= 0:
-        raise CompraError("La compra ya está pagada.")
+        raise CompraError("La compra ya está pagada o cubierta por notas de crédito.")
 
     try:
         valor = Decimal(str(importe)) if importe is not None else saldo
@@ -486,7 +489,8 @@ def pagar(
     )
 
     compra.monto_pagado = pagado_previo + llevado
-    compra.pagada = compra.monto_pagado >= total_pen
+    # La deuda también se extingue con una nota de crédito del proveedor.
+    compra.pagada = _cent(total_pen - compra.monto_pagado - acreditado) <= 0
     if compra.pagada:
         compra.fecha_pago = fecha
     compra.save(update_fields=["monto_pagado", "pagada", "fecha_pago"])

@@ -54,6 +54,14 @@ REGLAS = {
         "Nota de débito de venta",
         [("1212", D, TOTAL, "Por cobrar"), ("7599", H, BASE, "Otros ingresos"), ("40111", H, IGV, "IGV")],
     ),
+    "DEVOLUCION_COMPRA": (
+        "Nota de crédito de compra (devolución al proveedor)",
+        [("4212", D, TOTAL, "Deuda revertida"), ("40111", H, IGV, "IGV devuelto"), ("20111", H, COSTO, "Salida de inventario")],  # noqa: E501
+    ),
+    "REEMBOLSO_PROVEEDOR": (
+        "Reembolso de proveedor por devolución",
+        [(None, D, MEDIO, "Ingreso del reembolso"), ("4212", H, TOTAL, "Deuda revertida")],
+    ),
     "APORTE_CAPITAL": (
         "Aporte de capital",
         [(None, D, MEDIO, "Ingreso de dinero"), ("1421", H, TOTAL, "Capital suscrito por cobrar")],

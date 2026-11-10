@@ -26,6 +26,11 @@ def revertir_registro(*, empresa, compra_id, motivo, usuario):
     if not compra or compra.estado != Compra.Estado.CONFIRMADA:
         raise CompraError("Solo se puede revertir una compra confirmada de la empresa.")
     Empresa.objects.select_for_update().get(pk=empresa.pk)
+    if compra.notas_credito.exists():
+        raise CompraError(
+            "La compra tiene notas de crédito del proveedor; no se revierte un registro "
+            "con devoluciones registradas."
+        )
     if compra.moneda != "PEN" or compra.pagada or compra.monto_pagado != 0 or compra.revaluacion != 0:
         raise CompraError("La compra tiene pagos, revaluación o moneda extranjera y requiere otro tratamiento.")
     if (
