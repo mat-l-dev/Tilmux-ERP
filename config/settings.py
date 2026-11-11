@@ -144,6 +144,11 @@ STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
+# Archivos de propuestas SIRE y comprobantes que sube el usuario. En Render el
+# disco es efímero: el archivo se conserva mientras dure la instancia.
+MEDIA_URL = "media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedStaticFilesStorage"},
