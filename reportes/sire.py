@@ -139,8 +139,31 @@ def _cabecera(
     )
 
 
+def _filas_de_datos(filas: list[list]) -> list[list]:
+    """Filas con datos, sin vacías ni de totales; no incluye la cabecera."""
+    cabecera, *_ = _cabecera(filas)
+    return [
+        fila
+        for fila in filas[cabecera + 1 :]
+        if any(celda not in (None, "") for celda in fila) and not _es_fila_total(fila)
+    ]
+
+
+def sin_registros(filas: list[list]) -> bool:
+    """True si el archivo tiene cabecera reconocible pero ninguna fila de datos.
+
+    Un archivo de 0 registros es válido (el período puede no tener comprobantes);
+    no es lo mismo que un archivo ilegible, que falla antes en ``_cabecera``.
+    """
+    return not _filas_de_datos(filas)
+
+
 def validar_contexto(filas: list[list], *, ruc: str, anio: int, mes: int) -> dict:
-    """Comprueba datos de empresa y periodo cuando figuran en cada fila."""
+    """Comprueba datos de empresa y periodo cuando figuran en cada fila.
+
+    Con 0 filas de datos no hay nada que verificar y devuelve ``False`` en ambos
+    campos; el llamador distingue ese caso con ``sin_registros``.
+    """
     cabecera, *_ = _cabecera(filas)
     titulos = [_normalizar(celda) for celda in filas[cabecera]]
     indices = {
@@ -148,14 +171,9 @@ def validar_contexto(filas: list[list], *, ruc: str, anio: int, mes: int) -> dic
         "periodo": next((i for i, titulo in enumerate(titulos) if titulo in {"periodo", "período"}), None),
     }
     verificado = {"ruc": indices["ruc"] is not None, "periodo": indices["periodo"] is not None}
-    filas_datos = 0
     esperado = f"{anio:04d}{mes:02d}"
-    for fila in filas[cabecera + 1 :]:
-        if not any(celda not in (None, "") for celda in fila):
-            continue
-        if _es_fila_total(fila):
-            continue
-        filas_datos += 1
+    filas_datos = _filas_de_datos(filas)
+    for fila in filas_datos:
         for campo, indice in indices.items():
             if indice is None:
                 continue

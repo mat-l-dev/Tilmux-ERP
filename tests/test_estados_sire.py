@@ -431,3 +431,85 @@ class ConciliacionRceNotaCreditoTest(BaseContable):
         self.assertEqual(len(resultado["solo_archivo"]), 1)
         self.assertEqual(resultado["solo_archivo"][0]["tipo"], "Nota de crédito")
         self.assertEqual(resultado["solo_archivo"][0]["documento"], "FC99-7")
+
+
+CABECERA_RVIE = [
+    "Ruc",
+    "Razon Social",
+    "Periodo",
+    "Tipo CP/Doc.",
+    "Serie del CDP",
+    "Nro CP o Doc. Nro Inicial (Rango)",
+    "Nro Final (Rango)",
+    "Tipo Doc Identidad",
+    "Nro Doc Identidad",
+    "Fecha de Emisión",
+    "Valor Facturado Exportación",
+    "BI Gravada",
+    "Dscto BI",
+    "IGV / IPM",
+    "Dscto IGV / IPM",
+    "Total CP",
+    "Moneda",
+]
+
+
+class ConciliacionRvieSinRegistrosTest(BaseContable):
+    """P0-7: el RVIE de 0 registros es válido y tiene su propio mensaje."""
+
+    def setUp(self):
+        self.usuario = get_user_model().objects.create_superuser(username="rvie_sin_registros", password="test")
+        self.client.force_login(self.usuario)
+
+    def subir(self, contenido, mes="9"):
+        return self.client.post(
+            reverse("reportes:conciliacion_archivo"),
+            {
+                "anio": "2026",
+                "mes": mes,
+                "registro": "ventas",
+                "archivo": archivo("rvie-setiembre.txt", contenido),
+            },
+        )
+
+    def test_cero_registros_se_ve_como_sin_comprobantes_y_registra_la_propuesta(self):
+        respuesta = self.subir(csv_bytes(CABECERA_RVIE, [], delimitador="|"))
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(respuesta, "Sin comprobantes")
+        self.assertContains(respuesta, "no tiene comprobantes para el período")
+        self.assertNotContains(respuesta, "Requiere revisión")
+        estado = EstadoSIRE.objects.get(empresa=self.empresa, anio=2026, mes=9, registro="RVIE")
+        self.assertEqual(estado.estado, "PROPUESTA")
+        self.assertEqual(estado.propuesta_actual.filas, 0)
+
+    def test_una_fila_de_otro_ruc_sigue_rechazada(self):
+        fila = [
+            "20100000001",
+            "OTRO",
+            "202609",
+            "01",
+            "E001",
+            "1",
+            "",
+            "6",
+            "20100000001",
+            "30/09/2026",
+            "0",
+            "100",
+            "0",
+            "18",
+            "0",
+            "118",
+            "PEN",
+        ]
+        respuesta = self.subir(csv_bytes(CABECERA_RVIE, [fila], delimitador="|"))
+
+        self.assertContains(respuesta, "RUC del archivo no corresponde")
+        self.assertFalse(EstadoSIRE.objects.filter(registro="RVIE").exists())
+
+    def test_un_archivo_de_cero_bytes_sigue_siendo_ilegible(self):
+        respuesta = self.subir(b"")
+
+        self.assertContains(respuesta, "vacío")
+        self.assertFalse(EstadoSIRE.objects.exists())

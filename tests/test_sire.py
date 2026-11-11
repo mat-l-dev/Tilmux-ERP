@@ -12,7 +12,14 @@ from django.http import HttpResponse
 from django.test import RequestFactory, SimpleTestCase
 from openpyxl import Workbook
 
-from reportes.sire import ArchivoInvalido, leer_filas, sumar, validar_contexto, verificar_registro
+from reportes.sire import (
+    ArchivoInvalido,
+    leer_filas,
+    sin_registros,
+    sumar,
+    validar_contexto,
+    verificar_registro,
+)
 from reportes.views import conciliacion_archivo
 
 
@@ -280,3 +287,47 @@ class SireExcelTest(SimpleTestCase):
         self.assertEqual(totales["base"], Decimal("50.00"))
         self.assertEqual(totales["igv"], Decimal("9.00"))
         self.assertEqual(totales["total"], Decimal("59.00"))
+
+
+CABECERA_RVIE = (
+    "Ruc|Razon Social|Periodo|Tipo CP/Doc.|Serie del CDP|"
+    "Nro CP o Doc. Nro Inicial (Rango)|Nro Final (Rango)|Tipo Doc Identidad|"
+    "Nro Doc Identidad|Fecha de Emisión|Valor Facturado Exportación|BI Gravada|"
+    "Dscto BI|IGV / IPM|Dscto IGV / IPM|Total CP|Moneda"
+)
+
+
+class SinRegistrosTest(SimpleTestCase):
+    """Un archivo con cabecera y cero filas es válido; uno ilegible no."""
+
+    def test_cabecera_sin_filas_es_un_archivo_valido_de_cero_registros(self):
+        filas = leer_filas(Archivo("rvie-setiembre.txt", (CABECERA_RVIE + "\n").encode("utf-8")))
+
+        self.assertTrue(sin_registros(filas))
+        self.assertEqual(sumar(filas)["filas"], 0)
+        self.assertTrue(verificar_registro(filas, registro="ventas"))
+        self.assertEqual(
+            validar_contexto(filas, ruc="20123456789", anio=2026, mes=9),
+            {"ruc": False, "periodo": False},
+        )
+
+    def test_una_fila_de_totales_no_convierte_el_archivo_en_ilegible_ni_en_datos(self):
+        contenido = CABECERA_RVIE + "\nTotal||||||||||0.00|0.00|0.00|0.00|0.00|0.00|PEN\n"
+        filas = leer_filas(Archivo("rvie-setiembre.txt", contenido.encode("utf-8")))
+
+        self.assertTrue(sin_registros(filas))
+        self.assertEqual(sumar(filas)["filas"], 0)
+
+    def test_con_una_fila_ya_no_es_cero_registros(self):
+        fila = "20123456789|TILMUX|202609|01|E001|1||6|20100000001|30/09/2026|0|100|0|18|0|118|PEN"
+        filas = leer_filas(Archivo("rvie-setiembre.txt", (CABECERA_RVIE + "\n" + fila + "\n").encode("utf-8")))
+
+        self.assertFalse(sin_registros(filas))
+        self.assertEqual(
+            validar_contexto(filas, ruc="20123456789", anio=2026, mes=9),
+            {"ruc": True, "periodo": True},
+        )
+
+    def test_un_archivo_de_cero_bytes_sigue_siendo_ilegible(self):
+        with self.assertRaisesMessage(ArchivoInvalido, "vacío"):
+            leer_filas(Archivo("vacio.txt", b""))
