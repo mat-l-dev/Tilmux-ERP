@@ -25,6 +25,7 @@ from contabilidad.impuestos import (
 )
 from contabilidad.models import Asiento, AsientoLinea, Cuenta
 from contabilidad.servicios import ContabilidadError
+from reportes.vencimientos import resumen_panel
 from ventas.models import Venta
 
 from .context import empresa_actual, empresas_disponibles
@@ -246,6 +247,7 @@ def panel(request: HttpRequest) -> HttpResponse:
         "variacion": variacion,
         "anio_anterior": anio - 1,
         "pendientes_count": len(_pendientes(empresa)),
+        "vencimientos": resumen_panel(empresa, anio, mes, hoy=hoy),
     }
     return render(request, "core/panel.html", contexto)
 
