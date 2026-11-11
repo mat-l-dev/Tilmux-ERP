@@ -19,13 +19,41 @@ class CompararSaldoIGVForm(forms.Form):
 class DeclaracionIGV621Form(forms.ModelForm):
     class Meta:
         model = DeclaracionIGV621
-        fields = ["tipo", "numero_orden", "fecha_presentacion", "casilla_140", "casilla_145", "casilla_184"]
+        fields = [
+            "tipo",
+            "numero_orden",
+            "fecha_presentacion",
+            "casilla_100",
+            "casilla_101",
+            "casilla_107",
+            "casilla_108",
+            "casilla_120",
+            "casilla_140",
+            "casilla_145",
+            "casilla_184",
+            "casilla_301",
+            "casilla_312",
+        ]
         labels = {
-            "tipo": "Tipo de declaración", "numero_orden": "Número de orden de la constancia",
-            "fecha_presentacion": "Fecha de presentación", "casilla_140": "Casilla 140 (S/)",
-            "casilla_145": "Casilla 145 (S/)", "casilla_184": "Casilla 184 (S/)",
+            "tipo": "Tipo de declaración",
+            "numero_orden": "Número de orden de la constancia",
+            "fecha_presentacion": "Fecha de presentación",
+            "casilla_100": "Casilla 100 · ventas netas gravadas (S/)",
+            "casilla_101": "Casilla 101 · IGV de ventas (S/)",
+            "casilla_107": "Casilla 107 · compras gravadas, base (S/)",
+            "casilla_108": "Casilla 108 · IGV de compras (S/)",
+            "casilla_120": "Casilla 120 · compras no gravadas (S/)",
+            "casilla_140": "Casilla 140 · IGV resultado (S/)",
+            "casilla_145": "Casilla 145 · saldo a favor anterior (S/)",
+            "casilla_184": "Casilla 184 · IGV a pagar (S/)",
+            "casilla_301": "Casilla 301 · renta, base imponible (S/)",
+            "casilla_312": "Casilla 312 · renta, impuesto resultante (S/)",
         }
         widgets = {"fecha_presentacion": forms.DateInput(attrs={"type": "date"})}
+        help_texts = {
+            "casilla_100": "Déjala vacía si la constancia no la muestra; no se inventa.",
+            "casilla_301": "Opcional: solo si la constancia de renta la trae.",
+        }
 
     def clean_casilla_145(self):
         valor = self.cleaned_data["casilla_145"]

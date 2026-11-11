@@ -23,6 +23,47 @@ class DeclaracionIGV621(models.Model):
     casilla_140 = models.DecimalField(max_digits=15, decimal_places=0)
     casilla_145 = models.DecimalField(max_digits=15, decimal_places=0)
     casilla_184 = models.DecimalField(max_digits=15, decimal_places=0)
+    casilla_100 = models.DecimalField(
+        max_digits=15, decimal_places=0, null=True, blank=True,
+        help_text="Ventas netas gravadas, como figura en la constancia.",
+    )
+    casilla_101 = models.DecimalField(
+        max_digits=15, decimal_places=0, null=True, blank=True,
+        help_text="IGV de ventas, como figura en la constancia.",
+    )
+    casilla_107 = models.DecimalField(
+        max_digits=15, decimal_places=0, null=True, blank=True,
+        help_text="Compras gravadas (base), como figura en la constancia.",
+    )
+    casilla_108 = models.DecimalField(
+        max_digits=15, decimal_places=0, null=True, blank=True,
+        help_text="IGV de compras, como figura en la constancia.",
+    )
+    casilla_120 = models.DecimalField(
+        max_digits=15, decimal_places=0, null=True, blank=True,
+        help_text="Compras no gravadas, como figura en la constancia.",
+    )
+    casilla_301 = models.DecimalField(
+        max_digits=15, decimal_places=0, null=True, blank=True,
+        help_text="Renta: base imponible, como figura en la constancia.",
+    )
+    casilla_312 = models.DecimalField(
+        max_digits=15, decimal_places=0, null=True, blank=True,
+        help_text="Renta: impuesto resultante, como figura en la constancia.",
+    )
+    redondeo_deuda = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        default=0,
+        help_text=(
+            "Casilla 184 menos el IGV estimado en libros. Es el redondeo a enteros "
+            "(RS 025-2000), guardado para auditoría; no es un asiento."
+        ),
+    )
+    vigente = models.BooleanField(
+        default=False,
+        help_text="Solo una constancia vigente por período; una rectificatoria reemplaza a la anterior.",
+    )
     registrado_por = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL)
     registrado_en = models.DateTimeField(auto_now_add=True)
     anulada = models.BooleanField(default=False)
@@ -40,9 +81,61 @@ class DeclaracionIGV621(models.Model):
                 fields=["empresa", "numero_orden"], condition=models.Q(anulada=False),
                 name="declaracion_621_orden_unica",
             ),
+            models.UniqueConstraint(
+                fields=["empresa", "anio", "mes"],
+                condition=models.Q(vigente=True, anulada=False),
+                name="declaracion_621_vigente_unica",
+            ),
             models.CheckConstraint(condition=models.Q(mes__gte=1, mes__lte=12), name="declaracion_621_mes_valido"),
             models.CheckConstraint(condition=models.Q(casilla_145__gte=0), name="declaracion_621_saldo_no_negativo"),
         ]
+
+
+class PagoIGV621(models.Model):
+    """Pago del IGV ligado a la constancia vigente que lo justifica."""
+
+    empresa = models.ForeignKey(
+        "core.Empresa", on_delete=models.PROTECT, related_name="pagos_igv"
+    )
+    declaracion = models.ForeignKey(
+        DeclaracionIGV621, on_delete=models.PROTECT, related_name="pagos"
+    )
+    fecha = models.DateField()
+    importe = models.DecimalField(max_digits=18, decimal_places=2)
+    cuenta = models.ForeignKey(
+        "catalogo.CuentaTesoreria", on_delete=models.PROTECT, related_name="pagos_igv"
+    )
+    movimiento = models.ForeignKey(
+        "tesoreria.MovimientoTesoreria",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="pagos_igv",
+    )
+    asiento = models.ForeignKey(
+        "Asiento", on_delete=models.PROTECT, null=True, blank=True, related_name="pagos_igv"
+    )
+    creado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="pagos_igv",
+    )
+    creado = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "pago de IGV"
+        verbose_name_plural = "pagos de IGV"
+        ordering = ["-fecha", "-pk"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(importe__gt=0), name="pago_igv_importe_positivo"
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.fecha} · S/ {self.importe}"
 
 
 class Cuenta(models.Model):

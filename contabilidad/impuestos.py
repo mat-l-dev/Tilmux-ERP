@@ -11,7 +11,7 @@ from django.db.models import Sum
 
 from core.models import Empresa, HistorialDocumento, Periodo
 
-from .models import Asiento, AsientoLinea
+from .models import Asiento, AsientoLinea, DeclaracionIGV621, PagoIGV621
 from .servicios import ContabilidadError, Montos, periodo_de, postear
 
 CUENTA_RENTA = "40171"
@@ -136,7 +136,40 @@ def asiento_igv(empresa: Empresa, anio: int, mes: int) -> Asiento | None:
     ).first()
 
 
+def declaracion_vigente(empresa: Empresa, anio: int, mes: int):
+    """Constancia 621 que rige para el período (la última no anulada)."""
+    return DeclaracionIGV621.objects.filter(
+        empresa=empresa, anio=anio, mes=mes, anulada=False, vigente=True
+    ).first()
+
+
+def deuda_declarada(empresa: Empresa, anio: int, mes: int):
+    """Casilla 184 de la constancia vigente, o None si no hay constancia."""
+    declaracion = declaracion_vigente(empresa, anio, mes)
+    return declaracion.casilla_184 if declaracion else None
+
+
+def c184_libro(
+    empresa: Empresa,
+    anio: int,
+    mes: int,
+    saldo_favor_anterior: Decimal | None = None,
+) -> Decimal:
+    """IGV estimado desde los libros (céntimos), antes de la constancia."""
+    return _igv_del_periodo(
+        empresa, anio, mes, saldo_favor_anterior=saldo_favor_anterior
+    )
+
+
 def monto_igv_pagado(empresa: Empresa, anio: int, mes: int) -> Decimal:
+    """Pagos del IGV del período; los nuevos están ligados a su constancia."""
+    pagos = PagoIGV621.objects.filter(
+        empresa=empresa, declaracion__anio=anio, declaracion__mes=mes
+    )
+    if pagos.exists():
+        total = pagos.aggregate(s=Sum("importe"))["s"] or CERO
+        return Decimal(total)
+    # Compatibilidad: pagos registrados antes del P0-5, sin vínculo a constancia.
     asientos = Asiento.objects.filter(
         empresa=empresa,
         estado=Asiento.Estado.CONFIRMADO,
@@ -177,12 +210,38 @@ def igv_pendiente(
     mes: int,
     saldo_favor_anterior: Decimal | None = None,
 ) -> Decimal:
-    """IGV del periodo que aún no se ha pagado."""
+    """IGV que aún no se ha pagado.
+
+    Si hay constancia vigente manda su casilla 184 (enteros). Sin constancia se
+    mantiene la estimación del libro, que es solo una referencia: no habilita el
+    pago (``pagar_igv`` exige constancia). El parámetro ``saldo_favor_anterior``
+    se usa solo para la comparación temporal del libro.
+    """
+    if saldo_favor_anterior is None:
+        declarada = deuda_declarada(empresa, anio, mes)
+        if declarada is not None:
+            if declarada <= CERO:
+                return CERO
+            pagado = monto_igv_pagado(empresa, anio, mes)
+            return max(Decimal(declarada) - pagado, CERO)
     c184 = _igv_del_periodo(empresa, anio, mes, saldo_favor_anterior=saldo_favor_anterior)
     if c184 <= CERO:
         return CERO
     pagado = monto_igv_pagado(empresa, anio, mes)
     return max(c184 - pagado, CERO)
+
+
+def _ultimo_asiento_igv(empresa: Empresa, anio: int, mes: int) -> Asiento | None:
+    return (
+        Asiento.objects.filter(
+            empresa=empresa,
+            estado=Asiento.Estado.CONFIRMADO,
+            tipo_operacion="IGV_MENSUAL",
+            origen_id=anio * 100 + mes,
+        )
+        .order_by("-pk")
+        .first()
+    )
 
 
 @transaction.atomic
@@ -196,7 +255,7 @@ def pagar_igv(
     usuario=None,
     saldo_favor_anterior=None,
 ):
-    """Registra el pago del IGV de un periodo, con asiento y movimiento."""
+    """Paga el IGV de la constancia vigente, con asiento, movimiento y vínculo."""
     from tesoreria.servicios import registrar
 
     if saldo_favor_anterior is not None:
@@ -221,12 +280,25 @@ def pagar_igv(
     periodo = Periodo.objects.filter(empresa=empresa, anio=anio, mes=mes).first()
     if periodo is None:
         raise ContabilidadError(f"No existe el periodo {anio}-{mes:02d}.")
+
+    declaracion = declaracion_vigente(empresa, anio, mes)
+    if declaracion is None:
+        raise ContabilidadError(
+            "Registra primero la constancia vigente del 621: sin constancia no se "
+            "registra el pago del IGV."
+        )
+    limite = Decimal(declaracion.casilla_184)
+    if limite <= CERO:
+        raise ContabilidadError(
+            "La constancia vigente no tiene IGV por pagar (casilla 184)."
+        )
     pendiente = igv_pendiente(empresa, anio, mes)
     if pendiente <= CERO:
         raise ContabilidadError(f"No hay IGV pendiente en {mes:02d}/{anio}.")
     if importe > pendiente:
         raise ContabilidadError(
-            f"El pago (S/ {importe}) supera el IGV pendiente (S/ {pendiente})."
+            f"El pago (S/ {importe}) supera el pendiente de la constancia "
+            f"(S/ {pendiente})."
         )
 
     movimiento = registrar(
@@ -240,7 +312,17 @@ def pagar_igv(
         origen_tipo="PAGO_IGV",
         origen_id=anio * 100 + mes,
     )
-    asiento = asiento_igv(empresa, anio, mes)
+    asiento = _ultimo_asiento_igv(empresa, anio, mes)
+    PagoIGV621.objects.create(
+        empresa=empresa,
+        declaracion=declaracion,
+        fecha=fecha,
+        importe=importe,
+        cuenta=medio,
+        movimiento=movimiento,
+        asiento=asiento,
+        creado_por=usuario,
+    )
     HistorialDocumento.objects.create(
         empresa=empresa,
         tipo=HistorialDocumento.Tipo.IMPUESTO,
@@ -248,8 +330,8 @@ def pagar_igv(
         usuario=usuario,
         accion="PAGO",
         detalle=(
-            f"IGV {mes:02d}/{anio}: S/ {importe} desde {medio.nombre}. "
-            f"Movimiento {movimiento.pk}"
+            f"IGV {mes:02d}/{anio}: S/ {importe} desde {medio.nombre}, ligado a la "
+            f"constancia {declaracion.numero_orden}. Movimiento {movimiento.pk}"
             + (f", asiento {asiento.numero}." if asiento else ".")
         ),
     )

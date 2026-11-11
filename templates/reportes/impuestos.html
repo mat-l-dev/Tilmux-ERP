@@ -103,10 +103,47 @@
 {% if empresa_activa %}
 <section class="card" style="margin-top:12px">
   <header class="card-head"><h2>Constancias 621 registradas</h2></header>
-  <p class="preview-note">Copia manual de declaraciones ya presentadas para este mes. Revisa la constancia de SUNAT: el ERP no verifica su presentación ni determina si una rectificatoria surtió efecto. No registra pagos ni cambia los asientos.</p>
+  <p class="preview-note">Copia manual de declaraciones ya presentadas para este mes. Revisa la constancia de SUNAT: el ERP no verifica su presentación ni determina si una rectificatoria surtió efecto. La constancia vigente es la que rige para el pago del IGV; una rectificatoria reemplaza a la anterior.</p>
+
+  {% if declaracion_vigente %}
+  <dl class="datos">
+    <div><dt>Constancia vigente</dt><dd><strong>{{ declaracion_vigente.numero_orden }}</strong> · {{ declaracion_vigente.get_tipo_display }}</dd></div>
+    <div><dt>Casilla 184 (IGV a pagar)</dt><dd class="num">S/ {{ declaracion_vigente.casilla_184 }}</dd></div>
+    <div><dt>Redondeo a enteros</dt><dd class="num">S/ {{ declaracion_vigente.redondeo_deuda|floatformat:2 }}</dd></div>
+    <div><dt>Casillas de la constancia</dt><dd class="muted">
+      100: {{ declaracion_vigente.casilla_100|default:"—" }} ·
+      101: {{ declaracion_vigente.casilla_101|default:"—" }} ·
+      107: {{ declaracion_vigente.casilla_107|default:"—" }} ·
+      108: {{ declaracion_vigente.casilla_108|default:"—" }} ·
+      120: {{ declaracion_vigente.casilla_120|default:"—" }} ·
+      301: {{ declaracion_vigente.casilla_301|default:"—" }} ·
+      312: {{ declaracion_vigente.casilla_312|default:"—" }}
+    </dd></div>
+  </dl>
+  <p class="preview-note">El redondeo es la diferencia entre la casilla 184 (enteros) y el IGV del libro; se guarda para auditoría y no genera asiento.</p>
+  {% if pagos_igv %}
+  <p class="preview-title">Pagos ligados a la constancia</p>
+  <table class="tabla-doc">
+    <thead><tr><th>Fecha</th><th>Cuenta</th><th class="der">Importe</th><th>Asiento</th></tr></thead>
+    <tbody>
+      {% for pago in pagos_igv %}
+      <tr>
+        <td>{{ pago.fecha|date:"d/m/Y" }}</td>
+        <td>{{ pago.cuenta.nombre }}</td>
+        <td class="num der">S/ {{ pago.importe|floatformat:2 }}</td>
+        <td>{% if pago.asiento %}N.º {{ pago.asiento.numero }}{% else %}—{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+  {% else %}
+  <p class="message error">Sin constancia vigente para el período: el pago del IGV está bloqueado hasta registrar la constancia correcta.</p>
+  {% endif %}
+
   {% for declaracion in declaraciones_igv %}
   <dl class="datos">
-    <div><dt>Orden y tipo</dt><dd>{{ declaracion.numero_orden }} · {{ declaracion.get_tipo_display }}</dd></div>
+    <div><dt>Orden y tipo</dt><dd>{{ declaracion.numero_orden }} · {{ declaracion.get_tipo_display }}{% if declaracion.vigente %} <span class="chip chip-ok">Vigente</span>{% elif not declaracion.anulada %} <span class="chip">Histórico</span>{% endif %}</dd></div>
     <div><dt>Presentada</dt><dd>{{ declaracion.fecha_presentacion|date:"d/m/Y" }}</dd></div>
     <div><dt>Casillas 140 / 145 / 184</dt><dd>{{ declaracion.casilla_140 }} / {{ declaracion.casilla_145 }} / {{ declaracion.casilla_184 }}</dd></div>
     <div><dt>Registro manual</dt><dd>{{ declaracion.registrado_en|date:"d/m/Y H:i" }} · {{ declaracion.registrado_por|default:"Usuario no disponible" }}</dd></div>
@@ -143,8 +180,14 @@
 
   <dl class="totales">
     <div><dt>Resultado estimado para casilla 184</dt><dd class="num">{{ c184|floatformat:2 }}</dd></div>
-    <div><dt>Pagado en el libro</dt><dd class="num">{{ igv_pagado|floatformat:2 }}</dd></div>
+    <div><dt>Pagado registrado</dt><dd class="num">{{ igv_pagado|floatformat:2 }}</dd></div>
+    {% if declaracion_vigente %}
+    <div><dt>Deuda según la constancia vigente</dt><dd class="num">S/ {{ deuda_constancia }}</dd></div>
+    <div><dt>Redondeo a enteros de la constancia</dt><dd class="num">S/ {{ redondeo_constancia|floatformat:2 }}</dd></div>
+    <div class="total"><dt>Pendiente según la constancia</dt><dd class="num">S/ {{ igv_pendiente|floatformat:2 }}</dd></div>
+    {% else %}
     <div class="total"><dt>Pendiente estimado según el libro</dt><dd class="num">{{ igv_pendiente|floatformat:2 }}</dd></div>
+    {% endif %}
   </dl>
   {% if comparacion_saldo and igv_pendiente_declarado is not None %}
   <dl class="totales" style="margin-top:8px">
@@ -173,8 +216,10 @@
     <button class="btn btn-primary" type="submit">Registrar pago de IGV efectuado</button>
   </form>
   <p class="preview-note">Esta acción registra un pago ya efectuado; no paga ni declara ante SUNAT. Indica el importe y la fecha reales de la constancia. La fecha debe pertenecer a un período contable abierto.</p>
+  {% elif not declaracion_vigente %}
+  <p class="preview-note">No hay constancia vigente: registra los datos de la constancia presentada para habilitar el pago del IGV.</p>
   {% elif c184 > 0 %}
-  <p class="preview-note">Los pagos registrados alcanzan el pendiente estimado del período. Confirma el estado en SUNAT.</p>
+  <p class="preview-note">Los pagos ligados a la constancia alcanzan el pendiente. Confirma el estado en SUNAT.</p>
   {% else %}
   <p class="preview-note">El cálculo interno no muestra IGV por pagar para este período. Confirma el resultado en SUNAT.</p>
   {% endif %}

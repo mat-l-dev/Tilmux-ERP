@@ -19,7 +19,7 @@ from contabilidad.impuestos import (
     monto_igv_pagado,
     pagar_igv,
 )
-from contabilidad.models import Asiento, Cuenta
+from contabilidad.models import Asiento, Cuenta, DeclaracionIGV621
 from contabilidad.servicios import (
     ContabilidadError,
     anular_asiento,
@@ -190,6 +190,23 @@ class NumeracionSeries(BaseContable):
 
 
 class PagoIGV(BaseContable):
+    def declarar(self, anio=2026, mes=11, casilla_184=None):
+        """Registra la constancia vigente: desde P0-5 sin ella no se paga el IGV."""
+        if casilla_184 is None:
+            casilla_184 = int(igv_pendiente(self.empresa, anio, mes).to_integral_value())
+        return DeclaracionIGV621.objects.create(
+            empresa=self.empresa,
+            anio=anio,
+            mes=mes,
+            tipo=DeclaracionIGV621.Tipo.ORIGINAL,
+            numero_orden=f"621-{anio}{mes:02d}-{DeclaracionIGV621.objects.count() + 1}",
+            fecha_presentacion=date(anio, mes, 28),
+            casilla_140=Decimal(casilla_184),
+            casilla_145=Decimal("0"),
+            casilla_184=Decimal(casilla_184),
+            vigente=True,
+        )
+
     def test_pantalla_explora_base_y_fecha_del_saldo_de_renta(self) -> None:
         usuario = get_user_model().objects.create_user(username="renta_periodo")
         Perfil.objects.create(usuario=usuario, empresa=self.empresa)
@@ -237,6 +254,7 @@ class PagoIGV(BaseContable):
         Periodo.objects.filter(empresa=self.empresa, anio=2026, mes=11).update(
             estado=Periodo.Estado.CERRADO
         )
+        self.declarar(casilla_184=10)
         movimiento = pagar_igv(
             self.empresa, date(2026, 12, 10), Decimal("10.00"), self.bbva, 2026, 11
         )
@@ -256,12 +274,14 @@ class PagoIGV(BaseContable):
         usuario = get_user_model().objects.create_user(username="pago_cerrado")
         Perfil.objects.create(usuario=usuario, empresa=self.empresa)
         self.client.force_login(usuario)
+        self.declarar(casilla_184=10)
         respuesta = self.client.get(reverse("reportes:impuestos"), {"periodo": "2026-11"})
         self.assertContains(respuesta, "Registrar pago de IGV")
 
     def test_pago_parcial_de_igv(self) -> None:
         self.comprar("10", "100")
         self.vender("10", "250")
+        self.declarar()
         pendiente = igv_pendiente(self.empresa, 2026, 11)
         self.assertGreater(pendiente, Decimal("0"))
 
@@ -308,6 +328,7 @@ class PagoIGV(BaseContable):
     def test_rechaza_sobrepago(self) -> None:
         self.comprar("10", "100")
         self.vender("10", "250")
+        self.declarar()
         pendiente = igv_pendiente(self.empresa, 2026, 11)
 
         with self.assertRaises(ContabilidadError):
@@ -327,6 +348,7 @@ class PagoIGV(BaseContable):
             empresa=self.empresa, anio=2026, mes=11
         ).update(estado=Periodo.Estado.CERRADO)
 
+        self.declarar(casilla_184=10)
         with self.assertRaises(ContabilidadError):
             pagar_igv(
                 self.empresa,
@@ -340,6 +362,7 @@ class PagoIGV(BaseContable):
     def test_la_pantalla_de_impuestos_ofrece_el_pago(self) -> None:
         self.comprar("10", "100")
         self.vender("10", "250")
+        self.declarar()
         usuario = get_user_model().objects.create_user(
             username="probador", password="secreto"
         )
@@ -354,7 +377,7 @@ class PagoIGV(BaseContable):
         self.assertContains(respuesta, "Registrar pago de IGV")
         self.assertContains(respuesta, reverse("reportes:pagar_igv"))
         self.assertContains(respuesta, "no paga ni declara ante SUNAT")
-        self.assertContains(respuesta, "Pendiente estimado según el libro")
+        self.assertContains(respuesta, "Pendiente según la constancia")
         self.assertContains(respuesta, '<input type="number" name="importe" step="0.01" min="0.01" required>',
                             html=True)
 
