@@ -98,6 +98,7 @@ class VencimientosOctubreTest(BaseContable):
             casilla_140=Decimal("215"),
             casilla_145=Decimal("110"),
             casilla_184=Decimal("105"),
+            vigente=True,
         )
 
         datos = panel_vencimientos(self.empresa, 2026, 10, hoy=date(2026, 11, 10))
@@ -110,11 +111,25 @@ class VencimientosOctubreTest(BaseContable):
 
     def test_pago_del_igv_deja_la_obligacion_pagada(self):
         self.crear_octubre()
+        # P0-5: sin constancia vigente no se permite pagar; la deuda es la 184.
+        DeclaracionIGV621.objects.create(
+            empresa=self.empresa,
+            anio=2026,
+            mes=10,
+            tipo=DeclaracionIGV621.Tipo.ORIGINAL,
+            numero_orden="621-202610-1",
+            fecha_presentacion=date(2026, 11, 10),
+            casilla_140=Decimal("215"),
+            casilla_145=Decimal("110"),
+            casilla_184=Decimal("105"),
+            redondeo_deuda=Decimal("-0.38"),
+            vigente=True,
+        )
 
         pagar_igv(
             self.empresa,
             fecha=date(2026, 11, 15),
-            importe=Decimal("105.38"),
+            importe=Decimal("105.00"),
             medio=self.bbva,
             anio=2026,
             mes=10,
@@ -123,8 +138,11 @@ class VencimientosOctubreTest(BaseContable):
         datos = panel_vencimientos(self.empresa, 2026, 10, hoy=date(2026, 11, 16))
         igv = next(obligacion for obligacion in datos["obligaciones"] if obligacion["clave"] == "IGV")
 
+        self.assertEqual(datos["igv"]["deuda_libros"], Decimal("105.38"))
         self.assertEqual(datos["igv"]["pendiente"], Decimal("0"))
-        self.assertEqual(datos["igv"]["pagado"], Decimal("105.38"))
+        self.assertEqual(datos["igv"]["pagado"], Decimal("105.00"))
+        self.assertEqual(datos["igv"]["deuda_constancia"], Decimal("105"))
+        self.assertEqual(datos["igv"]["redondeo_constancia"], Decimal("-0.38"))
         self.assertEqual(igv["estado"], "PAGADO")
         self.assertEqual(igv["tono"], "ok")
 

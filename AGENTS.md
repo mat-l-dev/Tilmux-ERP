@@ -132,7 +132,7 @@ docker rm -f tilmux-test-pg                                 # al terminar
 
 `config/settings.py:25` carga `.env` con `os.environ.setdefault`, así que las
 variables del proceso **sí** ganan. `settings.py:114` aborta si falta
-`DATABASE_URL`. La suite completa (360 tests al 11/11/2026) tarda ~1,5 min.
+`DATABASE_URL`. La suite completa (365 tests al 11/11/2026) tarda ~1,5 min.
 
 ## 7. Convenciones del código
 
@@ -182,8 +182,11 @@ variables del proceso **sí** ganan. `settings.py:114` aborta si falta
   `reportes/casillas.py`, `registro_compras` y el CSV (tipo 07, signo negativo).
 - `inventario/servicios.py:139` guarda costo unitario **promedio** al salir: la NC
   de venta reingresa al promedio, no a la capa PEPS original (P1-1).
-- `contabilidad/impuestos.py:153-241`: `igv_pendiente`/`pagar_igv` miran el libro y
-  la casilla 184, no la constancia vigente (P0-5).
+- **IGV contra la constancia (P0-5, implementada):** `igv_pendiente` usa la
+  casilla 184 de la constancia **vigente** cuando existe (enteros); sin
+  constancia devuelve la estimación del libro, que ya no habilita el pago.
+  `pagar_igv` exige constancia vigente, limita al pendiente de la 184, admite
+  parciales y crea `PagoIGV621` ligado a la declaración. Ver §14.
 - `reportes/sire.py` sigue leyendo solo la primera hoja del Excel; los estados
   nuevos (`reportes/estados_sire.py`) ya separan propuesta, complemento y
   registro generado con constancia (P0-7).
@@ -220,8 +223,8 @@ variables del proceso **sí** ganan. `settings.py:114` aborta si falta
   `astral-sh/setup-uv@v10.3.3`, uv `0.13.7`, `postgres:17.11`.
 - Branch protection en `main`: activa desde el 10/11/2026 con los checks `Ruff`
   e `Invariantes` (strict=false, 0 aprobaciones, sin enforce_admins).
-  Suite local en verde al 11/11/2026: `Ran 360 tests ... OK (skipped=1)`.
-  Serie real de tests: 304 (P0-1) → 317 (P0-2) → 327 (P0-3) → 339 (P0-4) → 352 (P0-7) → 360 (P0-8). El
+  Suite local en verde al 11/11/2026: `Ran 365 tests ... OK (skipped=1)`.
+  Serie real de tests: 304 (P0-1) → 317 (P0-2) → 327 (P0-3) → 339 (P0-4) → 352 (P0-7) → 360 (P0-8) → 365 (P0-5). El
   “316” que se reportó en el P0-2 fue un error de conteo; no usarlo.
 
 
@@ -327,11 +330,11 @@ variables del proceso **sí** ganan. `settings.py:114` aborta si falta
   `PENDIENTE/VENCE HOY/VENCIDO` cuando no. `tono` rojo si falta.
 - SIRE: se apoya en `resumen_periodo` del P0-7; solo está cumplido si RCE **y**
   RVIE tienen constancia.
-- PDT: `DeclaracionIGV621` no anulada del período → `DECLARADO` (registro
-  manual; el P0-5 todavía no compara la constancia).
-- IGV: deuda estimada del libro con `igv_pendiente` y `monto_igv_pagado`; se
-  muestra 105,38 y se recuerda que la declaración va en 105 enteros
-  (RS 025-2000). No se presenta como deuda declarada.
+- PDT: `DeclaracionIGV621` **vigente** del período → `DECLARADO`.
+- IGV: deuda del libro con `c184_libro` y pendiente de la constancia vigente con
+  `igv_pendiente` (P0-5). Muestra 105,38 en libros, 105 en la constancia y el
+  redondeo −0,38. Sin constancia, la cifra de libros es solo referencia y el
+  pago queda bloqueado; se reutiliza `declaracion_vigente` del §14.
 - Caja: saldos 4411/4419 y restituciones registradas. Nota explícita: el IGV y
   el PDT vencen aunque no llegue el depósito; las deudas del socio siguen
   pendientes hasta tener voucher.
@@ -341,7 +344,40 @@ variables del proceso **sí** ganan. `settings.py:114` aborta si falta
   SIRE generado, declaración registrada, pago del IGV, vencimiento al 18/11,
   período sin fechas, caja y vista/panel.
 
-## 14. Qué no hacer nunca
+## 14. IGV contra la constancia (P0-5, implementada 11/11/2026)
+
+- `contabilidad/models.py` (migración `contabilidad/0015`):
+  - `DeclaracionIGV621` agrega casillas **100, 101, 107, 108, 120, 301 y 312**
+    (opcionales; no se inventan), `redondeo_deuda` (15,2) y `vigente`.
+  - Restricción `declaracion_621_vigente_unica`: **una sola vigente** por
+    empresa/período entre las no anuladas.
+  - `PagoIGV621`: pago ligado a la constancia vigente, con cuenta de tesorería,
+    movimiento y asiento. Es el vínculo que antes no existía.
+- `contabilidad/impuestos.py`: `declaracion_vigente`, `deuda_declarada` y
+  `c184_libro`. `igv_pendiente` usa la 184 de la vigente (enteros) si existe; sin
+  constancia devuelve la estimación del libro (solo referencia).
+  `monto_igv_pagado` suma `PagoIGV621` y cae a los asientos `IGV_MENSUAL` solo
+  para datos anteriores al P0-5.
+- `pagar_igv`: **exige constancia vigente** (sin ella lanza `ContabilidadError`
+  y no postea), limita el importe al pendiente de la 184, admite pagos parciales
+  y crea `PagoIGV621`. Una rectificatoria queda vigente y recalcula el pendiente
+  (184 nueva menos lo pagado del período); no devuelve automáticamente si ya se
+  pagó de más.
+- Anular la constancia vigente deja el período **sin vigente** y bloquea el
+  pago; la pantalla lo advierte.
+- `reportes/views.py` + `reportes/forms.py`: el registro marca la nueva vigente,
+  desmarca la anterior y guarda `redondeo_deuda = 184 − c184_libro`; el
+  formulario pide las casillas nuevas. `impuestos.html` muestra la constancia
+  vigente, sus casillas, el redondeo y los pagos ligados.
+- Caso octubre verificado: constancia 140=215, 145=110, 184=**105**; libro
+  **105,38**; `redondeo_deuda = −0,38`; pendiente y pago máximo **105**. Sigue
+  sin declarar ni pagar al 11/11/2026: no se registró nada real.
+- Tests: 5 nuevos en `tests/test_declaracion_621.py` (10 en total) y ajustes en
+  `tests/test_auditoria_p0.py` y `tests/test_vencimientos.py` para registrar la
+  constancia antes de pagar. `test_revision_gemini.py` sigue verde porque los
+  rechazos ocurren antes de tocar la base.
+
+## 15. Qué no hacer nunca
 
 - Mergear o empujar a `main`; crear PR de merge por cuenta propia.
 - Editar migraciones ya aplicadas (crear una nueva).

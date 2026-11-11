@@ -24,6 +24,8 @@ from compras.models_gasto import Gasto
 from contabilidad.impuestos import (
     asentar_renta,
     asiento_renta,
+    c184_libro,
+    declaracion_vigente,
     igv_pendiente,
     monto_igv_pagado,
     monto_renta_asentada,
@@ -459,6 +461,18 @@ def impuestos(request):
             )
             asiento = asiento_renta(empresa, desde.year, desde.month)
             monto_asentado = monto_renta_asentada(asiento)
+    declaracion_actual = (
+        declaracion_vigente(empresa, desde.year, desde.month)
+        if empresa and es_mes
+        else None
+    )
+    pagos_igv = (
+        declaracion_actual.pagos.select_related("cuenta", "movimiento").order_by(
+            "-fecha", "-pk"
+        )
+        if declaracion_actual
+        else []
+    )
     igv_resultante = igv_anterior + igv
     c145 = max(-igv_anterior, Decimal("0"))
     c184 = igv - c145
@@ -478,7 +492,7 @@ def impuestos(request):
     puede_pagar_igv = bool(
         empresa
         and es_mes
-        and c184 > 0
+        and declaracion_actual is not None
         and igv_por_pagar_mes > 0
     )
 
@@ -517,6 +531,14 @@ def impuestos(request):
             DeclaracionIGV621.objects.filter(empresa=empresa, anio=desde.year, mes=desde.month)
             if empresa and es_mes else []
         ),
+        "declaracion_vigente": declaracion_actual,
+        "deuda_constancia": (
+            declaracion_actual.casilla_184 if declaracion_actual else None
+        ),
+        "redondeo_constancia": (
+            declaracion_actual.redondeo_deuda if declaracion_actual else None
+        ),
+        "pagos_igv": pagos_igv,
         "formulario_declaracion": DeclaracionIGV621Form(),
         "mes_anterior": desde - timedelta(days=1),
         "c301": base_renta,
@@ -565,13 +587,23 @@ def registrar_declaracion_igv(request):
                 declaracion.empresa = empresa
                 declaracion.anio, declaracion.mes = anio, mes
                 declaracion.registrado_por = request.user
+                # Redondeo auditable: casilla 184 (enteros) menos el IGV del libro.
+                libro = c184_libro(empresa, anio, mes)
+                declaracion.redondeo_deuda = (
+                    Decimal(declaracion.casilla_184) - libro
+                ).quantize(Decimal("0.01"))
+                DeclaracionIGV621.objects.filter(
+                    empresa=empresa, anio=anio, mes=mes, vigente=True
+                ).update(vigente=False)
+                declaracion.vigente = True
                 declaracion.save()
                 HistorialDocumento.objects.create(
                     empresa=empresa, tipo=HistorialDocumento.Tipo.IMPUESTO,
                     documento_id=anio * 100 + mes, usuario=request.user, accion="REGISTRO_621",
                     detalle=(f"Constancia 621 {declaracion.numero_orden}, {declaracion.get_tipo_display()}; "
                              f"casillas 140: {declaracion.casilla_140}, 145: {declaracion.casilla_145}, "
-                             f"184: {declaracion.casilla_184}. Registro manual, sin verificar en SUNAT."),
+                             f"184: {declaracion.casilla_184}, redondeo: {declaracion.redondeo_deuda}. "
+                             f"Queda vigente para el período. Registro manual, sin verificar en SUNAT."),
                 )
         except IntegrityError:
             if not DeclaracionIGV621.objects.filter(
@@ -599,11 +631,21 @@ def anular_registro_621(request, pk):
         elif registro.anulada:
             messages.error(request, "Este registro interno ya fue anulado.")
         else:
+            era_vigente = registro.vigente
             registro.anulada = True
+            registro.vigente = False
             registro.motivo_anulacion = motivo
             registro.anulada_por = request.user
             registro.anulada_en = timezone.now()
-            registro.save(update_fields=["anulada", "motivo_anulacion", "anulada_por", "anulada_en"])
+            registro.save(
+                update_fields=[
+                    "anulada",
+                    "vigente",
+                    "motivo_anulacion",
+                    "anulada_por",
+                    "anulada_en",
+                ]
+            )
             HistorialDocumento.objects.create(
                 empresa=empresa, tipo=HistorialDocumento.Tipo.IMPUESTO,
                 documento_id=registro.anio * 100 + registro.mes, usuario=request.user,
@@ -611,6 +653,12 @@ def anular_registro_621(request, pk):
                 detalle=f"Anulación del registro interno {registro.numero_orden}; motivo: {motivo}.",
             )
             messages.success(request, "Registro interno anulado; esto no anula la declaración en SUNAT.")
+            if era_vigente:
+                messages.warning(
+                    request,
+                    "Ese registro era la constancia vigente del período: no queda ninguna "
+                    "vigente y el pago del IGV queda bloqueado hasta registrar la correcta.",
+                )
     return redirect(f"{reverse('reportes:impuestos')}?periodo={registro.anio}-{registro.mes:02d}")
 
 

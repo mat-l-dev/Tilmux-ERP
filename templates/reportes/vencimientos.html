@@ -94,8 +94,13 @@
   </p>
   <dl class="datos">
     <div><dt>Deuda estimada en libros</dt><dd class="num">S/ {{ datos.igv.deuda_libros|floatformat:2 }}</dd></div>
+    {% if datos.igv.saldo_favor_libros %}<div><dt>Saldo a favor en libros</dt><dd class="num">S/ {{ datos.igv.saldo_favor_libros|floatformat:2 }}</dd></div>{% endif %}
+    {% if datos.igv.deuda_constancia is not None %}
+    <div><dt>Deuda según la constancia vigente (184)</dt><dd class="num">S/ {{ datos.igv.deuda_constancia }}</dd></div>
+    <div><dt>Redondeo a enteros</dt><dd class="num">S/ {{ datos.igv.redondeo_constancia|floatformat:2 }}</dd></div>
+    {% endif %}
     <div><dt>Pagado registrado</dt><dd class="num">S/ {{ datos.igv.pagado|floatformat:2 }}</dd></div>
-    <div><dt>Pendiente en libros</dt><dd class="num"><strong>S/ {{ datos.igv.pendiente|floatformat:2 }}</strong></dd></div>
+    <div><dt>Pendiente</dt><dd class="num"><strong>S/ {{ datos.igv.pendiente|floatformat:2 }}</strong></dd></div>
     {% if datos.pdt.declaracion %}
     <div><dt>Casilla 184 de la constancia cargada</dt><dd class="num">S/ {{ datos.pdt.casilla_184 }}</dd></div>
     <div><dt>N° de orden</dt><dd>{{ datos.pdt.declaracion.numero_orden }}</dd></div>

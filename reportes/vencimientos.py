@@ -17,7 +17,12 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from contabilidad.impuestos import igv_pendiente, monto_igv_pagado, saldo_cuenta
+from contabilidad.impuestos import (
+    c184_libro,
+    igv_pendiente,
+    monto_igv_pagado,
+    saldo_cuenta,
+)
 from contabilidad.models import DeclaracionIGV621
 from core.models import Empresa
 from tesoreria.models import RestitucionSocio
@@ -155,7 +160,9 @@ def panel_vencimientos(
 
     pendiente = igv_pendiente(empresa, anio, mes)
     pagado = monto_igv_pagado(empresa, anio, mes)
-    deuda_libros = (pendiente + pagado).quantize(Decimal("0.01"))
+    libro = c184_libro(empresa, anio, mes)
+    deuda_libros = libro if libro > CERO else CERO
+    saldo_favor_libros = -libro if libro < CERO else CERO
     if deuda_libros <= CERO:
         cumplido_igv, estado_igv = True, "SIN DEUDA"
     else:
@@ -173,6 +180,7 @@ def panel_vencimientos(
                 "pendiente": pendiente,
                 "pagado": pagado,
                 "deuda_libros": deuda_libros,
+                "saldo_favor_libros": saldo_favor_libros,
                 "declarada": declaracion is not None,
             },
         )
@@ -202,7 +210,12 @@ def panel_vencimientos(
                 "pendiente": pendiente,
                 "pagado": pagado,
                 "deuda_libros": deuda_libros,
+                "saldo_favor_libros": saldo_favor_libros,
                 "declarada": declaracion is not None,
+                "deuda_constancia": declaracion.casilla_184 if declaracion else None,
+                "redondeo_constancia": (
+                    declaracion.redondeo_deuda if declaracion else None
+                ),
             },
             "caja": caja,
         }
