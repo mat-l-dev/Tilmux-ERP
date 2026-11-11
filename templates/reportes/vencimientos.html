@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block titulo %}Vencimientos{% endblock %}
+{% block titulo_pagina %}Vencimientos y caja{% endblock %}
+
+{% block contenido %}
+{% include "reportes/_tabs.html" %}
+
+{% if not datos.verificado %}
+<section class="card">
+  <header class="card-head"><h2>Vencimientos</h2></header>
+  <p class="message warning">{{ datos.mensaje }}</p>
+  <a class="btn btn-ghost" href="{% url 'reportes:vencimientos' %}?anio=2026&mes=10">Ver octubre 2026</a>
+</section>
+{% else %}
+
+<form method="get" class="filtro">
+  <label class="field" style="min-width:110px">
+    <span>Año</span>
+    <input type="number" name="anio" value="{{ datos.anio }}" min="2020" max="2100">
+  </label>
+  <label class="field" style="min-width:110px">
+    <span>Mes</span>
+    <input type="number" name="mes" value="{{ datos.mes }}" min="1" max="12">
+  </label>
+  <button class="btn btn-ghost" type="submit">Consultar período</button>
+</form>
+
+<section class="card">
+  <header class="card-head">
+    <h2>Obligaciones de octubre 2026</h2>
+    <span class="chip {% if datos.pendientes %}chip-danger{% else %}chip-ok{% endif %}">
+      {% if datos.pendientes %}{{ datos.pendientes }} pendiente{{ datos.pendientes|pluralize }}{% else %}Todo cumplido{% endif %}
+    </span>
+  </header>
+  <p class="preview-note">{{ datos.fuente }} Las fechas de noviembre no se muestran porque no están verificadas.</p>
+  {% if datos.vencidos %}
+  <p class="message error">
+    {{ datos.vencidos }} obligación(es) vencida(s) al {{ datos.hoy|date:"d/m/Y" }}.
+    Regulariza y conserva la constancia; la facultad discrecional de la RSNATI
+    041-2026 no mueve el vencimiento.
+  </p>
+  {% endif %}
+  <div class="tabla-scroll">
+  <table class="tabla-doc">
+    <thead>
+      <tr><th>Obligación</th><th>Vence</th><th class="der">Días</th><th>Estado</th><th>Detalle</th></tr>
+    </thead>
+    <tbody>
+      {% for obligacion in datos.obligaciones %}
+      <tr>
+        <td>{{ obligacion.nombre }}</td>
+        <td>{{ obligacion.fecha|date:"d/m/Y" }}</td>
+        <td class="num der">{{ obligacion.dias }}</td>
+        <td><span class="chip {% if obligacion.tono == 'ok' %}chip-ok{% else %}chip-danger{% endif %}">{{ obligacion.estado }}</span></td>
+        <td class="muted">{{ obligacion.detalle }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section class="card" style="margin-top:12px">
+  <header class="card-head"><h2>SIRE · RCE y RVIE</h2>
+    <span class="chip {% if datos.sire.cerrado %}chip-ok{% else %}chip-danger{% endif %}">{% if datos.sire.cerrado %}Cerrado{% else %}No cerrado{% endif %}</span>
+  </header>
+  <p class="preview-note">Sin constancia de recepción el registro no está generado y el período no está cerrado, aunque la propuesta se haya aceptado.</p>
+  <table class="tabla-doc">
+    <thead><tr><th>Registro</th><th>Estado</th><th>Constancia</th></tr></thead>
+    <tbody>
+      {% for registro in datos.sire.registros %}
+      <tr>
+        <td>{{ registro.registro }}</td>
+        <td><span class="chip {% if registro.cerrado %}chip-ok{% else %}chip-danger{% endif %}">{{ registro.estado }}</span></td>
+        <td>{% if registro.cerrado %}Sí{% else %}Pendiente{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <a class="btn btn-ghost" href="{% url 'reportes:estado_sire' %}?anio={{ datos.anio }}&mes={{ datos.mes }}">Ver estado SIRE</a>
+</section>
+
+<section class="card" style="margin-top:12px">
+  <header class="card-head"><h2>IGV y PDT 621</h2>
+    <span class="chip {% if datos.pdt.declaracion %}chip-ok{% else %}chip-danger{% endif %}">
+      {% if datos.pdt.declaracion %}Declaración registrada{% else %}Sin declaración registrada{% endif %}
+    </span>
+  </header>
+  <p class="preview-note">
+    La deuda es la estimación del libro. La declaración va en enteros
+    (RS 025-2000): según la auditoría son S/ 105 frente a 105,38 en libros.
+    Este panel no reemplaza la constancia del 621.
+  </p>
+  <dl class="datos">
+    <div><dt>Deuda estimada en libros</dt><dd class="num">S/ {{ datos.igv.deuda_libros|floatformat:2 }}</dd></div>
+    <div><dt>Pagado registrado</dt><dd class="num">S/ {{ datos.igv.pagado|floatformat:2 }}</dd></div>
+    <div><dt>Pendiente en libros</dt><dd class="num"><strong>S/ {{ datos.igv.pendiente|floatformat:2 }}</strong></dd></div>
+    {% if datos.pdt.declaracion %}
+    <div><dt>Casilla 184 de la constancia cargada</dt><dd class="num">S/ {{ datos.pdt.casilla_184 }}</dd></div>
+    <div><dt>N° de orden</dt><dd>{{ datos.pdt.declaracion.numero_orden }}</dd></div>
+    {% endif %}
+  </dl>
+  <a class="btn btn-ghost" href="{% url 'reportes:impuestos' %}?periodo={{ datos.anio }}-{{ datos.mes|stringformat:"02d" }}">Ver IGV y RER</a>
+</section>
+
+<section class="card" style="margin-top:12px">
+  <header class="card-head"><h2>Caja y restituciones</h2>
+    <span class="chip {% if datos.caja.prestamo_socio > 0 or datos.caja.reembolso_socio > 0 %}chip-danger{% else %}chip-ok{% endif %}">Pendiente de voucher</span>
+  </header>
+  <dl class="datos">
+    <div><dt>Préstamo del socio (4411)</dt><dd class="num">S/ {{ datos.caja.prestamo_socio|floatformat:2 }}</dd></div>
+    <div><dt>Reembolso al socio (4419)</dt><dd class="num">S/ {{ datos.caja.reembolso_socio|floatformat:2 }}</dd></div>
+    <div><dt>Restituciones registradas con voucher</dt><dd>{{ datos.caja.restituciones_registradas }}</dd></div>
+  </dl>
+  <p class="preview-note">{{ datos.caja.nota }}</p>
+  <a class="btn btn-ghost" href="{% url 'tesoreria:obligaciones_socios' %}">Ver deudas con el socio</a>
+</section>
+
+{% endif %}
+{% endblock %}

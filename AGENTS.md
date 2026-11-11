@@ -91,7 +91,7 @@ Fuente: auditoría consolidada 2026-11-10 + confirmación del usuario 09/11.
 | `tesoreria/` | cuentas, movimientos, conciliación |
 | `reportes/` | SIRE, casillas, RCE, EEFF, exportar |
 | `data/` | PCGE 2026 en JSON |
-| `tests/` | 51 archivos `test_*.py` (incluye `test_devolucion_proveedor.py`, `test_restitucion_4411_4419.py`, `test_moneda_extranjera.py` y `test_estados_sire.py`) |
+| `tests/` | 52 archivos `test_*.py` (incluye `test_devolucion_proveedor.py`, `test_restitucion_4411_4419.py`, `test_moneda_extranjera.py`, `test_estados_sire.py` y `test_vencimientos.py`) |
 | `docs/`, `scripts/`, `templates/`, `static/` | documentación, utilidades, UI |
 
 ## 5. Cómo trabajar
@@ -132,7 +132,7 @@ docker rm -f tilmux-test-pg                                 # al terminar
 
 `config/settings.py:25` carga `.env` con `os.environ.setdefault`, así que las
 variables del proceso **sí** ganan. `settings.py:114` aborta si falta
-`DATABASE_URL`. La suite completa (352 tests al 10/11/2026) tarda ~1,5 min.
+`DATABASE_URL`. La suite completa (360 tests al 11/11/2026) tarda ~1,5 min.
 
 ## 7. Convenciones del código
 
@@ -220,8 +220,8 @@ variables del proceso **sí** ganan. `settings.py:114` aborta si falta
   `astral-sh/setup-uv@v10.3.3`, uv `0.13.7`, `postgres:17.11`.
 - Branch protection en `main`: activa desde el 10/11/2026 con los checks `Ruff`
   e `Invariantes` (strict=false, 0 aprobaciones, sin enforce_admins).
-  Suite local en verde al 10/11/2026: `Ran 352 tests ... OK (skipped=1)`.
-  Serie real de tests: 304 (P0-1) → 317 (P0-2) → 327 (P0-3) → 339 (P0-4) → 352 (P0-7). El
+  Suite local en verde al 11/11/2026: `Ran 360 tests ... OK (skipped=1)`.
+  Serie real de tests: 304 (P0-1) → 317 (P0-2) → 327 (P0-3) → 339 (P0-4) → 352 (P0-7) → 360 (P0-8). El
   “316” que se reportó en el P0-2 fue un error de conteo; no usarlo.
 
 
@@ -317,7 +317,31 @@ variables del proceso **sí** ganan. `settings.py:114` aborta si falta
   120, sin crédito fiscal; 43 + 198,04 = 241,04 en libros). Sin definitivo ni
   constancia, el período queda PENDIENTE.
 
-## 13. Qué no hacer nunca
+## 13. Vencimientos y caja (P0-8, implementada 11/11/2026)
+
+- `reportes/vencimientos.py`: `panel_vencimientos` y `resumen_panel`. Solo
+  **octubre 2026**, con las fechas verificadas: SIRE **16/11/2026**, PDT 621 e
+  IGV **17/11/2026** (RUC terminado en 1). Para otro período responde "no hay
+  fechas verificadas": **no se inventan fechas de noviembre**.
+- Estados por obligación: `GENERADO/DECLARADO/PAGADO` cuando se cumple;
+  `PENDIENTE/VENCE HOY/VENCIDO` cuando no. `tono` rojo si falta.
+- SIRE: se apoya en `resumen_periodo` del P0-7; solo está cumplido si RCE **y**
+  RVIE tienen constancia.
+- PDT: `DeclaracionIGV621` no anulada del período → `DECLARADO` (registro
+  manual; el P0-5 todavía no compara la constancia).
+- IGV: deuda estimada del libro con `igv_pendiente` y `monto_igv_pagado`; se
+  muestra 105,38 y se recuerda que la declaración va en 105 enteros
+  (RS 025-2000). No se presenta como deuda declarada.
+- Caja: saldos 4411/4419 y restituciones registradas. Nota explícita: el IGV y
+  el PDT vencen aunque no llegue el depósito; las deudas del socio siguen
+  pendientes hasta tener voucher.
+- Pantallas: página `/reportes/vencimientos/` y tarjeta-resumen en el panel
+  (`core/views.py` importa `resumen_panel`). Sin migraciones nuevas.
+- Tests `tests/test_vencimientos.py` (8): octubre en cero con los tres en rojo,
+  SIRE generado, declaración registrada, pago del IGV, vencimiento al 18/11,
+  período sin fechas, caja y vista/panel.
+
+## 14. Qué no hacer nunca
 
 - Mergear o empujar a `main`; crear PR de merge por cuenta propia.
 - Editar migraciones ya aplicadas (crear una nueva).

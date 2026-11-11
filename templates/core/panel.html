@@ -47,6 +47,33 @@
 
 <section class="card rise" style="--i:1">
   <header class="card-head">
+    <h2>Vencimientos tributarios</h2>
+    {% if vencimientos.verificado %}
+    <span class="chip {% if vencimientos.pendientes %}chip-danger{% else %}chip-ok{% endif %}">
+      {% if vencimientos.pendientes %}{{ vencimientos.pendientes }} pendiente{{ vencimientos.pendientes|pluralize }}{% else %}Todo cumplido{% endif %}
+    </span>
+    {% endif %}
+  </header>
+  {% if vencimientos.verificado %}
+    {% if vencimientos.proximo %}
+    <p>
+      Próximo: <strong>{{ vencimientos.proximo.nombre }}</strong>,
+      vence el {{ vencimientos.proximo.fecha|date:"d/m/Y" }}
+      ({{ vencimientos.proximo.dias }} día{{ vencimientos.proximo.dias|pluralize }}).
+      {% if vencimientos.vencidos %}<span class="message error">{{ vencimientos.vencidos }} vencida(s).</span>{% endif %}
+    </p>
+    {% else %}
+    <p class="muted">No hay obligaciones pendientes de octubre 2026.</p>
+    {% endif %}
+    <a class="btn btn-ghost" href="{% url 'reportes:vencimientos' %}?anio={{ vencimientos.anio }}&mes={{ vencimientos.mes }}">Ver vencimientos y caja</a>
+  {% else %}
+  <p class="muted">{{ vencimientos.mensaje }}</p>
+  <a class="btn btn-ghost" href="{% url 'reportes:vencimientos' %}?anio=2026&mes=10">Ver octubre 2026</a>
+  {% endif %}
+</section>
+
+<section class="card rise" style="--i:1">
+  <header class="card-head">
     <h2>Ventas por mes</h2>
     <span class="chip">12 meses hasta {{ periodo_etiqueta }} · máximo S/ {{ maximo_mes }}</span>
   </header>

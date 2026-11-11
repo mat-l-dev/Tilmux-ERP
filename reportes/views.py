@@ -58,6 +58,7 @@ from .estados_sire import (
 from .forms import CompararSaldoIGVForm, DeclaracionIGV621Form
 from .sire import ArchivoInvalido, leer_filas, moneda_verificada_soles, sumar, validar_contexto, verificar_registro
 from .utils import FiltroReporteError, filtros_seguros, rango
+from .vencimientos import panel_vencimientos
 
 CERO = Decimal("0")
 
@@ -1006,6 +1007,27 @@ def conciliacion_archivo(request):
             "error": error,
             "nombre_archivo": nombre_archivo,
             "grupos_documentos": grupos_documentos,
+        },
+    )
+
+
+@login_required
+def vencimientos(request):
+    """Vencimientos de octubre 2026 y dependencia de caja."""
+    empresa = empresa_actual(request)
+    anio = request.GET.get("anio") or 2026
+    mes = request.GET.get("mes") or 10
+    try:
+        anio, mes = int(anio), int(mes)
+    except (TypeError, ValueError):
+        anio, mes = 2026, 10
+    return render(
+        request,
+        "reportes/vencimientos.html",
+        {
+            "datos": panel_vencimientos(empresa, anio, mes),
+            "anio": anio,
+            "mes": mes,
         },
     )
 
