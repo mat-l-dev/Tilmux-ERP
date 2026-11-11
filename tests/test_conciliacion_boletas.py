@@ -121,7 +121,7 @@ class ConciliacionBoletasTest(TestCase):
         cabecera = ("RUC,Periodo,Tipo CP/Doc.,Serie del CDP,Nro CP o Doc. Nro Inicial (Rango),"
                     "Nro Final (Rango),Tipo Doc Identidad,Nro Doc Identidad,Fecha de emisión,"
                     "BI Gravado DG,IGV / IPM DG,Total CP,Moneda\n")
-        nota = "20123456789,202610,07,FC01,1,,6,20100000001,02/10/2026,0,0,10.00,PEN\n"
+        nota = "20123456789,202610,20,FC01,1,,6,20100000001,02/10/2026,0,0,10.00,PEN\n"
         sin_ruc = "20123456789,202610,03,B001,1,,1,20100000001,02/10/2026,0,0,10.00,PEN\n"
         rango = "20123456789,202610,03,B001,2,5,6,20100000001,02/10/2026,0,0,10.00,PEN\n"
         respuesta = self.conciliar(cabecera + nota + sin_ruc + rango)

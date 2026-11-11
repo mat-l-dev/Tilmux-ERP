@@ -16,6 +16,7 @@ urlpatterns = [
     path("eeff/pdf/", exportar.eeff_pdf, name="exportar_eeff_pdf"),
     path("conciliacion/", views.conciliacion, name="conciliacion"),
     path("conciliacion/archivo/", views.conciliacion_archivo, name="conciliacion_archivo"),
+    path("sire/", views.estado_sire, name="estado_sire"),
     path("inventario/", views.inventario, name="inventario"),
     path("kardex/<int:pk>/", views.kardex, name="kardex"),
     path("impuestos/", views.impuestos, name="impuestos"),

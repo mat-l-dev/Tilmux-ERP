@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block titulo %}Estado del SIRE{% endblock %}
+{% block titulo_pagina %}Estado del SIRE por período{% endblock %}
+
+{% block contenido %}
+{% include "reportes/_tabs.html" %}
+
+<form method="get" class="filtro">
+  <label class="field" style="min-width:110px">
+    <span>Año</span>
+    <input type="number" name="anio" value="{{ anio }}" min="2020" max="2100">
+  </label>
+  <label class="field" style="min-width:110px">
+    <span>Mes</span>
+    <input type="number" name="mes" value="{{ mes }}" min="1" max="12">
+  </label>
+  <button class="btn btn-ghost" type="submit">Consultar período</button>
+</form>
+
+{% if resumen %}
+<section class="card">
+  <header class="card-head">
+    <h2>Período {{ mes }}/{{ anio }}</h2>
+    <span class="chip {% if resumen.cerrado %}chip-ok{% else %}chip-warn{% endif %}">
+      {% if resumen.cerrado %}Cerrado con constancias{% else %}NO cerrado{% endif %}
+    </span>
+  </header>
+  <p class="preview-note">
+    Una propuesta descargada no acredita nada: el período solo se cierra cuando
+    RCE y RVIE tienen su <strong>constancia de recepción del registro generado</strong>.
+    Sin esa constancia, el período sigue PENDIENTE aunque la propuesta se haya aceptado.
+  </p>
+  {% if not resumen.cerrado %}
+  <p class="message error">
+    Falta la constancia de recepción de:
+    {% for fila in registros %}{% if not fila.cerrado %}{{ fila.registro }}{% if not forloop.last %} y {% endif %}{% endif %}{% endfor %}.
+    Mientras tanto este período no está conciliado ni cerrado.
+  </p>
+  {% endif %}
+</section>
+{% endif %}
+
+{% for fila in registros %}
+<section class="card" style="margin-top:12px">
+  <header class="card-head">
+    <h2>{{ fila.etiqueta }}</h2>
+    <span class="chip {% if fila.cerrado %}chip-ok{% elif fila.estado == 'SIN PROPUESTA' %}chip-warn{% endif %}">{{ fila.estado }}</span>
+  </header>
+  <p class="preview-note">{{ fila.estado_texto }}{% if not fila.cerrado %} · pendiente de constancia{% endif %}.</p>
+
+  {% if fila.propuesta %}
+  <dl class="datos">
+    <div><dt>Archivo</dt><dd>{{ fila.propuesta.nombre_original }}</dd></div>
+    <div><dt>Descargada</dt><dd>{{ fila.propuesta.descargada_en|date:"d/m/Y H:i" }}</dd></div>
+    <div><dt>Hash SHA-256</dt><dd class="muted">{{ fila.propuesta.hash_sha256|slice:":16" }}…</dd></div>
+    <div><dt>Filas</dt><dd>{{ fila.propuesta.filas }}</dd></div>
+    <div><dt>Base / IGV / Total</dt><dd class="num">S/ {{ fila.propuesta.base|floatformat:2 }} · {{ fila.propuesta.igv|floatformat:2 }} · {{ fila.propuesta.total|floatformat:2 }}</dd></div>
+  </dl>
+  {% else %}
+  <p class="muted">
+    Sin propuesta descargada para {{ fila.registro }}.
+    <a href="{% url 'reportes:conciliacion_archivo' %}?anio={{ anio }}&mes={{ mes }}&registro={% if fila.registro == 'RCE' %}compras{% else %}ventas{% endif %}">Cargar y conciliar la propuesta</a>.
+  </p>
+  {% endif %}
+
+  {% if fila.estado == "GENERADO" %}
+  <dl class="datos">
+    <div><dt>Constancia de recepción</dt><dd>{{ fila.obj.constancia_recepcion }}</dd></div>
+    <div><dt>N° de operación</dt><dd>{{ fila.obj.numero_operacion }}</dd></div>
+    <div><dt>Generado</dt><dd>{{ fila.obj.generado_en|date:"d/m/Y H:i" }}</dd></div>
+    <div><dt>Registros generados</dt><dd>{{ fila.obj.registros_generados }}</dd></div>
+  </dl>
+  {% endif %}
+
+  {% if fila.ajustes %}
+  <p class="preview-title">Complementos de la propuesta</p>
+  <div class="tabla-scroll">
+  <table class="tabla-doc">
+    <thead><tr><th>Tipo</th><th>Comprobante</th><th>Fecha</th><th class="der">Base</th><th class="der">IGV</th><th class="der">Total</th><th>Motivo</th></tr></thead>
+    <tbody>
+      {% for ajuste in fila.ajustes %}
+      <tr>
+        <td>{{ ajuste.get_tipo_display }}</td>
+        <td>{{ ajuste.documento }}</td>
+        <td>{{ ajuste.fecha|date:"d/m/Y"|default:"—" }}</td>
+        <td class="num der">{{ ajuste.base|floatformat:2 }}</td>
+        <td class="num der">{{ ajuste.igv|floatformat:2 }}</td>
+        <td class="num der">{{ ajuste.total|floatformat:2 }}</td>
+        <td class="muted">{{ ajuste.motivo }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+
+  {% if fila.propuesta and not fila.cerrado %}
+  <div class="grid-fields" style="margin-top:12px">
+    <form method="post" class="card form">
+      {% csrf_token %}
+      <input type="hidden" name="accion" value="ajuste">
+      <input type="hidden" name="registro" value="{{ fila.registro }}">
+      <input type="hidden" name="anio" value="{{ anio }}">
+      <input type="hidden" name="mes" value="{{ mes }}">
+      <header class="card-head"><h3>Complementar propuesta</h3></header>
+      <p class="preview-note">Registra el comprobante que se agregó o excluyó y por qué. Un ajuste no cambia el IGV por sí solo: eso se corrige en el RCE y el 621.</p>
+      <label class="field"><span>Tipo</span>
+        <select name="tipo">
+          <option value="AGREGADO">Agregado</option>
+          <option value="EXCLUIDO">Excluido</option>
+        </select>
+      </label>
+      <label class="field"><span>Comprobante (serie-número)</span><input name="documento" maxlength="60" required></label>
+      <label class="field"><span>Tipo de comprobante</span>
+        <select name="tipo_doc">
+          <option value="FACTURA">Factura</option>
+          <option value="BOLETA">Boleta</option>
+          <option value="NOTA_CREDITO">Nota de crédito</option>
+          <option value="OTRO">Otro</option>
+        </select>
+      </label>
+      <label class="field"><span>Fecha</span><input type="date" name="fecha"></label>
+      <label class="field"><span>Base</span><input name="base" inputmode="decimal" placeholder="0.00"></label>
+      <label class="field"><span>IGV</span><input name="igv" inputmode="decimal" placeholder="0.00"></label>
+      <label class="field"><span>Total</span><input name="total" inputmode="decimal" placeholder="0.00"></label>
+      <label class="field"><span>Motivo</span><input name="motivo" maxlength="300" required></label>
+      <button class="btn btn-ghost" type="submit">Registrar ajuste</button>
+    </form>
+
+    <form method="post" class="card form">
+      {% csrf_token %}
+      <input type="hidden" name="accion" value="generar">
+      <input type="hidden" name="registro" value="{{ fila.registro }}">
+      <input type="hidden" name="anio" value="{{ anio }}">
+      <input type="hidden" name="mes" value="{{ mes }}">
+      <header class="card-head"><h3>Registro generado</h3></header>
+      <p class="preview-note">Copia los datos de la constancia de recepción del SIRE. Sin estos datos el registro no se marca como generado y el período no se cierra.</p>
+      <label class="field"><span>Constancia de recepción</span><input name="constancia_recepcion" maxlength="80" required></label>
+      <label class="field"><span>N° de operación</span><input name="numero_operacion" maxlength="60" required></label>
+      <label class="field"><span>Fecha y hora de generación</span><input type="datetime-local" name="generado_en"></label>
+      <label class="field"><span>N° de registros generados</span><input type="number" name="registros" min="1" required></label>
+      <button class="btn btn-primary" type="submit">Registrar constancia</button>
+    </form>
+  </div>
+  {% endif %}
+</section>
+{% endfor %}
+{% endblock %}

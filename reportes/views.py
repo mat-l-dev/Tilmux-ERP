@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import calendar
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
@@ -48,6 +48,13 @@ from .casillas import calcular
 from .clientes import nombre_cliente
 from .conciliacion_documentos import totales_documentales
 from .conciliacion_rce import comparar_rce
+from .estados_sire import (
+    SireError,
+    registrar_ajuste,
+    registrar_generacion,
+    registrar_propuesta,
+    resumen_periodo,
+)
 from .forms import CompararSaldoIGVForm, DeclaracionIGV621Form
 from .sire import ArchivoInvalido, leer_filas, moneda_verificada_soles, sumar, validar_contexto, verificar_registro
 from .utils import FiltroReporteError, filtros_seguros, rango
@@ -890,6 +897,25 @@ def conciliacion_archivo(request):
                 error = str(exc)
             else:
                 nombre_archivo = archivo.name
+                try:
+                    archivo.seek(0)
+                    registrar_propuesta(
+                        empresa=empresa,
+                        anio=anio,
+                        mes=mes,
+                        registro="RCE" if registro == "compras" else "RVIE",
+                        archivo=archivo,
+                        filas=totales["filas"],
+                        base=totales["base"],
+                        igv=totales["igv"],
+                        total=totales["total"],
+                        usuario=request.user,
+                    )
+                except SireError as exc:
+                    messages.warning(
+                        request,
+                        f"Propuesta comparada, pero no se pudo guardar como estado SIRE: {exc}",
+                    )
                 datos = calcular(empresa, anio, mes)
                 if registro == "ventas":
                     sistema_base = datos["ventas_base"] - datos["descuentos_base"]
@@ -980,5 +1006,85 @@ def conciliacion_archivo(request):
             "error": error,
             "nombre_archivo": nombre_archivo,
             "grupos_documentos": grupos_documentos,
+        },
+    )
+
+
+@login_required
+@requiere_escritura
+def estado_sire(request):
+    """Estado documental del SIRE: propuesta, complemento y constancia."""
+    empresa = empresa_actual(request)
+    hoy = date.today()
+    anio = request.POST.get("anio") or request.GET.get("anio") or hoy.year
+    mes = request.POST.get("mes") or request.GET.get("mes") or hoy.month
+    try:
+        anio, mes = int(anio), int(mes)
+    except (TypeError, ValueError):
+        anio, mes = hoy.year, hoy.month
+    if not 2000 <= anio <= 2100:
+        anio = hoy.year
+    if not 1 <= mes <= 12:
+        mes = hoy.month
+
+    if request.method == "POST" and empresa is not None:
+        accion = request.POST.get("accion")
+        registro = request.POST.get("registro") or "RCE"
+        try:
+            if accion == "ajuste":
+                fecha = request.POST.get("fecha") or ""
+                registrar_ajuste(
+                    empresa=empresa,
+                    anio=anio,
+                    mes=mes,
+                    registro=registro,
+                    tipo=request.POST.get("tipo", ""),
+                    documento=request.POST.get("documento", ""),
+                    tipo_doc=request.POST.get("tipo_doc", "OTRO"),
+                    fecha=date.fromisoformat(fecha) if fecha else None,
+                    base=request.POST.get("base") or 0,
+                    igv=request.POST.get("igv") or 0,
+                    total=request.POST.get("total") or None,
+                    motivo=request.POST.get("motivo", ""),
+                    usuario=request.user,
+                )
+                messages.success(
+                    request, "Ajuste registrado. La propuesta queda complementada."
+                )
+            elif accion == "generar":
+                generado = request.POST.get("generado_en") or ""
+                registrar_generacion(
+                    empresa=empresa,
+                    anio=anio,
+                    mes=mes,
+                    registro=registro,
+                    constancia_recepcion=request.POST.get("constancia_recepcion", ""),
+                    numero_operacion=request.POST.get("numero_operacion", ""),
+                    registros=request.POST.get("registros") or 0,
+                    generado_en=(
+                        datetime.fromisoformat(generado) if generado else None
+                    ),
+                    usuario=request.user,
+                )
+                messages.success(
+                    request,
+                    "Constancia registrada. El registro queda GENERADO; revisa si el "
+                    "período está completo antes de cerrarlo.",
+                )
+            else:
+                messages.error(request, "Acción no reconocida.")
+        except (SireError, ValueError) as exc:
+            messages.error(request, str(exc))
+        return redirect(f"{reverse('reportes:estado_sire')}?anio={anio}&mes={mes}")
+
+    resumen = resumen_periodo(empresa, anio, mes) if empresa else None
+    return render(
+        request,
+        "reportes/estado_sire.html",
+        {
+            "anio": anio,
+            "mes": mes,
+            "resumen": resumen,
+            "registros": resumen["registros"] if resumen else [],
         },
     )

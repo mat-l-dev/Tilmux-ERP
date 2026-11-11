@@ -6,7 +6,7 @@ from datetime import date, datetime
 from django.db.models.functions import Coalesce
 from django.urls import reverse
 
-from compras.models import Compra
+from compras.models import Compra, NotaCreditoCompra
 from compras.models_gasto import Gasto
 
 from .sire import _cabecera, _es_fila_total, _normalizar, _numero_validado
@@ -22,7 +22,12 @@ ENCABEZADOS = {
     "total": "total cp",
     "moneda": "moneda",
 }
-TIPOS = {"01": "FACTURA", "03": "BOLETA"}
+TIPOS = {"01": "FACTURA", "03": "BOLETA", "07": "NOTA_CREDITO"}
+ETIQUETAS_TIPO = {
+    "FACTURA": "Factura",
+    "BOLETA": "Boleta",
+    "NOTA_CREDITO": "Nota de crédito",
+}
 
 
 def _texto(valor):
@@ -96,13 +101,41 @@ def comparar_rce(*, filas, empresa, anio, mes):
                                args=[documento.pk]),
             })
 
+    # Las notas de crédito del proveedor van en el RCE como tipo 07, con signo
+    # negativo. Antes quedaban como "solo_archivo" porque no se mapeaban.
+    notas = (
+        NotaCreditoCompra.objects.filter(
+            compra__empresa=empresa, fecha__range=(desde, hasta)
+        )
+        .select_related("compra__proveedor")
+    )
+    for nota in notas:
+        clave = _clave(
+            nota.compra.proveedor.numero_doc,
+            "NOTA_CREDITO",
+            nota.serie,
+            nota.numero,
+        )
+        if not clave or nota.compra.proveedor.tipo_doc != "RUC":
+            omitidos_sistema += 1
+            continue
+        sistema.setdefault(clave, []).append({
+            "fecha": nota.fecha,
+            "total": -nota.total,
+            "url": reverse("compras:detalle", args=[nota.compra_id]),
+        })
+
     resultado = {"solo_archivo": [], "solo_sistema": [], "diferentes": [], "ambiguos": [],
                  "coinciden": 0, "omitidos_archivo": omitidos_archivo, "omitidos_sistema": omitidos_sistema}
     for clave in sorted(archivo.keys() | sistema.keys()):
         externos, internos = archivo.get(clave, []), sistema.get(clave, [])
-        fila = {"ruc": clave[0], "tipo": clave[1], "documento": f"{clave[2]}-{clave[3]}",
-                "archivo": externos[0] if len(externos) == 1 else None,
-                "sistema": internos[0] if len(internos) == 1 else None}
+        fila = {
+            "ruc": clave[0],
+            "tipo": ETIQUETAS_TIPO.get(clave[1], clave[1]),
+            "documento": f"{clave[2]}-{clave[3]}",
+            "archivo": externos[0] if len(externos) == 1 else None,
+            "sistema": internos[0] if len(internos) == 1 else None,
+        }
         if len(externos) > 1 or len(internos) > 1:
             resultado["ambiguos"].append(fila)
         elif not externos:

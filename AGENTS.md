@@ -91,7 +91,7 @@ Fuente: auditoría consolidada 2026-11-10 + confirmación del usuario 09/11.
 | `tesoreria/` | cuentas, movimientos, conciliación |
 | `reportes/` | SIRE, casillas, RCE, EEFF, exportar |
 | `data/` | PCGE 2026 en JSON |
-| `tests/` | 50 archivos `test_*.py` (incluye `test_devolucion_proveedor.py`, `test_restitucion_4411_4419.py` y `test_moneda_extranjera.py`) |
+| `tests/` | 51 archivos `test_*.py` (incluye `test_devolucion_proveedor.py`, `test_restitucion_4411_4419.py`, `test_moneda_extranjera.py` y `test_estados_sire.py`) |
 | `docs/`, `scripts/`, `templates/`, `static/` | documentación, utilidades, UI |
 
 ## 5. Cómo trabajar
@@ -132,7 +132,7 @@ docker rm -f tilmux-test-pg                                 # al terminar
 
 `config/settings.py:25` carga `.env` con `os.environ.setdefault`, así que las
 variables del proceso **sí** ganan. `settings.py:114` aborta si falta
-`DATABASE_URL`. La suite completa (339 tests al 10/11/2026) tarda ~1,5 min.
+`DATABASE_URL`. La suite completa (352 tests al 10/11/2026) tarda ~1,5 min.
 
 ## 7. Convenciones del código
 
@@ -184,8 +184,9 @@ variables del proceso **sí** ganan. `settings.py:114` aborta si falta
   de venta reingresa al promedio, no a la capa PEPS original (P1-1).
 - `contabilidad/impuestos.py:153-241`: `igv_pendiente`/`pagar_igv` miran el libro y
   la casilla 184, no la constancia vigente (P0-5).
-- `reportes/sire.py`: lee solo la primera hoja; no distingue propuesta de
-  definitivo ni exige constancia de recepción (P0-7).
+- `reportes/sire.py` sigue leyendo solo la primera hoja del Excel; los estados
+  nuevos (`reportes/estados_sire.py`) ya separan propuesta, complemento y
+  registro generado con constancia (P0-7).
 - `docker-entrypoint.sh`: `migrate --noinput` al arrancar; en Render Free no hay
   `preDeployCommand`. Un merge a `main` despliega (`render.yaml`).
 - El importador de Excel está suspendido (`core/management/commands/importar_excel.py:250`).
@@ -219,8 +220,8 @@ variables del proceso **sí** ganan. `settings.py:114` aborta si falta
   `astral-sh/setup-uv@v10.3.3`, uv `0.13.7`, `postgres:17.11`.
 - Branch protection en `main`: activa desde el 10/11/2026 con los checks `Ruff`
   e `Invariantes` (strict=false, 0 aprobaciones, sin enforce_admins).
-  Suite local en verde al 10/11/2026: `Ran 339 tests ... OK (skipped=1)`.
-  Serie real de tests: 304 (P0-1) → 317 (P0-2) → 327 (P0-3) → 339 (P0-4). El
+  Suite local en verde al 10/11/2026: `Ran 352 tests ... OK (skipped=1)`.
+  Serie real de tests: 304 (P0-1) → 317 (P0-2) → 327 (P0-3) → 339 (P0-4) → 352 (P0-7). El
   “316” que se reportó en el P0-2 fue un error de conteo; no usarlo.
 
 
@@ -284,7 +285,39 @@ variables del proceso **sí** ganan. `settings.py:114` aborta si falta
   de otro proveedor), devolución a proveedor en FX (P0-2), y venta/cobro/gasto/
   transferencia en USD (decisión de alcance del usuario, 10/11/2026).
 
-## 12. Qué no hacer nunca
+## 12. Estados SIRE (P0-7, implementada 10/11/2026)
+
+- Modelos en `reportes/models.py` (migración `reportes/0001`):
+  `EstadoSIRE` (uno por empresa/período/registro), `PropuestaSIRE` (archivo
+  original, hash SHA-256, fecha de descarga, filas y totales; historial) y
+  `AjusteSIRE` (agregado/excluido con motivo e importes).
+- Servicio `reportes/estados_sire.py`: `registrar_propuesta`, `registrar_ajuste`,
+  `registrar_generacion`, `estado_de`, `resumen_periodo`. Estado derivado:
+  `SIN PROPUESTA` → `PROPUESTA` → `COMPLEMENTADA` → `GENERADO`.
+  `cerrado` **solo** si hay constancia de recepción + N° de operación + fecha/hora
+  + N° de registros. El período solo se cierra con RCE **y** RVIE.
+- Vista `/reportes/sire/` (`reportes:estado_sire`): muestra el estado de ambos
+  registros, los ajustes y dos formularios (complementar / registrar constancia).
+  La carga de la propuesta se hace desde Conciliación SUNAT y ahora persiste el
+  estado. Las migraciones de estado no crean filas al consultar: octubre aparece
+  "SIN PROPUESTA" y **NO cerrado**, nunca "conciliado".
+- `conciliacion_rce` mapea el tipo 07 (nota de crédito del proveedor) contra
+  `NotaCreditoCompra`, con signo negativo y etiqueta "Nota de crédito". Antes
+  salía como "solo_archivo".
+- Validación con los archivos reales de SUNAT (10/11/2026, fuera del repo):
+  RCE setiembre definitivo 4 documentos → base 612,72 / IGV 110,28 / total 783;
+  RVIE octubre export 2 documentos → 1.196,62 / 215,38 / 1.412; RVIE setiembre
+  0 registros; el "Reporte de inconsistencias" se rechaza como propuesta.
+- `MEDIA_ROOT = BASE_DIR / "media"` para el archivo original de la propuesta.
+  **Limitación:** en Render Free el disco es efímero; el archivo se pierde al
+  redesplegar y el hash/estado de la base se conserva. No se commitean archivos
+  SIRE reales ni sus datos.
+- Caso octubre documentado: RCE propuesta 3 documentos por S/ 43, RVIE 2
+  documentos por 1.412, boleta B001-00393302 S/ 198,04 por Complementar (casilla
+  120, sin crédito fiscal; 43 + 198,04 = 241,04 en libros). Sin definitivo ni
+  constancia, el período queda PENDIENTE.
+
+## 13. Qué no hacer nunca
 
 - Mergear o empujar a `main`; crear PR de merge por cuenta propia.
 - Editar migraciones ya aplicadas (crear una nueva).
