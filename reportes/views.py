@@ -48,6 +48,7 @@ from ventas.models import NotaCredito, NotaDebito, Venta
 
 from .casillas import calcular
 from .clientes import nombre_cliente
+from .complementos import compras_no_gravadas, registrar_complemento
 from .conciliacion_documentos import totales_documentales
 from .conciliacion_rce import comparar_rce
 from .estados_sire import (
@@ -57,7 +58,12 @@ from .estados_sire import (
     registrar_propuesta,
     resumen_periodo,
 )
-from .forms import CompararSaldoIGVForm, DeclaracionIGV621Form
+from .forms import (
+    CompararSaldoIGVForm,
+    ComplementoRCEForm,
+    DeclaracionIGV621Form,
+)
+from .models import AjusteSIRE
 from .sire import (
     ArchivoInvalido,
     leer_filas,
@@ -1100,6 +1106,82 @@ def vencimientos(request):
 
 @login_required
 @requiere_escritura
+def complemento_rce(request):
+    """Agrega al RCE una boleta tipo 03 no incluida en la propuesta."""
+    empresa = empresa_actual(request)
+    hoy = date.today()
+    anio = request.POST.get("anio") or request.GET.get("anio") or hoy.year
+    mes = request.POST.get("mes") or request.GET.get("mes") or hoy.month
+    try:
+        anio, mes = int(anio), int(mes)
+    except (TypeError, ValueError):
+        anio, mes = hoy.year, hoy.month
+    if not 2000 <= anio <= 2100:
+        anio = hoy.year
+    if not 1 <= mes <= 12:
+        mes = hoy.month
+
+    if request.method == "POST":
+        formulario = ComplementoRCEForm(request.POST)
+        if empresa is None:
+            messages.error(request, "Configura una empresa antes de complementar.")
+        elif formulario.is_valid():
+            datos = formulario.cleaned_data
+            try:
+                ajuste = registrar_complemento(
+                    empresa=empresa,
+                    anio=anio,
+                    mes=mes,
+                    tipo_doc=datos["tipo_doc"],
+                    serie=datos["serie"],
+                    numero=datos["numero"],
+                    ruc_emisor=datos["ruc_emisor"],
+                    razon_social=datos["razon_social"],
+                    fecha=datos["fecha"],
+                    total=datos["total"],
+                    clasif_tabla23=datos["clasif_tabla23"],
+                    motivo=datos["motivo"],
+                    usuario=request.user,
+                )
+            except SireError as exc:
+                messages.error(request, str(exc))
+            else:
+                messages.success(
+                    request,
+                    f"Complemento registrado con CAR {ajuste.car}. "
+                    "El RCE queda COMPLEMENTADO y el importe va a la casilla 120.",
+                )
+                return redirect(
+                    f"{reverse('reportes:estado_sire')}?anio={anio}&mes={mes}"
+                )
+        else:
+            for errores in formulario.errors.values():
+                for error in errores:
+                    messages.error(request, error)
+    else:
+        formulario = ComplementoRCEForm(
+            initial={
+                "fecha": date(anio, mes, calendar.monthrange(anio, mes)[1]),
+            }
+        )
+    return render(
+        request,
+        "reportes/complemento_rce.html",
+        {
+            "anio": anio,
+            "mes": mes,
+            "formulario": formulario,
+            "casilla120": (
+                compras_no_gravadas(empresa=empresa, anio=anio, mes=mes)
+                if empresa
+                else None
+            ),
+        },
+    )
+
+
+@login_required
+@requiere_escritura
 def estado_sire(request):
     """Estado documental del SIRE: propuesta, complemento y constancia."""
     empresa = empresa_actual(request)
@@ -1166,6 +1248,20 @@ def estado_sire(request):
         return redirect(f"{reverse('reportes:estado_sire')}?anio={anio}&mes={mes}")
 
     resumen = resumen_periodo(empresa, anio, mes) if empresa else None
+    casilla120 = (
+        compras_no_gravadas(empresa=empresa, anio=anio, mes=mes) if empresa else None
+    )
+    complementos = (
+        AjusteSIRE.objects.filter(
+            estado__empresa=empresa,
+            estado__anio=anio,
+            estado__mes=mes,
+            estado__registro="RCE",
+            car__gt="",
+        ).order_by("-creado")
+        if empresa
+        else []
+    )
     return render(
         request,
         "reportes/estado_sire.html",
@@ -1174,5 +1270,7 @@ def estado_sire(request):
             "mes": mes,
             "resumen": resumen,
             "registros": resumen["registros"] if resumen else [],
+            "casilla120": casilla120,
+            "complementos": complementos,
         },
     )

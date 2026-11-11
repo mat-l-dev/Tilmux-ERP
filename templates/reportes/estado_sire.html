@@ -64,6 +64,14 @@
   </p>
   {% endif %}
 
+  {% if fila.registro == "RCE" and casilla120 %}
+  <dl class="datos">
+    <div><dt>Compras no gravadas (casilla 120)</dt><dd class="num">S/ {{ casilla120.total|floatformat:2 }}</dd></div>
+    <div><dt>Propuesta + complementos</dt><dd class="num">S/ {{ casilla120.propuesta|floatformat:2 }} + S/ {{ casilla120.complementos|floatformat:2 }}</dd></div>
+  </dl>
+  <p class="preview-note">La boleta tipo 03 no da crédito fiscal (RS 007-99, art. 4.3.2): su importe va a la casilla 120, nunca a la 107/108, y no mueve el IGV ni la renta.</p>
+  {% endif %}
+
   {% if fila.estado == "GENERADO" %}
   <dl class="datos">
     <div><dt>Constancia de recepción</dt><dd>{{ fila.obj.constancia_recepcion }}</dd></div>
@@ -77,13 +85,15 @@
   <p class="preview-title">Complementos de la propuesta</p>
   <div class="tabla-scroll">
   <table class="tabla-doc">
-    <thead><tr><th>Tipo</th><th>Comprobante</th><th>Fecha</th><th class="der">Base</th><th class="der">IGV</th><th class="der">Total</th><th>Motivo</th></tr></thead>
+    <thead><tr><th>Tipo</th><th>CAR</th><th>Comprobante</th><th>Fecha</th><th class="der">No gravado</th><th class="der">Base</th><th class="der">IGV</th><th class="der">Total</th><th>Motivo</th></tr></thead>
     <tbody>
       {% for ajuste in fila.ajustes %}
       <tr>
         <td>{{ ajuste.get_tipo_display }}</td>
+        <td class="muted">{{ ajuste.car|default:"—" }}</td>
         <td>{{ ajuste.documento }}</td>
         <td>{{ ajuste.fecha|date:"d/m/Y"|default:"—" }}</td>
+        <td class="num der">{{ ajuste.no_gravado|floatformat:2 }}</td>
         <td class="num der">{{ ajuste.base|floatformat:2 }}</td>
         <td class="num der">{{ ajuste.igv|floatformat:2 }}</td>
         <td class="num der">{{ ajuste.total|floatformat:2 }}</td>
@@ -93,6 +103,12 @@
     </tbody>
   </table>
   </div>
+  {% endif %}
+
+  {% if fila.registro == "RCE" and fila.propuesta and not fila.cerrado %}
+  <p style="margin-top:10px">
+    <a class="btn btn-ghost" href="{% url 'reportes:complemento_rce' %}?anio={{ anio }}&mes={{ mes }}">Complementar una boleta no propuesta</a>
+  </p>
   {% endif %}
 
   {% if fila.propuesta and not fila.cerrado %}

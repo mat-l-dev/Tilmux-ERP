@@ -110,6 +110,51 @@ class AjusteSIRE(models.Model):
     tipo = models.CharField(max_length=8, choices=Tipo.choices)
     documento = models.CharField(max_length=60)
     tipo_doc = models.CharField(max_length=8, default="OTRO")
+    car = models.CharField(
+        max_length=27,
+        blank=True,
+        default="",
+        help_text=(
+            "Código de anotación del RCE: RUC (11) + tipo (2) + serie (4) + "
+            "número a 10 dígitos. Obligatorio en los complementos."
+        ),
+    )
+    ruc_emisor = models.CharField(max_length=11, blank=True, default="")
+    razon_social = models.CharField(max_length=200, blank=True, default="")
+    serie = models.CharField(max_length=4, blank=True, default="")
+    numero = models.CharField(max_length=10, blank=True, default="")
+    no_gravado = models.DecimalField(
+        max_digits=18,
+        decimal_places=2,
+        default=0,
+        help_text="Importe a compras no gravadas (casilla 120). En una boleta tipo 03 es el total.",
+    )
+    moneda = models.CharField(max_length=3, default="PEN")
+    tipo_cambio = models.DecimalField(
+        max_digits=12,
+        decimal_places=3,
+        default=0,
+        help_text="En soles va 0,000; no 1,000.",
+    )
+    fecha_vencimiento = models.DateField(null=True, blank=True)
+    clasif_tabla23 = models.CharField(
+        max_length=2,
+        blank=True,
+        default="",
+        help_text="Clasificación de la Tabla 23; 5 = otros gastos no incluidos en el numeral 4.",
+    )
+    anio_documento = models.CharField(
+        max_length=4,
+        blank=True,
+        default="",
+        help_text="En blanco para anotación individual.",
+    )
+    numero_final = models.CharField(
+        max_length=10,
+        blank=True,
+        default="",
+        help_text="En blanco para anotación individual.",
+    )
     fecha = models.DateField(null=True, blank=True)
     base = models.DecimalField(max_digits=18, decimal_places=2, default=0)
     igv = models.DecimalField(max_digits=18, decimal_places=2, default=0)
@@ -128,6 +173,13 @@ class AjusteSIRE(models.Model):
         verbose_name = "ajuste SIRE"
         verbose_name_plural = "ajustes SIRE"
         ordering = ["-creado", "-pk"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["estado", "car"],
+                condition=~models.Q(car=""),
+                name="ajuste_sire_car_unico",
+            )
+        ]
 
     def __str__(self) -> str:
         return f"{self.get_tipo_display()} · {self.documento}"
