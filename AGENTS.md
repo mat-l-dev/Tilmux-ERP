@@ -132,7 +132,7 @@ docker rm -f tilmux-test-pg                                 # al terminar
 
 `config/settings.py:25` carga `.env` con `os.environ.setdefault`, así que las
 variables del proceso **sí** ganan. `settings.py:114` aborta si falta
-`DATABASE_URL`. La suite completa (365 tests al 11/11/2026) tarda ~1,5 min.
+`DATABASE_URL`. La suite completa (372 tests al 11/11/2026) tarda ~1,5 min.
 
 ## 7. Convenciones del código
 
@@ -223,8 +223,8 @@ variables del proceso **sí** ganan. `settings.py:114` aborta si falta
   `astral-sh/setup-uv@v10.3.3`, uv `0.13.7`, `postgres:17.11`.
 - Branch protection en `main`: activa desde el 10/11/2026 con los checks `Ruff`
   e `Invariantes` (strict=false, 0 aprobaciones, sin enforce_admins).
-  Suite local en verde al 11/11/2026: `Ran 365 tests ... OK (skipped=1)`.
-  Serie real de tests: 304 (P0-1) → 317 (P0-2) → 327 (P0-3) → 339 (P0-4) → 352 (P0-7) → 360 (P0-8) → 365 (P0-5). El
+  Suite local en verde al 11/11/2026: `Ran 372 tests ... OK (skipped=1)`.
+  Serie real de tests: 304 (P0-1) → 317 (P0-2) → 327 (P0-3) → 339 (P0-4) → 352 (P0-7) → 360 (P0-8) → 365 (P0-5) → 372 (RVIE 0). El
   “316” que se reportó en el P0-2 fue un error de conteo; no usarlo.
 
 
@@ -315,6 +315,12 @@ variables del proceso **sí** ganan. `settings.py:114` aborta si falta
   **Limitación:** en Render Free el disco es efímero; el archivo se pierde al
   redesplegar y el hash/estado de la base se conserva. No se commitean archivos
   SIRE reales ni sus datos.
+- **0 registros (implementado 11/11/2026):** `reportes.sire.sin_registros()`
+  separa "archivo con cabecera y sin filas" de "archivo ilegible". La
+  conciliación muestra chip neutro "Sin comprobantes" y su propio mensaje,
+  `cuadra` queda en `False` (no hay importes que comparar) y la propuesta se
+  registra con `filas=0`. Con al menos una fila, la validación de RUC y período
+  sigue estricta; un archivo de 0 bytes sigue siendo ilegible.
 - Caso octubre documentado: RCE propuesta 3 documentos por S/ 43, RVIE 2
   documentos por 1.412, boleta B001-00393302 S/ 198,04 por Complementar (casilla
   120, sin crédito fiscal; 43 + 198,04 = 241,04 en libros). Sin definitivo ni

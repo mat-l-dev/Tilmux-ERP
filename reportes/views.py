@@ -58,7 +58,15 @@ from .estados_sire import (
     resumen_periodo,
 )
 from .forms import CompararSaldoIGVForm, DeclaracionIGV621Form
-from .sire import ArchivoInvalido, leer_filas, moneda_verificada_soles, sumar, validar_contexto, verificar_registro
+from .sire import (
+    ArchivoInvalido,
+    leer_filas,
+    moneda_verificada_soles,
+    sin_registros,
+    sumar,
+    validar_contexto,
+    verificar_registro,
+)
 from .utils import FiltroReporteError, filtros_seguros, rango
 from .vencimientos import panel_vencimientos
 
@@ -938,6 +946,7 @@ def conciliacion_archivo(request):
         else:
             try:
                 filas = leer_filas(archivo)
+                archivo_sin_registros = sin_registros(filas)
                 contexto_archivo = validar_contexto(filas, ruc=empresa.ruc, anio=anio, mes=mes)
                 registro_verificado = verificar_registro(filas, registro=registro)
                 totales = sumar(filas)
@@ -986,6 +995,7 @@ def conciliacion_archivo(request):
                     "columnas": totales["columnas"],
                     "contexto_archivo": contexto_archivo,
                     "registro_verificado": registro_verificado,
+                    "sin_registros": archivo_sin_registros,
                     "sunat_base": totales["base"],
                     "sunat_igv": totales["igv"],
                     "sunat_total": totales["total"],
@@ -1036,6 +1046,14 @@ def conciliacion_archivo(request):
                         "omitidos_sistema",
                     )):
                         resultado["cuadra"] = False
+
+                resultado["estado"] = (
+                    "sin_registros"
+                    if resultado["sin_registros"]
+                    else "cuadra"
+                    if resultado["cuadra"]
+                    else "revisar"
+                )
 
     documentos = resultado.get("documentos") if resultado else None
     grupos_documentos = [

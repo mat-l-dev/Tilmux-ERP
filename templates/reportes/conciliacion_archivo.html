@@ -40,8 +40,8 @@
 <section class="card">
   <header class="card-head">
     <h2>{{ resultado.etiqueta }} · {{ mes }}/{{ anio }}</h2>
-    <span class="chip {% if resultado.cuadra %}chip-ok{% else %}chip-warn{% endif %}">
-      {% if resultado.cuadra %}Importes coinciden{% else %}Requiere revisión{% endif %}
+    <span class="chip {% if resultado.sin_registros %}{% elif resultado.cuadra %}chip-ok{% else %}chip-warn{% endif %}">
+      {% if resultado.sin_registros %}Sin comprobantes{% elif resultado.cuadra %}Importes coinciden{% else %}Requiere revisión{% endif %}
     </span>
   </header>
 
@@ -51,7 +51,9 @@
     Columnas detectadas: {{ resultado.columnas|join:", " }}.
   </p>
   <p class="preview-note">Los totales no demuestran por sí solos que cada comprobante coincida. Revisa también el detalle documental cuando esté disponible.</p>
-  {% if not resultado.contexto_archivo.ruc or not resultado.contexto_archivo.periodo %}
+  {% if resultado.sin_registros %}
+  <p class="preview-note">El archivo no tiene comprobantes para el período (0 registros). Es un resultado válido si el registro está vacío; no hay importes que comparar.</p>
+  {% elif not resultado.contexto_archivo.ruc or not resultado.contexto_archivo.periodo %}
   <p class="preview-note">No se pudo verificar automáticamente el RUC o el período del archivo. Confírmalos antes de usar esta comparación.</p>
   {% endif %}
   {% if not resultado.registro_verificado %}<p class="preview-note">No se pudo identificar automáticamente si el archivo es RCE o RVIE. Confirma el registro en SUNAT; los importes se muestran para revisión.</p>{% endif %}
