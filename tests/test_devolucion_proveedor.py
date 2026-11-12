@@ -17,7 +17,7 @@ from inventario.models import CapaFIFO, ConsumoCapa, MovimientoStock
 from reportes.casillas import calcular
 from tesoreria.models import MovimientoTesoreria
 
-from .test_invariantes import BaseContable
+from .test_invariantes import BaseContable, importes_por_cuenta
 
 
 class DevolucionProveedorTest(BaseContable):
@@ -51,7 +51,7 @@ class DevolucionProveedorTest(BaseContable):
 
         # 1) El asiento revierte deuda, inventario e IGV, y no es una reversión interna.
         asiento = Asiento.objects.get(origen_tipo="DEVOLUCION_COMPRA", origen_id=nota.pk)
-        importes = {linea.cuenta.codigo: (linea.debe, linea.haber) for linea in asiento.lineas.all()}
+        importes = importes_por_cuenta(asiento)
         self.assertEqual(importes["4212"], (Decimal("118.00"), Decimal("0.00")))
         self.assertEqual(importes["20111"], (Decimal("0.00"), Decimal("100.00")))
         self.assertEqual(importes["40111"], (Decimal("0.00"), Decimal("18.00")))

@@ -15,7 +15,7 @@ from tesoreria.restituciones import (
 )
 from tesoreria.servicios import registrar
 
-from .test_invariantes import BaseContable
+from .test_invariantes import BaseContable, importes_por_cuenta
 
 
 class RestitucionSocioTest(BaseContable):
@@ -74,7 +74,7 @@ class RestitucionSocioTest(BaseContable):
 
         self.assertEqual(saldo_obligacion(self.empresa, "PRESTAMO_SOCIO"), Decimal("0.00"))
         asiento = Asiento.objects.get(tipo_operacion="RESTITUCION_SOCIO", origen_id=restitucion.pk)
-        importes = {linea.cuenta.codigo: (linea.debe, linea.haber) for linea in asiento.lineas.all()}
+        importes = importes_por_cuenta(asiento)
         self.assertEqual(importes["4411"], (Decimal("500.00"), Decimal("0.00")))
         self.assertEqual(importes["1061"], (Decimal("0.00"), Decimal("500.00")))
         self.assertNotIn("4212", importes)
@@ -99,7 +99,7 @@ class RestitucionSocioTest(BaseContable):
 
         self.assertEqual(saldo_obligacion(self.empresa, "REEMBOLSO_SOCIO"), Decimal("0.00"))
         asiento = restitucion.asiento
-        importes = {linea.cuenta.codigo: (linea.debe, linea.haber) for linea in asiento.lineas.all()}
+        importes = importes_por_cuenta(asiento)
         self.assertEqual(importes["4419"], (Decimal("39.00"), Decimal("0.00")))
         self.assertEqual(importes["1061"], (Decimal("0.00"), Decimal("39.00")))
         self.assertNotIn("4212", importes)

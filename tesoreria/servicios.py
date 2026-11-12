@@ -127,6 +127,16 @@ def transferir(
             "aún no están disponibles."
         )
 
+    from .subcuentas import subcuenta_de
+
+    subcuenta_origen = subcuenta_de(origen)
+    subcuenta_destino = subcuenta_de(destino)
+    if subcuenta_origen.pk == subcuenta_destino.pk:
+        raise ContabilidadError(
+            "Cada cuenta bancaria necesita una subcuenta contable distinta bajo la "
+            "1061; revisa la configuración de las cuentas de tesorería."
+        )
+
     MovimientoTesoreria.objects.create(
         empresa=empresa,
         cuenta=origen,
@@ -152,6 +162,6 @@ def transferir(
         glosa=concepto,
         montos=Montos(total=importe),
         origen_tipo="TRANSFERENCIA",
-        cuenta_medio=origen.cuenta_contable,
-        cuenta_destino=destino.cuenta_contable,
+        cuenta_medio=subcuenta_origen,
+        cuenta_destino=subcuenta_destino,
     )

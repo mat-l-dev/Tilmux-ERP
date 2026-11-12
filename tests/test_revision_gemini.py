@@ -15,11 +15,11 @@ class ValidacionesRevisionTest(SimpleTestCase):
         self.empresa = SimpleNamespace(pk=1)
         self.origen = SimpleNamespace(
             pk=1, empresa_id=1, activa=True, cuenta_contable_id=1,
-            cuenta_contable=object(), moneda="PEN", nombre="Origen",
+            cuenta_contable=SimpleNamespace(pk=101, codigo="106101"), moneda="PEN", nombre="Origen",
         )
         self.destino = SimpleNamespace(
             pk=2, empresa_id=1, activa=True, cuenta_contable_id=2,
-            cuenta_contable=object(), moneda="PEN", nombre="Destino",
+            cuenta_contable=SimpleNamespace(pk=102, codigo="106102"), moneda="PEN", nombre="Destino",
         )
 
     def transferencia(self, importe):
