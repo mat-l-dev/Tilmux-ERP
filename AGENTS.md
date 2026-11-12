@@ -104,7 +104,7 @@ Fuente: auditoría consolidada 2026-11-10 + confirmaciones del usuario 09/11,
 | `tesoreria/` | cuentas, movimientos, conciliación |
 | `reportes/` | SIRE, casillas, RCE, EEFF, exportar |
 | `data/` | PCGE 2026 en JSON |
-| `tests/` | 55 archivos `test_*.py` (incluye `test_devolucion_proveedor.py`, `test_restitucion_4411_4419.py`, `test_moneda_extranjera.py`, `test_estados_sire.py` y `test_vencimientos.py`) |
+| `tests/` | 56 archivos `test_*.py` (incluye `test_devolucion_proveedor.py`, `test_restitucion_4411_4419.py`, `test_moneda_extranjera.py`, `test_estados_sire.py` y `test_vencimientos.py`) |
 | `docs/`, `scripts/`, `templates/`, `static/` | documentación, utilidades, UI |
 
 ## 5. Cómo trabajar
@@ -145,7 +145,7 @@ docker rm -f tilmux-test-pg                                 # al terminar
 
 `config/settings.py:25` carga `.env` con `os.environ.setdefault`, así que las
 variables del proceso **sí** ganan. `settings.py:114` aborta si falta
-`DATABASE_URL`. La suite completa (398 tests al 12/11/2026) tarda ~1,5 min.
+`DATABASE_URL`. La suite completa (403 tests al 12/11/2026) tarda ~1,5 min.
 
 ## 7. Convenciones del código
 
@@ -239,8 +239,8 @@ variables del proceso **sí** ganan. `settings.py:114` aborta si falta
   `astral-sh/setup-uv@v10.3.3`, uv `0.13.7`, `postgres:17.11`.
 - Branch protection en `main`: activa desde el 10/11/2026 con los checks `Ruff`
   e `Invariantes` (strict=false, 0 aprobaciones, sin enforce_admins).
-  Suite local en verde al 12/11/2026: `Ran 398 tests ... OK (skipped=1)`.
-  Serie real de tests: 304 (P0-1) → 317 (P0-2) → 327 (P0-3) → 339 (P0-4) → 352 (P0-7) → 360 (P0-8) → 365 (P0-5) → 372 (RVIE 0) → 381 (P0-5b) → 389 (P1-1) → 397 (P1-6) → 398 (P1-6 ajuste). El
+  Suite local en verde al 12/11/2026: `Ran 403 tests ... OK (skipped=1)`.
+  Serie real de tests: 304 (P0-1) → 317 (P0-2) → 327 (P0-3) → 339 (P0-4) → 352 (P0-7) → 360 (P0-8) → 365 (P0-5) → 372 (RVIE 0) → 381 (P0-5b) → 389 (P1-1) → 397 (P1-6) → 398 (P1-6 ajuste) → 403 (P1-9). El
   “316” que se reportó en el P0-2 fue un error de conteo; no usarlo.
 
 
@@ -500,7 +500,35 @@ variables del proceso **sí** ganan. `settings.py:114` aborta si falta
   transferencias conciliadas, pantalla con subcuenta y saldo, y reclasificación
   histórica idempotente.
 
-## 18. Qué no hacer nunca
+## 18. Cobros: histórico y reparto FIFO en cuotas (P1-9, implementada 12/11/2026)
+
+- **Hallazgo:** `servicios_cobro.cobrar_venta` bloqueaba cualquier cobro si existía
+  un `MovimientoTesoreria` con `origen_tipo="VENTA"` (histórico, sin vínculo a
+  cuotas), y la asignación exigía que el cobro completo cupiera en **una** cuota.
+- **Histórico:** `saldo_pendiente` ahora descuenta esos movimientos de ingreso
+  (son dinero real que entró por la venta) y ya no bloquean. Los cobros nuevos
+  usan `origen_tipo="COBRO_VENTA"`, así que no se cuentan dos veces.
+- **Reparto FIFO:** si no se indica cuota, `cobrar_venta` crea una fila
+  `CobroVenta` por tramo, en orden `vencimiento, numero`, hasta agotar el
+  importe; la última cuota puede quedar parcial y si sobra dinero queda una
+  fila sin cuota. Con cuota explícita se conserva el comportamiento anterior
+  (una sola cuota, sin exceder lo pactado).
+- **Manual:** `asignar_automaticamente=False` deja el cobro sin cuota para
+  asignarlo después (usado por los tests de asignación manual).
+- **Sobre-cobro:** se valida contra `saldo_pendiente` **antes** de crear filas,
+  movimientos o asientos; no deja efectos.
+- **Movimiento y asiento:** se registra **uno** por el total del cobro, ligado
+  a la primera fila; las filas suman el mismo total. No se agregó modelo ni
+  migración: la fila de `CobroVenta` es la unidad de asignación auditable.
+- `asignacion_cobros.asignar_cobro` tampoco se bloquea por el movimiento
+  histórico; sigue validando el movimiento y asiento del cobro que se asigna.
+- Tests `tests/test_cobro_cuotas_fifo.py` (5): reparto FIFO en 3 cuotas con
+  última parcial, cobro exacto en una cuota, sobre-cobro sin efectos, histórico
+  que reduce el saldo y no bloquea, y no autoasignación si hay cobros previos
+  sin cuota. Se actualizaron dos tests de `test_cobros_ventas.py` a la conducta
+  nueva.
+
+## 19. Qué no hacer nunca
 
 - Mergear o empujar a `main`; crear PR de merge por cuenta propia.
 - Editar migraciones ya aplicadas (crear una nueva).
