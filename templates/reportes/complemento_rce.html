@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block titulo %}Complementar RCE{% endblock %}
+{% block titulo_pagina %}Complementar el RCE{% endblock %}
+
+{% block contenido %}
+{% include "reportes/_tabs.html" %}
+
+<section class="card">
+  <header class="card-head">
+    <h2>Boleta tipo 03 no incluida en la propuesta</h2>
+    <span class="chip">Período {{ mes }}/{{ anio }}</span>
+  </header>
+  <p class="preview-note">
+    La boleta de venta electrónica (tipo 03) no se incluye en la propuesta del
+    RCE por diseño (Tabla 11 del Anexo 1 de la RS 040-2022) y se incorpora por
+    <strong>Complementar</strong>. Una boleta <strong>no da crédito fiscal</strong>
+    (RS 007-99, art. 4.3.2): todo el importe va a compras no gravadas
+    (casilla 120, Valor Adq No Grav), con base gravada e IGV en 0,00.
+  </p>
+  <dl class="datos">
+    <div><dt>Compras no gravadas del período (casilla 120)</dt><dd class="num"><strong>S/ {{ casilla120.total|floatformat:2 }}</strong></dd></div>
+    <div><dt>Propuesta + complementos</dt><dd class="num">S/ {{ casilla120.propuesta|floatformat:2 }} + S/ {{ casilla120.complementos|floatformat:2 }}</dd></div>
+  </dl>
+  <p class="preview-note">
+    Este flujo registra el complemento documental del SIRE con su CAR; no
+    registra pagos, asientos, ni mueve el IGV a pagar o la renta RER.
+  </p>
+</section>
+
+<section class="card" style="margin-top:12px">
+  <header class="card-head"><h2>Datos de la boleta</h2></header>
+  <form method="post" class="filtro">
+    {% csrf_token %}
+    <input type="hidden" name="anio" value="{{ anio }}">
+    <input type="hidden" name="mes" value="{{ mes }}">
+    {% for campo in formulario %}
+    <label class="field">
+      <span>{{ campo.label }}</span>
+      {{ campo }}
+      {% if campo.help_text %}<small>{{ campo.help_text }}</small>{% endif %}
+      {% if campo.errors %}<small class="message error">{{ campo.errors }}</small>{% endif %}
+    </label>
+    {% endfor %}
+    <button type="submit" class="btn btn-primary">Registrar complemento</button>
+  </form>
+  <p class="preview-note">
+    CAR del RCE: RUC 11 + tipo 2 + serie 4 + número a 10 dígitos (27 caracteres).
+    Para la boleta B001-00393302 de Mercadolibre Perú S.R.L. (RUC 20605980008)
+    el CAR es <strong>2060598000803B0010000393302</strong>.
+  </p>
+</section>
+{% endblock %}

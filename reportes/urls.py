@@ -17,6 +17,7 @@ urlpatterns = [
     path("conciliacion/", views.conciliacion, name="conciliacion"),
     path("conciliacion/archivo/", views.conciliacion_archivo, name="conciliacion_archivo"),
     path("sire/", views.estado_sire, name="estado_sire"),
+    path("sire/complemento/", views.complemento_rce, name="complemento_rce"),
     path("vencimientos/", views.vencimientos, name="vencimientos"),
     path("inventario/", views.inventario, name="inventario"),
     path("kardex/<int:pk>/", views.kardex, name="kardex"),

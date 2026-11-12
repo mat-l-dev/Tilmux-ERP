@@ -67,3 +67,73 @@ class DeclaracionIGV621Form(forms.ModelForm):
         if None not in (c140, c145, c184) and c140 - c145 != c184:
             raise forms.ValidationError("La casilla 184 debe ser igual a la 140 menos la 145; revisa la constancia.")
         return datos
+
+
+class ComplementoRCEForm(forms.Form):
+    """Boleta tipo 03 que no va en la propuesta y se incorpora al RCE."""
+
+    tipo_doc = forms.ChoiceField(
+        label="Tipo de comprobante",
+        choices=[("03", "Boleta de venta electrónica (tipo 03)")],
+        initial="03",
+    )
+    ruc_emisor = forms.CharField(
+        label="RUC del emisor",
+        max_length=11,
+        min_length=11,
+        widget=forms.TextInput(attrs={"inputmode": "numeric"}),
+    )
+    razon_social = forms.CharField(label="Razón social del emisor", max_length=200)
+    serie = forms.CharField(label="Serie", max_length=4, min_length=4)
+    numero = forms.CharField(
+        label="Número",
+        max_length=20,
+        help_text="Como figura en la boleta; el CAR lo lleva a 10 dígitos.",
+    )
+    fecha = forms.DateField(
+        label="Fecha de emisión",
+        widget=forms.DateInput(attrs={"type": "date"}),
+    )
+    total = forms.DecimalField(
+        label="Total de la boleta (S/)",
+        max_digits=18,
+        decimal_places=2,
+        min_value=Decimal("0.01"),
+        help_text="Todo el importe va a compras no gravadas (casilla 120).",
+    )
+    clasif_tabla23 = forms.CharField(
+        label="Clasificación Tabla 23",
+        max_length=2,
+        initial="5",
+        help_text="5 = otros gastos no incluidos en el numeral 4 (comisiones y envío).",
+    )
+    motivo = forms.CharField(
+        label="Motivo del complemento",
+        max_length=300,
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 2}),
+    )
+
+    def clean_ruc_emisor(self):
+        valor = "".join(c for c in self.cleaned_data["ruc_emisor"] if c.isdigit())
+        if len(valor) != 11:
+            raise forms.ValidationError("El RUC del emisor debe tener 11 dígitos.")
+        return valor
+
+    def clean_serie(self):
+        valor = (self.cleaned_data["serie"] or "").strip().upper()
+        if len(valor) != 4 or not valor.isalnum():
+            raise forms.ValidationError("La serie debe tener 4 caracteres, por ejemplo B001.")
+        return valor
+
+    def clean_numero(self):
+        valor = "".join(c for c in self.cleaned_data["numero"] if c.isdigit())
+        if not 1 <= len(valor) <= 10:
+            raise forms.ValidationError("El número debe tener entre 1 y 10 dígitos.")
+        return valor
+
+    def clean_clasif_tabla23(self):
+        valor = (self.cleaned_data["clasif_tabla23"] or "5").strip()
+        if not valor.isdigit():
+            raise forms.ValidationError("La clasificación de la Tabla 23 debe ser numérica.")
+        return valor[:2]

@@ -91,7 +91,7 @@ Fuente: auditoría consolidada 2026-11-10 + confirmación del usuario 09/11.
 | `tesoreria/` | cuentas, movimientos, conciliación |
 | `reportes/` | SIRE, casillas, RCE, EEFF, exportar |
 | `data/` | PCGE 2026 en JSON |
-| `tests/` | 52 archivos `test_*.py` (incluye `test_devolucion_proveedor.py`, `test_restitucion_4411_4419.py`, `test_moneda_extranjera.py`, `test_estados_sire.py` y `test_vencimientos.py`) |
+| `tests/` | 53 archivos `test_*.py` (incluye `test_devolucion_proveedor.py`, `test_restitucion_4411_4419.py`, `test_moneda_extranjera.py`, `test_estados_sire.py` y `test_vencimientos.py`) |
 | `docs/`, `scripts/`, `templates/`, `static/` | documentación, utilidades, UI |
 
 ## 5. Cómo trabajar
@@ -132,7 +132,7 @@ docker rm -f tilmux-test-pg                                 # al terminar
 
 `config/settings.py:25` carga `.env` con `os.environ.setdefault`, así que las
 variables del proceso **sí** ganan. `settings.py:114` aborta si falta
-`DATABASE_URL`. La suite completa (372 tests al 11/11/2026) tarda ~1,5 min.
+`DATABASE_URL`. La suite completa (381 tests al 11/11/2026) tarda ~1,5 min.
 
 ## 7. Convenciones del código
 
@@ -223,8 +223,8 @@ variables del proceso **sí** ganan. `settings.py:114` aborta si falta
   `astral-sh/setup-uv@v10.3.3`, uv `0.13.7`, `postgres:17.11`.
 - Branch protection en `main`: activa desde el 10/11/2026 con los checks `Ruff`
   e `Invariantes` (strict=false, 0 aprobaciones, sin enforce_admins).
-  Suite local en verde al 11/11/2026: `Ran 372 tests ... OK (skipped=1)`.
-  Serie real de tests: 304 (P0-1) → 317 (P0-2) → 327 (P0-3) → 339 (P0-4) → 352 (P0-7) → 360 (P0-8) → 365 (P0-5) → 372 (RVIE 0). El
+  Suite local en verde al 11/11/2026: `Ran 381 tests ... OK (skipped=1)`.
+  Serie real de tests: 304 (P0-1) → 317 (P0-2) → 327 (P0-3) → 339 (P0-4) → 352 (P0-7) → 360 (P0-8) → 365 (P0-5) → 372 (RVIE 0) → 381 (P0-5b). El
   “316” que se reportó en el P0-2 fue un error de conteo; no usarlo.
 
 
@@ -383,7 +383,39 @@ variables del proceso **sí** ganan. `settings.py:114` aborta si falta
   constancia antes de pagar. `test_revision_gemini.py` sigue verde porque los
   rechazos ocurren antes de tocar la base.
 
-## 15. Qué no hacer nunca
+## 15. Complemento del RCE (P0-5b, implementada 11/11/2026)
+
+- `reportes/complementos.py`: `car_sunat()`, `registrar_complemento()` y
+  `compras_no_gravadas()`. El CAR del RCE es RUC 11 + tipo 2 + serie 4 + número
+  a 10 dígitos (27); para la boleta B001-00393302 de Mercadolibre Perú S.R.L.
+  (RUC 20605980008) da **2060598000803B0010000393302**.
+- La boleta tipo 03 **no va en la propuesta** (Tabla 11, Anexo 1, RS 040-2022)
+  y se incorpora por **Complementar**. **No da crédito fiscal** (RS 007-99, art.
+  4.3.2): todo el importe va a **compras no gravadas (casilla 120, Valor Adq No
+  Grav)**, con base e IGV en 0,00. El servicio **rechaza** base 167,83 o IGV
+  30,21 con error explícito; solo acepta tipo 03.
+- Al registrar: `AjusteSIRE` (migración `reportes/0002`) guarda CAR, RUC emisor,
+  razón social, serie, número, no gravado, moneda PEN, **tipo de cambio 0,000**,
+  fecha de vencimiento igual a la de emisión, clasificación **Tabla 23 = 5**
+  (otros gastos no incluidos en el numeral 4) y **Año / Nro Final en blanco**
+  (anotación individual). Restricción `ajuste_sire_car_unico` impide duplicados.
+- La fecha debe pertenecer al período; se exige propuesta previa y registro no
+  cerrado (reutiliza `registrar_ajuste`). El estado del RCE pasa a
+  **COMPLEMENTADA**.
+- `compras_no_gravadas()` calcula la casilla 120 como no gravado de la propuesta
+  (43,00) + complementos (198,04) = **241,04**. No crea asientos ni movimientos:
+  no mueve el crédito fiscal, el IGV a pagar ni la renta RER.
+- Pantalla `/reportes/sire/complemento/` (`reportes:complemento_rce`), enlazada
+  desde el estado SIRE; la tarjeta del RCE muestra el CAR, el no gravado y la
+  casilla 120. Registro documental del SIRE: **no registra el gasto contable**;
+  si la boleta debe ir a libros, eso se hace por el flujo de gastos con su
+  propio sustento.
+- Tests `tests/test_complemento_rce.py` (9): CAR exacto y de 27 caracteres,
+  rechazo de base/IGV/tipo/fecha/duplicado, datos guardados (0,000, Tabla 23,
+  Año y Nro Final vacíos), estado COMPLEMENTADA, casilla 120 en 241,04, sin
+  asientos ni movimientos, y la pantalla.
+
+## 16. Qué no hacer nunca
 
 - Mergear o empujar a `main`; crear PR de merge por cuenta propia.
 - Editar migraciones ya aplicadas (crear una nueva).
