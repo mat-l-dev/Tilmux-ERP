@@ -208,6 +208,17 @@ class VentaLinea(models.Model):
     total = models.DecimalField(max_digits=18, decimal_places=2, default=0)
     costo_unitario = models.DecimalField(max_digits=24, decimal_places=10, default=0)
     costo_total = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    movimiento_stock = models.ForeignKey(
+        "inventario.MovimientoStock",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="lineas_venta",
+        help_text=(
+            "Salida PEPS de esta línea. Sus consumos permiten devolver la nota "
+            "de crédito a las capas originales."
+        ),
+    )
 
     class Meta:
         verbose_name = "línea de venta"
@@ -262,6 +273,10 @@ class NotaCredito(models.Model):
 
 
 class NotaCreditoLinea(models.Model):
+    class OrigenCosto(models.TextChoices):
+        PEPS = "PEPS", "PEPS (capas originales)"
+        PROMEDIO = "PROMEDIO", "Promedio (venta sin detalle)"
+
     nota = models.ForeignKey(
         NotaCredito, on_delete=models.CASCADE, related_name="lineas"
     )
@@ -273,11 +288,56 @@ class NotaCreditoLinea(models.Model):
     igv = models.DecimalField(max_digits=18, decimal_places=2, default=0)
     total = models.DecimalField(max_digits=18, decimal_places=2, default=0)
     costo_total = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    origen_costo = models.CharField(
+        max_length=10,
+        choices=OrigenCosto.choices,
+        default=OrigenCosto.PEPS,
+        help_text=(
+            "PEPS cuando se restauraron las capas originales; PROMEDIO cuando la "
+            "venta no tiene detalle de consumo y se usó el promedio como respaldo."
+        ),
+    )
 
     class Meta:
         verbose_name = "línea de nota de crédito"
         verbose_name_plural = "líneas de nota de crédito"
         ordering = ["nota", "id"]
+
+
+class RestitucionCapa(models.Model):
+    """Trazabilidad de las capas que devolvió una línea de nota de crédito."""
+
+    nota_linea = models.ForeignKey(
+        NotaCreditoLinea, on_delete=models.CASCADE, related_name="restituciones"
+    )
+    capa = models.ForeignKey(
+        "inventario.CapaFIFO", on_delete=models.PROTECT, related_name="restituciones"
+    )
+    capa_restaurada = models.ForeignKey(
+        "inventario.CapaFIFO",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="origen_restitucion",
+        help_text="Capa nueva creada con el costo original.",
+    )
+    cantidad = models.DecimalField(max_digits=18, decimal_places=4)
+    costo_unitario = models.DecimalField(max_digits=24, decimal_places=10)
+    costo_total = models.DecimalField(max_digits=18, decimal_places=2)
+
+    class Meta:
+        verbose_name = "restitución de capa"
+        verbose_name_plural = "restitución de capas"
+        ordering = ["nota_linea", "id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(cantidad__gt=0),
+                name="restitucion_cantidad_positiva",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.cantidad} de capa {self.capa_id}"
 
 
 class NotaDebito(models.Model):
