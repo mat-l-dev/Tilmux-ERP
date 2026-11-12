@@ -39,16 +39,29 @@ código verificado, vale el código y se anota aquí y en el reporte.
 
 ## 3. Datos verificados (no inventar ni dar por pagados)
 
-Fuente: auditoría consolidada 2026-11-10 + confirmación del usuario 09/11.
+Fuente: auditoría consolidada 2026-11-10 + confirmaciones del usuario 09/11,
+10/11 y 12/11/2026.
 
 - Ventas octubre: BI 1.196,62 / IGV 215,38 / total 1.412,00. Renta RER 17,95.
 - IGV octubre: libros 105,38 (215,38 − 110); declaración en enteros 105.
   Crédito fiscal octubre **0**. Casilla 120: 43 por propuesta CSV; 241,04 en
-  libros con la boleta complementada. **Sin pagar al 09/11/2026.**
+  libros con la boleta complementada. **Declarado y pagado el 11/11/2026**
+  (ver PDT y go-live abajo).
 - Saldo a favor setiembre: 110 enteros (constancia 1211949769, PDT total S/ 0),
   **no** 110,28. El crédito de octubre es 110, no 110,28.
-- PDT 621 octubre: **no declarado**, vence 17/11/2026. SIRE octubre: **no
-  generado**, vence 16/11/2026. SIRE vence un día antes que el PDT.
+- PDT 621 octubre: **declarado y pagado el 11/11/2026**. Constancia de
+  declaración N.º de Orden **1215236278**, total **S/ 123** = IGV **S/ 105**
+  (boleta de pago Formulario 1662, Orden **1215236292**) + renta RER **S/ 18**
+  (Formulario 1662, Orden **1215236865**); operación SUNAT **7859744286**,
+  pagada con tarjeta débito BCP de la empresa. SIRE octubre: **no generado ni
+  validado** (definitivos pendientes), vence 16/11/2026. SIRE vence un día antes
+  que el PDT.
+- **Go-live pendiente (no registrar sin los documentos a la mano):** cargar en
+  el ERP la constancia 621 vigente con sus casillas, el pago del IGV de S/ 105
+  ligado a ella, la renta de S/ 18, el complemento de la boleta B001-00393302 y
+  las restituciones. Hasta entonces el ERP muestra ese período como pendiente:
+  no es que falten datos, es que **aún no se registraron** (decisión del
+  usuario, 12/11/2026).
 - S/ 500 préstamo socio (4411): **NO restituido**. EXP-002 dice RESTITUIDO
   08/10/2026 y es **falso** (confirmado por el usuario). Sin voucher. No marcar
   pagado. EXP-001 son otros S/ 500 (capital inicial en BBVA), no confundir.
@@ -352,6 +365,10 @@ variables del proceso **sí** ganan. `settings.py:114` aborta si falta
 - Tests `tests/test_vencimientos.py` (8): octubre en cero con los tres en rojo,
   SIRE generado, declaración registrada, pago del IGV, vencimiento al 18/11,
   período sin fechas, caja y vista/panel.
+- **Octubre ya pagado en SUNAT, pendiente en el ERP:** el PDT se declaró y pagó
+  el 11/11/2026, pero el panel lo seguirá mostrando PENDIENTE hasta que se
+  registren la constancia vigente y el pago en el ERP (go-live). No es un error
+  del panel: refleja que el dato aún no está cargado.
 
 ## 14. IGV contra la constancia (P0-5, implementada 11/11/2026)
 
@@ -379,8 +396,12 @@ variables del proceso **sí** ganan. `settings.py:114` aborta si falta
   formulario pide las casillas nuevas. `impuestos.html` muestra la constancia
   vigente, sus casillas, el redondeo y los pagos ligados.
 - Caso octubre verificado: constancia 140=215, 145=110, 184=**105**; libro
-  **105,38**; `redondeo_deuda = −0,38`; pendiente y pago máximo **105**. Sigue
-  sin declarar ni pagar al 11/11/2026: no se registró nada real.
+  **105,38**; `redondeo_deuda = −0,38`; pendiente y pago máximo **105**. El PDT
+  fue **declarado y pagado el 11/11/2026** (constancia 1215236278: IGV 105 +
+  renta 18), pero **no está registrado en el ERP**: no se creó ningún
+  `PagoIGV621` real. Queda como go-live pendiente (§3); hasta entonces
+  `igv_pendiente` sigue mostrando la estimación del libro y `pagar_igv` sigue
+  exigiendo una constancia vigente cargada.
 - Tests: 5 nuevos en `tests/test_declaracion_621.py` (10 en total) y ajustes en
   `tests/test_auditoria_p0.py` y `tests/test_vencimientos.py` para registrar la
   constancia antes de pagar. `test_revision_gemini.py` sigue verde porque los
