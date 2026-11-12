@@ -43,17 +43,24 @@ def _siguiente_codigo(version: str) -> str:
     return f"{PADRE}{siguiente:02d}"
 
 
-def subcuenta_de(cuenta) -> Cuenta:
-    """Devuelve la subcuenta de la cuenta bancaria, creándola si no existe.
+def subcuenta_de(cuenta) -> Cuenta | None:
+    """Devuelve la subcuenta contable que corresponde a la cuenta de tesorería.
 
-    Es determinista: la primera vez crea el siguiente código libre bajo 1061 y
-    lo guarda en la cuenta de tesorería; las siguientes veces devuelve el mismo.
+    Solo las cuentas cuya cuenta contable es la **1061** (cuentas bancarias)
+    reciben una subcuenta bajo esa familia. Una billetera (Mercado Pago, 1031),
+    una caja (101) o cualquier otra cuenta devuelven su propia cuenta contable,
+    sin crear cuentas ni reapuntar ``CuentaTesoreria.cuenta_contable``.
     """
     actual = cuenta.cuenta_contable
-    if actual is not None and len(actual.codigo) == 6 and actual.codigo.startswith(PADRE) and actual.codigo != PADRE:
+    if actual is None:
+        return None
+    if actual.codigo == PADRE:
+        version = actual.version
+    elif len(actual.codigo) == 6 and actual.codigo.startswith(PADRE):
+        return actual
+    else:
         return actual
 
-    version = actual.version if actual is not None else "2026"
     padre = _padre(version)
     codigo = _siguiente_codigo(version)
     subcuenta = Cuenta.objects.create(
@@ -85,8 +92,10 @@ def saldo_tesoreria(empresa, cuenta, hasta=None) -> Decimal:
 
 
 def saldo_contable(empresa, cuenta, hasta=None) -> Decimal:
-    """Saldo deudor de la subcuenta contable del banco."""
+    """Saldo deudor de la cuenta contable propia del banco, billetera o caja."""
     subcuenta = subcuenta_de(cuenta)
+    if subcuenta is None:
+        return CERO
     lineas = AsientoLinea.objects.filter(
         asiento__empresa=empresa,
         asiento__estado=Asiento.Estado.CONFIRMADO,
@@ -114,6 +123,8 @@ def reclasificar_historico(empresa, fecha) -> list[dict]:
         "cuenta_contable"
     ):
         subcuenta = subcuenta_de(cuenta)
+        if subcuenta is None:
+            continue
         padre = _padre(subcuenta.version)
         en_tesoreria = saldo_tesoreria(empresa, cuenta)
         en_contabilidad = saldo_contable(empresa, cuenta, hasta=fecha)
