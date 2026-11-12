@@ -22,6 +22,7 @@ from .models import (
     NotaCredito,
     NotaCreditoLinea,
     NotaDebito,
+    RestitucionCapa,
     Venta,
     VentaLinea,
 )
@@ -145,7 +146,10 @@ def confirmar(venta: Venta) -> Venta:
         )
         linea.costo_unitario = movimiento.costo_unitario
         linea.costo_total = movimiento.costo_total
-        linea.save(update_fields=["costo_unitario", "costo_total"])
+        linea.movimiento_stock = movimiento
+        linea.save(
+            update_fields=["costo_unitario", "costo_total", "movimiento_stock"]
+        )
         costo_venta += movimiento.costo_total
 
     venta.subtotal = base
@@ -191,6 +195,44 @@ def confirmar(venta: Venta) -> Venta:
 
     logger.info("venta confirmada %s-%s total=%s", venta.serie, venta.numero, total)
     return venta
+
+
+def _plan_restauracion_peps(linea: VentaLinea, desde: Decimal, cantidad: Decimal):
+    """Capas a restaurar en el mismo orden en que se consumieron.
+
+    ``desde`` son las unidades que ya se devolvieron antes (con reingreso de
+    stock); ``cantidad`` es lo que devuelve esta nota. Devuelve ``None`` cuando
+    la venta no tiene detalle de consumo (venta histórica) o el detalle no
+    alcanza, para que el llamador use el promedio y lo marque como respaldo.
+    """
+    movimiento = linea.movimiento_stock
+    if movimiento is None:
+        return None
+    consumos = list(movimiento.consumos.select_related("capa").order_by("id"))
+    if not consumos:
+        return None
+    total_consumido = sum((consumo.cantidad for consumo in consumos), Decimal("0"))
+    if total_consumido < desde + cantidad:
+        return None
+
+    plan = []
+    saltar = desde
+    tomar = cantidad
+    for consumo in consumos:
+        if tomar <= 0:
+            break
+        if saltar >= consumo.cantidad:
+            saltar -= consumo.cantidad
+            continue
+        disponible = consumo.cantidad - saltar
+        toma = min(disponible, tomar)
+        costo = _cent(toma * consumo.costo_unitario)
+        plan.append((consumo.capa, toma, costo))
+        tomar -= toma
+        saltar = Decimal("0")
+    if tomar > 0:
+        return None
+    return plan
 
 
 @transaction.atomic
@@ -264,16 +306,31 @@ def emitir_nota_credito(
         base = (linea.base * proporcion_acumulada).quantize(CENT) - (anterior.get("base_acreditada") or Decimal("0"))
         igv = (linea.igv * proporcion_acumulada).quantize(CENT) - (anterior.get("igv_acreditado") or Decimal("0"))
         costo = Decimal("0.00")
+        origen_costo = NotaCreditoLinea.OrigenCosto.PEPS
+        plan = None
         if reingresa_stock:
-            costo_acumulado = (linea.costo_total * proporcion_acumulada).quantize(CENT)
-            if anterior.get("cantidad_sin_reingreso"):
-                costo_anterior = (linea.costo_total * cantidad_anterior / linea.cantidad).quantize(CENT)
+            restituido = (
+                NotaCreditoLinea.objects.filter(
+                    venta_linea=linea, nota__reingresa_stock=True
+                ).aggregate(s=Sum("cantidad"))["s"]
+                or Decimal("0")
+            )
+            plan = _plan_restauracion_peps(linea, restituido, pedida)
+            if plan is None:
+                costo_acumulado = (linea.costo_total * proporcion_acumulada).quantize(CENT)
+                if anterior.get("cantidad_sin_reingreso"):
+                    costo_anterior = (linea.costo_total * cantidad_anterior / linea.cantidad).quantize(CENT)
+                else:
+                    costo_anterior = anterior.get("costo_reingresado") or Decimal("0")
+                costo = costo_acumulado - costo_anterior
+                origen_costo = NotaCreditoLinea.OrigenCosto.PROMEDIO
             else:
-                costo_anterior = anterior.get("costo_reingresado") or Decimal("0")
-            costo = costo_acumulado - costo_anterior
+                costo = sum((fila[2] for fila in plan), Decimal("0.00"))
         if base < 0 or igv < 0 or costo < 0:
             raise VentaError("Las notas anteriores exceden el importe proporcional; revisa el historial de la venta.")
-        seleccion.append((linea, pedida, base, igv, base + igv, costo))
+        seleccion.append(
+            (linea, pedida, base, igv, base + igv, costo, origen_costo, plan)
+        )
         base_total += base
         igv_total += igv
         costo_total += costo
@@ -295,8 +352,8 @@ def emitir_nota_credito(
         reingresa_stock=reingresa_stock,
     )
 
-    for linea, pedida, base, igv, total, costo in seleccion:
-        NotaCreditoLinea.objects.create(
+    for linea, pedida, base, igv, total, costo, origen_costo, plan in seleccion:
+        linea_nota = NotaCreditoLinea.objects.create(
             nota=nota,
             venta_linea=linea,
             cantidad=pedida,
@@ -304,8 +361,12 @@ def emitir_nota_credito(
             igv=igv,
             total=total,
             costo_total=costo,
+            origen_costo=origen_costo,
         )
-        if reingresa_stock:
+        if not reingresa_stock:
+            continue
+        if plan is None:
+            # Venta histórica sin detalle de capas: promedio, marcado en la línea.
             costo_unitario = (costo / pedida).quantize(PRECISION_COSTO, rounding=ROUND_HALF_UP)
             if _cent(costo_unitario * pedida) != costo:
                 raise VentaError("El costo de la devolución no se puede representar con la precisión disponible.")
@@ -318,6 +379,26 @@ def emitir_nota_credito(
                 origen_tipo="NOTA_CREDITO",
                 origen_id=nota.pk,
                 glosa=f"Devolución {serie}-{numero}",
+            )
+            continue
+        for capa, toma, costo_toma in plan:
+            capa_restaurada = entrar(
+                empresa=venta.empresa,
+                producto=linea.producto,
+                fecha=fecha,
+                cantidad=toma,
+                costo_unitario=capa.costo_unitario,
+                origen_tipo="NOTA_CREDITO",
+                origen_id=nota.pk,
+                glosa=f"Devolución {serie}-{numero} · capa {capa.pk}",
+            )
+            RestitucionCapa.objects.create(
+                nota_linea=linea_nota,
+                capa=capa,
+                capa_restaurada=capa_restaurada,
+                cantidad=toma,
+                costo_unitario=capa.costo_unitario,
+                costo_total=costo_toma,
             )
 
     postear(

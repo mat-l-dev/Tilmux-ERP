@@ -91,7 +91,7 @@ Fuente: auditoría consolidada 2026-11-10 + confirmación del usuario 09/11.
 | `tesoreria/` | cuentas, movimientos, conciliación |
 | `reportes/` | SIRE, casillas, RCE, EEFF, exportar |
 | `data/` | PCGE 2026 en JSON |
-| `tests/` | 53 archivos `test_*.py` (incluye `test_devolucion_proveedor.py`, `test_restitucion_4411_4419.py`, `test_moneda_extranjera.py`, `test_estados_sire.py` y `test_vencimientos.py`) |
+| `tests/` | 54 archivos `test_*.py` (incluye `test_devolucion_proveedor.py`, `test_restitucion_4411_4419.py`, `test_moneda_extranjera.py`, `test_estados_sire.py` y `test_vencimientos.py`) |
 | `docs/`, `scripts/`, `templates/`, `static/` | documentación, utilidades, UI |
 
 ## 5. Cómo trabajar
@@ -132,7 +132,7 @@ docker rm -f tilmux-test-pg                                 # al terminar
 
 `config/settings.py:25` carga `.env` con `os.environ.setdefault`, así que las
 variables del proceso **sí** ganan. `settings.py:114` aborta si falta
-`DATABASE_URL`. La suite completa (381 tests al 11/11/2026) tarda ~1,5 min.
+`DATABASE_URL`. La suite completa (389 tests al 12/11/2026) tarda ~1,5 min.
 
 ## 7. Convenciones del código
 
@@ -180,8 +180,11 @@ variables del proceso **sí** ganan. `settings.py:114` aborta si falta
   otro proveedor) y compras en moneda extranjera (P0-4); tampoco admite fechas
   fuera de orden. El RCE revierte por `fecha_anotacion` o fecha de la nota en
   `reportes/casillas.py`, `registro_compras` y el CSV (tipo 07, signo negativo).
-- `inventario/servicios.py:139` guarda costo unitario **promedio** al salir: la NC
-  de venta reingresa al promedio, no a la capa PEPS original (P1-1).
+- **NC de venta a capas originales (P1-1, implementada 12/11/2026):**
+  `VentaLinea.movimiento_stock` guarda la salida PEPS de la línea y
+  `ConsumoCapa` qué capas consumió. La NC reingresa a la **primera capa
+  consumida**, no al promedio, y guarda `RestitucionCapa`. Las ventas sin
+  detalle usan el promedio marcado como `origen_costo=PROMEDIO`. Ver §16.
 - **IGV contra la constancia (P0-5, implementada):** `igv_pendiente` usa la
   casilla 184 de la constancia **vigente** cuando existe (enteros); sin
   constancia devuelve la estimación del libro, que ya no habilita el pago.
@@ -223,8 +226,8 @@ variables del proceso **sí** ganan. `settings.py:114` aborta si falta
   `astral-sh/setup-uv@v10.3.3`, uv `0.13.7`, `postgres:17.11`.
 - Branch protection en `main`: activa desde el 10/11/2026 con los checks `Ruff`
   e `Invariantes` (strict=false, 0 aprobaciones, sin enforce_admins).
-  Suite local en verde al 11/11/2026: `Ran 381 tests ... OK (skipped=1)`.
-  Serie real de tests: 304 (P0-1) → 317 (P0-2) → 327 (P0-3) → 339 (P0-4) → 352 (P0-7) → 360 (P0-8) → 365 (P0-5) → 372 (RVIE 0) → 381 (P0-5b). El
+  Suite local en verde al 12/11/2026: `Ran 389 tests ... OK (skipped=1)`.
+  Serie real de tests: 304 (P0-1) → 317 (P0-2) → 327 (P0-3) → 339 (P0-4) → 352 (P0-7) → 360 (P0-8) → 365 (P0-5) → 372 (RVIE 0) → 381 (P0-5b) → 389 (P1-1). El
   “316” que se reportó en el P0-2 fue un error de conteo; no usarlo.
 
 
@@ -415,7 +418,37 @@ variables del proceso **sí** ganan. `settings.py:114` aborta si falta
   Año y Nro Final vacíos), estado COMPLEMENTADA, casilla 120 en 241,04, sin
   asientos ni movimientos, y la pantalla.
 
-## 16. Qué no hacer nunca
+## 16. NC de venta a capas PEPS originales (P1-1, implementada 12/11/2026)
+
+- **Investigación:** el sistema **sí** guardaba qué capas consumió cada salida
+  (`inventario.ConsumoCapa`, creado en `salir()`), pero la línea de venta no
+  apuntaba a su movimiento (la salida usaba `origen_tipo="VENTA"`,
+  `origen_id=venta.pk`, ambiguo con varias líneas del mismo producto) y la NC
+  ignoraba ese detalle: calculaba el costo como **promedio proporcional** de
+  `linea.costo_total`.
+- **Modelo (migración `ventas/0010`):** `VentaLinea.movimiento_stock` (FK a la
+  salida PEPS, se guarda al confirmar), `NotaCreditoLinea.origen_costo`
+  (`PEPS`/`PROMEDIO`) y `RestitucionCapa` (capa original, capa restaurada,
+  cantidad y costo). `ConsumoCapa` no se tocó.
+- **`_plan_restauracion_peps()`** en `ventas/servicios.py`: recorre los consumos
+  en orden y salta las unidades ya devueltas con reingreso (solo NC con
+  `reingresa_stock=True`), para que cada devolución parcial tome la siguiente
+  capa. Costo por tramo con redondeo a centavos, igual que `salir()`.
+- **Devolución:** una entrada por capa restaurada, con el **costo original** de
+  esa capa; el asiento `NOTA_CREDITO` usa la suma restaurada (D 20111 / H 69121).
+  Una sola capa da el mismo resultado que antes (promedio = original).
+- **Fallback:** si la venta no tiene `movimiento_stock` o no tiene consumos,
+  se usa el promedio proporcional, la línea queda `origen_costo=PROMEDIO` y la
+  vista muestra un aviso. No es silencioso.
+- **Límite:** la cantidad devuelta no puede superar lo vendido (validación que
+  ya existía por línea y notas previas).
+- **Aceptación (test):** venta de 2u con capas 274,58 y 338,14; devolver 1u
+  reingresa a **274,58**, no a 306,36. Segunda devolución: 338,14 (suma 612,72).
+- Tests `tests/test_nc_venta_peps.py` (8): venta guarda consumos, ejemplo
+  exacto, parcial en orden, total, una capa, sin detalle marcado como fallback,
+  asiento con costo restaurado y tope de cantidad.
+
+## 17. Qué no hacer nunca
 
 - Mergear o empujar a `main`; crear PR de merge por cuenta propia.
 - Editar migraciones ya aplicadas (crear una nueva).

@@ -408,6 +408,15 @@ def nota_credito(request, pk: int):
                 messages.error(request, str(exc))
             else:
                 messages.success(request, f"Nota de crédito {nota} registrada.")
+                if nota.lineas.filter(
+                    origen_costo=NotaCreditoLinea.OrigenCosto.PROMEDIO
+                ).exists():
+                    messages.warning(
+                        request,
+                        "La devolución usó el costo promedio porque la venta no "
+                        "tiene detalle de capas (venta histórica). Revisa el costo "
+                        "antes de cerrar el período.",
+                    )
                 return redirect("ventas:detalle", venta.pk)
 
     return render(
