@@ -35,10 +35,6 @@ def asignar_cobro(*, venta, cobro_id, cuota_id, usuario):
         raise VentaError("Este cobro ya tiene otra cuota asignada y no se puede cambiar aquí.")
     if venta.notas_credito.exists() or venta.notas_debito.exists():
         raise VentaError("La venta tiene notas; la asignación necesita revisión antes de continuar.")
-    if MovimientoTesoreria.objects.filter(
-        empresa=venta.empresa, origen_tipo="VENTA", origen_id=venta.pk, tipo="INGRESO",
-    ).exists():
-        raise VentaError("La venta tiene un cobro histórico adicional que necesita revisión.")
     movimientos = list(MovimientoTesoreria.objects.filter(
         empresa=venta.empresa, origen_tipo="COBRO_VENTA", origen_id=cobro.pk,
     ))

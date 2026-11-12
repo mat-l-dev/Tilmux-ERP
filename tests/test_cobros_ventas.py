@@ -85,7 +85,7 @@ class CobrosVentaTest(BaseContable):
         otra_cuota = CuotaVenta.objects.create(venta=otra_venta, numero=1, vencimiento=date(2026, 12, 20), importe=118)
         with self.assertRaisesMessage(VentaError, "cuota no pertenece"):
             self.cobrar("10", cuota=otra_cuota)
-        self.cobrar("10")
+        self.cobrar("10", asignar_automaticamente=False)
         with self.assertRaisesMessage(VentaError, "cobros sin asignar"):
             self.cobrar("10", cuota=self.venta.cuotas.get())
         self.assertEqual(self.venta.cobros.count(), 1)
@@ -99,7 +99,7 @@ class CobrosVentaTest(BaseContable):
 
     def test_asigna_cobro_existente_sin_crear_otro_movimiento(self):
         usuario = get_user_model().objects.create_user(username="asignador")
-        cobro = self.cobrar("50")
+        cobro = self.cobrar("50", asignar_automaticamente=False)
         cuota = self.venta.cuotas.get()
         movimientos = MovimientoTesoreria.objects.count()
         asientos = Asiento.objects.count()
@@ -115,7 +115,7 @@ class CobrosVentaTest(BaseContable):
 
     def test_no_asigna_con_nota_periodo_cerrado_o_movimiento_inconsistente(self):
         usuario = get_user_model().objects.create_user(username="revisor")
-        cobro = self.cobrar("50")
+        cobro = self.cobrar("50", asignar_automaticamente=False)
         cuota = self.venta.cuotas.get()
         kwargs = {"venta": self.venta, "cobro_id": cobro.pk, "cuota_id": cuota.pk, "usuario": usuario}
         movimiento = MovimientoTesoreria.objects.get(origen_tipo="COBRO_VENTA", origen_id=cobro.pk)
@@ -141,7 +141,7 @@ class CobrosVentaTest(BaseContable):
 
     def test_no_asigna_un_cobro_mayor_a_cuota_ni_cuota_de_otra_venta(self):
         usuario = get_user_model().objects.create_user(username="asignacion_limites")
-        cobro = self.cobrar("50")
+        cobro = self.cobrar("50", asignar_automaticamente=False)
         cuota = self.venta.cuotas.get()
         cuota.importe = Decimal("40")
         cuota.save(update_fields=["importe"])
@@ -157,7 +157,7 @@ class CobrosVentaTest(BaseContable):
     def test_pantalla_exige_confirmacion_para_asignar(self):
         usuario = get_user_model().objects.create_superuser(username="asignador_web", password="test")
         self.client.force_login(usuario)
-        cobro = self.cobrar("50")
+        cobro = self.cobrar("50", asignar_automaticamente=False)
         cuota = self.venta.cuotas.get()
         url = reverse("ventas:asignar_cuota", args=[self.venta.pk, cobro.pk])
         self.assertContains(self.client.get(url), "no registra otra entrada de dinero")
@@ -179,7 +179,7 @@ class CobrosVentaTest(BaseContable):
             self.cobrar("1")
         self.assertFalse(self.venta.cobros.exists())
 
-    def test_bloquea_movimiento_historico_ya_vinculado(self):
+    def test_movimiento_historico_no_bloquea_y_reduce_el_saldo(self):
         MovimientoTesoreria.objects.create(
             empresa=self.empresa,
             cuenta=self.bbva,
@@ -189,8 +189,10 @@ class CobrosVentaTest(BaseContable):
             origen_tipo="VENTA",
             origen_id=self.venta.pk,
         )
-        with self.assertRaisesMessage(VentaError, "requiere revisión"):
-            self.cobrar("10")
+        self.assertEqual(saldo_pendiente(self.venta), Decimal("108"))
+        cobro = self.cobrar("50")
+        self.assertEqual(saldo_pendiente(self.venta), Decimal("58"))
+        self.assertEqual(cobro.cuota_id, self.venta.cuotas.get().pk)
 
     def test_nota_posterior_a_cobro_muestra_saldo_a_favor(self):
         self.cobrar("50")
