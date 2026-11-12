@@ -14,7 +14,7 @@ from core.models import TipoCambio
 from inventario.models import CapaFIFO
 from tesoreria.models import MovimientoTesoreria
 
-from .test_invariantes import BaseContable
+from .test_invariantes import BaseContable, importes_por_cuenta
 
 
 class MonedaExtranjeraTest(BaseContable):
@@ -79,7 +79,7 @@ class MonedaExtranjeraTest(BaseContable):
         self.assertEqual(capa.costo_unitario, Decimal("292.5400000000"))
 
         asiento = Asiento.objects.get(origen_tipo="COMPRA", origen_id=compra.pk)
-        importes = {linea.cuenta.codigo: (linea.debe, linea.haber) for linea in asiento.lineas.all()}
+        importes = importes_por_cuenta(asiento)
         self.assertEqual(importes["20111"], (Decimal("292.54"), Decimal("0.00")))
         self.assertEqual(importes["40111"], (Decimal("52.66"), Decimal("0.00")))
         self.assertEqual(importes["4212"], (Decimal("0.00"), Decimal("345.20")))
@@ -103,7 +103,7 @@ class MonedaExtranjeraTest(BaseContable):
         self.assertTrue(compra.pagada)
 
         asiento = Asiento.objects.get(origen_tipo="COMPRA_PAGO", origen_id=compra.pk)
-        importes = {linea.cuenta.codigo: (linea.debe, linea.haber) for linea in asiento.lineas.all()}
+        importes = importes_por_cuenta(asiento)
         self.assertEqual(importes["4212"], (Decimal("345.20"), Decimal("0.00")))
         self.assertEqual(importes["6761"], (Decimal("4.80"), Decimal("0.00")))
         self.assertEqual(importes["1061"], (Decimal("0.00"), Decimal("350.00")))
@@ -163,7 +163,7 @@ class MonedaExtranjeraTest(BaseContable):
         self.assertEqual(compra.revaluacion, Decimal("2.40"))
 
         asiento = Asiento.objects.get(origen_tipo="REVALUACION", origen_id=compra.pk)
-        importes = {linea.cuenta.codigo: (linea.debe, linea.haber) for linea in asiento.lineas.all()}
+        importes = importes_por_cuenta(asiento)
         self.assertEqual(importes["6761"], (Decimal("2.40"), Decimal("0.00")))
         self.assertEqual(importes["4212"], (Decimal("0.00"), Decimal("2.40")))
 

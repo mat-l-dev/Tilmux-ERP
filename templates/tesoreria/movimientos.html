@@ -9,7 +9,7 @@
   <p class="preview-note">Los totales son la suma de movimientos registrados en el ERP, antes de aplicar los filtros del historial. No incluyen necesariamente el saldo inicial y no representan un saldo bancario conciliado. Verifica la moneda de los movimientos antiguos.</p>
   {% if filas %}
   <div class="tabla-scroll" tabindex="0" role="region" aria-label="Resumen de movimientos por cuenta"><table class="tabla-doc">
-    <thead><tr><th>Cuenta</th><th>Moneda configurada</th><th class="der">Ingresos</th><th class="der">Egresos</th><th class="der">Neto registrado</th></tr></thead>
+    <thead><tr><th>Cuenta</th><th>Moneda configurada</th><th class="der">Ingresos</th><th class="der">Egresos</th><th class="der">Neto registrado</th><th>Subcuenta contable</th><th class="der">Saldo contable</th></tr></thead>
     <tbody>
       {% for fila in filas %}
       <tr>
@@ -18,6 +18,8 @@
         <td class="num der">{{ fila.ingresos|floatformat:2 }}</td>
         <td class="num der">{{ fila.egresos|floatformat:2 }}</td>
         <td class="num der">{{ fila.neto|floatformat:2 }}</td>
+        <td>{% if fila.subcuenta %}{{ fila.subcuenta.codigo }} · {{ fila.subcuenta.nombre }}{% else %}—{% endif %}</td>
+        <td class="num der">{% if fila.saldo_contable is not None %}S/ {{ fila.saldo_contable|floatformat:2 }}{% else %}—{% endif %}</td>
       </tr>
       {% endfor %}
     </tbody>

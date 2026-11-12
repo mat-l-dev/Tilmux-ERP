@@ -91,7 +91,7 @@ Fuente: auditoría consolidada 2026-11-10 + confirmación del usuario 09/11.
 | `tesoreria/` | cuentas, movimientos, conciliación |
 | `reportes/` | SIRE, casillas, RCE, EEFF, exportar |
 | `data/` | PCGE 2026 en JSON |
-| `tests/` | 54 archivos `test_*.py` (incluye `test_devolucion_proveedor.py`, `test_restitucion_4411_4419.py`, `test_moneda_extranjera.py`, `test_estados_sire.py` y `test_vencimientos.py`) |
+| `tests/` | 55 archivos `test_*.py` (incluye `test_devolucion_proveedor.py`, `test_restitucion_4411_4419.py`, `test_moneda_extranjera.py`, `test_estados_sire.py` y `test_vencimientos.py`) |
 | `docs/`, `scripts/`, `templates/`, `static/` | documentación, utilidades, UI |
 
 ## 5. Cómo trabajar
@@ -132,7 +132,7 @@ docker rm -f tilmux-test-pg                                 # al terminar
 
 `config/settings.py:25` carga `.env` con `os.environ.setdefault`, así que las
 variables del proceso **sí** ganan. `settings.py:114` aborta si falta
-`DATABASE_URL`. La suite completa (389 tests al 12/11/2026) tarda ~1,5 min.
+`DATABASE_URL`. La suite completa (398 tests al 12/11/2026) tarda ~1,5 min.
 
 ## 7. Convenciones del código
 
@@ -226,8 +226,8 @@ variables del proceso **sí** ganan. `settings.py:114` aborta si falta
   `astral-sh/setup-uv@v10.3.3`, uv `0.13.7`, `postgres:17.11`.
 - Branch protection en `main`: activa desde el 10/11/2026 con los checks `Ruff`
   e `Invariantes` (strict=false, 0 aprobaciones, sin enforce_admins).
-  Suite local en verde al 12/11/2026: `Ran 389 tests ... OK (skipped=1)`.
-  Serie real de tests: 304 (P0-1) → 317 (P0-2) → 327 (P0-3) → 339 (P0-4) → 352 (P0-7) → 360 (P0-8) → 365 (P0-5) → 372 (RVIE 0) → 381 (P0-5b) → 389 (P1-1). El
+  Suite local en verde al 12/11/2026: `Ran 398 tests ... OK (skipped=1)`.
+  Serie real de tests: 304 (P0-1) → 317 (P0-2) → 327 (P0-3) → 339 (P0-4) → 352 (P0-7) → 360 (P0-8) → 365 (P0-5) → 372 (RVIE 0) → 381 (P0-5b) → 389 (P1-1) → 397 (P1-6) → 398 (P1-6 ajuste). El
   “316” que se reportó en el P0-2 fue un error de conteo; no usarlo.
 
 
@@ -448,7 +448,38 @@ variables del proceso **sí** ganan. `settings.py:114` aborta si falta
   exacto, parcial en orden, total, una capa, sin detalle marcado como fallback,
   asiento con costo restaurado y tope de cantidad.
 
-## 17. Qué no hacer nunca
+## 17. Subcuentas por banco y transferencias (P1-6, implementada 12/11/2026)
+
+- **Investigación:** el mapeo banco → contabilidad es el FK
+  `catalogo.CuentaTesoreria.cuenta_contable`; `sembrar_base` creaba BBVA y BCP
+  apuntando ambos a **1061**. `transferir()` asentaba D 1061 / H 1061 y el
+  movimiento desaparecía del mayor.
+- **Esquema:** una **divisionaria de 6 dígitos por banco** bajo la 1061
+  (`106101`, `106102`, …), con `padre="1061"`, misma versión/elemento/naturaleza
+  y `admite_movimiento=True`. Es determinista (siguiente sufijo libre) y el
+  total de la 1061 no cambia porque `saldo_cuenta` filtra por `startswith`.
+- **Asignación:** `CuentaTesoreria.save()` asigna la subcuenta al crear/guardar
+  un banco; la migración de datos `contabilidad/0016_subcuentas_bancos` la crea
+  y asigna para las cuentas existentes. Si no hay 1061 cargada, no inventa nada.
+- **Transferencia:** `transferir()` resuelve la subcuenta de origen y destino,
+  bloquea la misma cuenta bancaria y también dos cuentas que compartan la misma
+  subcuenta; asienta **D subcuenta destino / H subcuenta origen**. El mayor de
+  la 1061 agregada no se mueve.
+- **Histórico:** los asientos viejos quedaron en la 1061 y no se editan. El
+  comando `reclasificar_saldos_bancos --fecha AAAA-MM-DD [--aplicar]` calcula la
+  diferencia entre tesorería y subcuenta y crea un asiento de reclasificación
+  por banco (D subcuenta / H 1061 o al revés); es idempotente y por defecto es
+  dry-run. Así cada subcuenta queda igual al saldo de tesorería de su banco.
+- **Pantalla:** `/tesoreria/` agrega la columna "Subcuenta contable" y el "Saldo
+  contable" por banco junto al neto de tesorería.
+- Tests `tests/test_transferencia_bancos.py` (9): subcuentas distintas bajo 1061,
+  saldos iniciales conciliados (BBVA 457,60 / BCP 444,00), transferencia de 200
+  (D subcuenta BCP / H subcuenta BBVA, total 901,60 intacto, saldos 257,60 /
+  644,00), misma cuenta bloqueada, misma subcuenta bloqueada, varias
+  transferencias conciliadas, pantalla con subcuenta y saldo, y reclasificación
+  histórica idempotente.
+
+## 18. Qué no hacer nunca
 
 - Mergear o empujar a `main`; crear PR de merge por cuenta propia.
 - Editar migraciones ya aplicadas (crear una nueva).

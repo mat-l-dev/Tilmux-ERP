@@ -399,7 +399,7 @@ class InvarianteComprobantes(BaseContable):
         )
 
         asiento = Asiento.objects.get(origen_tipo="NOTA_DEBITO", origen_id=nota.pk)
-        importes = {linea.cuenta.codigo: (linea.debe, linea.haber) for linea in asiento.lineas.all()}
+        importes = importes_por_cuenta(asiento)
         self.assertEqual(importes["1212"], (Decimal("118.00"), Decimal("0.00")))
         self.assertEqual(importes["7599"], (Decimal("0.00"), Decimal("100.00")))
         self.assertEqual(importes["40111"], (Decimal("0.00"), Decimal("18.00")))
@@ -524,7 +524,7 @@ class InvariantePagos(BaseContable):
         asiento = Asiento.objects.get(
             origen_tipo="COMPRA_PAGO", origen_id=compra.pk
         )
-        importes = {linea.cuenta.codigo: (linea.debe, linea.haber) for linea in asiento.lineas.all()}
+        importes = importes_por_cuenta(asiento)
         self.assertEqual(importes["4212"], (Decimal("1180.00"), Decimal("0.00")))
         self.assertEqual(importes["1061"], (Decimal("0.00"), Decimal("1180.00")))
 
@@ -632,7 +632,7 @@ class InvarianteRevaluacion(BaseContable):
         self.assertEqual(compra.revaluacion, Decimal("4.80"))
 
         asiento = Asiento.objects.get(origen_tipo="REVALUACION", origen_id=compra.pk)
-        importes = {linea.cuenta.codigo: (linea.debe, linea.haber) for linea in asiento.lineas.all()}
+        importes = importes_por_cuenta(asiento)
         self.assertEqual(importes["6761"][0], Decimal("4.80"))
         self.assertEqual(importes["4212"][1], Decimal("4.80"))
 
@@ -840,3 +840,12 @@ class InvarianteRenta(BaseContable):
 
         self.assertEqual(movimiento.importe, Decimal("15.00"))
         self.assertEqual(saldo_renta(self.empresa, date(2026, 11, 5)), Decimal("0.00"))
+
+def importes_por_cuenta(asiento):
+    """Importes por cuenta; agrupa las subcuentas 1061xx en la 1061."""
+    importes = {}
+    for linea in asiento.lineas.all():
+        codigo = "1061" if linea.cuenta.codigo.startswith("1061") else linea.cuenta.codigo
+        debe, haber = importes.get(codigo, (Decimal("0"), Decimal("0")))
+        importes[codigo] = (debe + linea.debe, haber + linea.haber)
+    return importes

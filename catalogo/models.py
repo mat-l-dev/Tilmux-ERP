@@ -120,6 +120,17 @@ class CuentaTesoreria(models.Model):
             )
         ]
 
+    def save(self, *args, **kwargs):
+        # Cada banco recibe su subcuenta analítica bajo la 1061 al guardarse.
+        if self.tipo == self.Tipo.BANCO:
+            from tesoreria.subcuentas import SubcuentaError, subcuenta_de
+
+            try:
+                self.cuenta_contable = subcuenta_de(self)
+            except SubcuentaError:
+                pass
+        super().save(*args, **kwargs)
+
     def __str__(self) -> str:
         return f"{self.empresa.nombre} · {self.nombre}"
 

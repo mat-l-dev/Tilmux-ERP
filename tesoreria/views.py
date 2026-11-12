@@ -26,6 +26,7 @@ from .forms import (
 from .models import ConciliacionBancaria, MovimientoTesoreria, RestitucionSocio
 from .origenes import enlazar_documentos
 from .restituciones import RestitucionError, obligaciones, reembolsos_registrados, registrar_restitucion
+from .subcuentas import SubcuentaError, saldo_contable, subcuenta_de
 
 
 @login_required
@@ -50,7 +51,23 @@ def movimientos(request):
     for cuenta in cuentas:
         resumen = resumenes.get(cuenta.pk, {})
         ingresos, egresos = resumen.get("ingresos") or Decimal("0"), resumen.get("egresos") or Decimal("0")
-        filas.append({"cuenta": cuenta, "ingresos": ingresos, "egresos": egresos, "neto": ingresos - egresos})
+        subcuenta = None
+        saldo = None
+        if cuenta.tipo == CuentaTesoreria.Tipo.BANCO:
+            try:
+                subcuenta = subcuenta_de(cuenta)
+                saldo = saldo_contable(empresa, cuenta)
+            except SubcuentaError:
+                # Cuenta creada sin PCGE cargado o sin 1061: no inventar subcuenta.
+                subcuenta, saldo = None, None
+        filas.append({
+            "cuenta": cuenta,
+            "ingresos": ingresos,
+            "egresos": egresos,
+            "neto": ingresos - egresos,
+            "subcuenta": subcuenta,
+            "saldo_contable": saldo,
+        })
 
     cuenta_id = request.GET.get("cuenta", "")
     if cuenta_id:
